@@ -1302,9 +1302,10 @@ def login():
                     flash("Usuario desactivado.", "error")
                     return render_template("login.html")
                 session["user_id"] = user["id"]
+                session["role"] = user["role"]  # CRÍTICO: Guardar rol en sesión
                 session.modified = True
                 flash(f"Bienvenido {email}", "success")
-                print(f"[LOGIN] Sesion creada para user_id: {user['id']}")
+                print(f"[LOGIN] Sesion creada para user_id: {user['id']}, role: {user['role']}")
                 return redirect(url_for("index"))
         
         flash("Credenciales inválidas.", "error")
