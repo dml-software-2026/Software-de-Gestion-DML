@@ -33,7 +33,7 @@
             <span class="nav-text">RAYPAC</span>
           </a>
         </li>
-        {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'RAYPAC', 'DML_REPUESTOS'] %}
+        {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'RAYPAC', 'DML_REPUESTOS', 'DML_ST'] %}
         <li class="nav-item">
           <a class="nav-link nav-link-enhanced" href="{{ url_for('envios_list') }}">
             <i class="bi bi-truck"></i>

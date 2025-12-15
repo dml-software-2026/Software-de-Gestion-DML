@@ -2543,7 +2543,7 @@ def ticket_print(numero_ticket):
 
 @app.route("/envios")
 @login_required
-@role_required("ADMIN", "RAYPAC", "DML_REPUESTOS")
+@role_required("ADMIN", "RAYPAC", "DML_REPUESTOS", "DML_ST")
 def envios_list():
     db = get_db()
     envios = db.execute(
@@ -2676,7 +2676,7 @@ def envios_new():
 
 @app.route("/envios/<int:id>")
 @login_required
-@role_required("ADMIN", "RAYPAC", "DML_REPUESTOS")
+@role_required("ADMIN", "RAYPAC", "DML_REPUESTOS", "DML_ST")
 def envios_view(id):
     db = get_db()
     envio = db.execute("SELECT * FROM envios_repuestos WHERE id = ?", (id,)).fetchone()
@@ -2698,7 +2698,7 @@ def envios_view(id):
 
 @app.route("/envios/<int:id>/confirmar", methods=["POST"])
 @login_required
-@role_required("ADMIN", "DML_REPUESTOS")
+@role_required("ADMIN", "DML_REPUESTOS", "DML_ST")
 def envios_confirmar(id):
     user = get_current_user()
     db = get_db()
