@@ -1354,39 +1354,63 @@ def index():
         }
     elif role == "DML_ST":
         # Equipos freezados en RAYPAC (con remito) sin ficha DML creada = pendientes de recepción
-        equipos_pendientes = db.execute("""
-            SELECT COUNT(*) AS total 
-            FROM raypac_entries r 
-            WHERE r.is_frozen = 1 
-            AND r.numero_remito IS NOT NULL 
-            AND NOT EXISTS (SELECT 1 FROM dml_fichas f WHERE f.raypac_id = r.id)
-        """).fetchone()['total']
+        try:
+            equipos_pendientes = db.execute("""
+                SELECT COUNT(*) AS total 
+                FROM raypac_entries r 
+                WHERE r.is_frozen = 1 
+                AND r.numero_remito IS NOT NULL 
+                AND NOT EXISTS (SELECT 1 FROM dml_fichas f WHERE f.raypac_id = r.id)
+            """).fetchone()['total']
+        except:
+            equipos_pendientes = 0
         
         # Tickets sin ficha (pendientes de revisión inicial)
-        tickets_revision_inicial = db.execute("""
-            SELECT COUNT(*) AS total 
-            FROM tickets 
-            WHERE estado = 'ACTIVO' 
-            AND ficha_id IS NULL
-        """).fetchone()['total']
+        try:
+            tickets_revision_inicial = db.execute("""
+                SELECT COUNT(*) AS total 
+                FROM tickets 
+                WHERE estado = 'ACTIVO' 
+                AND ficha_id IS NULL
+            """).fetchone()['total']
+        except:
+            tickets_revision_inicial = 0
         
         # Repuestos que estaban EN FALTA y ahora tienen stock disponible
-        repuestos_disponibles = db.execute("""
-            SELECT COUNT(DISTINCT dr.codigo_repuesto) AS total
-            FROM dml_repuestos dr
-            JOIN dml_fichas f ON f.id = dr.ficha_id
-            JOIN stock_ubicaciones su ON su.codigo_repuesto = dr.codigo_repuesto AND su.ubicacion = 'DML'
-            WHERE dr.en_falta = 1 
-            AND f.is_closed = 0
-            AND su.cantidad >= dr.cantidad_utilizada
-        """).fetchone()['total']
+        try:
+            repuestos_disponibles = db.execute("""
+                SELECT COUNT(DISTINCT dr.codigo_repuesto) AS total
+                FROM dml_repuestos dr
+                JOIN dml_fichas f ON f.id = dr.ficha_id
+                JOIN stock_ubicaciones su ON su.codigo_repuesto = dr.codigo_repuesto AND su.ubicacion = 'DML'
+                WHERE dr.en_falta = 1 
+                AND f.is_closed = 0
+                AND su.cantidad >= dr.cantidad_utilizada
+            """).fetchone()['total']
+        except:
+            repuestos_disponibles = 0
         
         # Envíos de repuestos pendientes de recibir desde RAYPAC
-        envios_repuestos_pendientes = db.execute("""
-            SELECT COUNT(*) AS total 
-            FROM envios_repuestos 
-            WHERE estado_envio = 'ENVIADO' AND is_frozen = 1 AND fecha_recepcion_dml IS NULL
-        """).fetchone()['total']
+        # Verificar si existen las columnas nuevas primero
+        try:
+            columns = db.execute("PRAGMA table_info(envios_repuestos)").fetchall()
+            column_names = [col['name'] for col in columns]
+            
+            if 'estado_envio' in column_names and 'is_frozen' in column_names and 'fecha_recepcion_dml' in column_names:
+                envios_repuestos_pendientes = db.execute("""
+                    SELECT COUNT(*) AS total 
+                    FROM envios_repuestos 
+                    WHERE estado_envio = 'ENVIADO' AND is_frozen = 1 AND fecha_recepcion_dml IS NULL
+                """).fetchone()['total']
+            else:
+                # Fallback para esquema antiguo
+                envios_repuestos_pendientes = db.execute("""
+                    SELECT COUNT(*) AS total 
+                    FROM envios_repuestos 
+                    WHERE estado = 'PENDIENTE'
+                """).fetchone()['total']
+        except:
+            envios_repuestos_pendientes = 0
         
         stats = {
             "tickets_revision_inicial": tickets_revision_inicial,
