@@ -68,9 +68,11 @@
                     <tr>
                         <th>Código</th>
                         <th>Descripción</th>
+                        {% if user.role != 'RAYPAC' %}
                         <th>Cantidad</th>
                         <th>Estado</th>
-                        {% if user.role in ['ADMIN', 'RAYPAC'] %}
+                        {% endif %}
+                        {% if user.role in ['ADMIN', 'DML_ST'] %}
                         <th>Acciones</th>
                         {% endif %}
                     </tr>
@@ -80,6 +82,7 @@
                     <tr>
                         <td><strong>{{ row.codigo_repuesto }}</strong></td>
                         <td><span style="color: black;">{{ row.item or 'N/A' }}</span></td>
+                        {% if user.role != 'RAYPAC' %}
                         <td class="text-center">
                             <strong style="color: black;">{{ row.cantidad }}</strong>
                         </td>
@@ -96,6 +99,7 @@
                             <span class="badge bg-secondary">N/A</span>
                             {% endif %}
                         </td>
+                        {% endif %}
                         {% if user.role in ['ADMIN', 'DML_ST'] %}
                         <td>
                             <a href="{{ url_for('stock_edit', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" class="btn btn-sm btn-primary">Editar</a>
