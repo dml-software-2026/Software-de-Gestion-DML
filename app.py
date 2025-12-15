@@ -341,7 +341,7 @@ def migrate_db():
                 # Eliminar tabla original
                 db.execute("DROP TABLE tickets")
                 
-                # Recrear tabla con ficha_id NULLABLE
+                # Recrear tabla con ficha_id NULLABLE y todas las columnas necesarias
                 db.execute("""
                     CREATE TABLE tickets (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -354,6 +354,21 @@ def migrate_db():
                         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                         raypac_id INTEGER REFERENCES raypac_entries(id),
+                        fecha_ingreso TEXT,
+                        tecnico_responsable TEXT,
+                        observaciones TEXT,
+                        estado_equipo TEXT DEFAULT 'BUENO',
+                        carcaza TEXT DEFAULT 'BUENO',
+                        cubre_feedwheel TEXT DEFAULT 'BUENO',
+                        mango TEXT DEFAULT 'BUENO',
+                        botones TEXT DEFAULT 'BUENO',
+                        motor_arrastre TEXT DEFAULT 'BUENO',
+                        motor_sellado TEXT DEFAULT 'BUENO',
+                        cuchilla TEXT DEFAULT 'BUENO',
+                        servo TEXT DEFAULT 'BUENO',
+                        rueda_arrastre TEXT DEFAULT 'BUENO',
+                        resorte_manija TEXT DEFAULT 'BUENO',
+                        otros TEXT DEFAULT 'BUENO',
                         FOREIGN KEY(ficha_id) REFERENCES dml_fichas(id) ON DELETE CASCADE,
                         UNIQUE(numero_ticket)
                     )
