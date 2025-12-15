@@ -1338,6 +1338,14 @@ def index():
             AND NOT EXISTS (SELECT 1 FROM dml_fichas f WHERE f.raypac_id = r.id)
         """).fetchone()['total']
         
+        # Tickets sin ficha (pendientes de revisión inicial)
+        tickets_revision_inicial = db.execute("""
+            SELECT COUNT(*) AS total 
+            FROM tickets 
+            WHERE estado = 'ACTIVO' 
+            AND ficha_id IS NULL
+        """).fetchone()['total']
+        
         # Repuestos que estaban EN FALTA y ahora tienen stock disponible
         repuestos_disponibles = db.execute("""
             SELECT COUNT(DISTINCT dr.codigo_repuesto) AS total
@@ -1350,6 +1358,7 @@ def index():
         """).fetchone()['total']
         
         stats = {
+            "tickets_revision_inicial": tickets_revision_inicial,
             "fichas_revision_inicial": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'A LA ESPERA DE REVISI_N' AND is_closed = 0"),
             "fichas_en_reparacion": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'EN REPARACI_N' AND is_closed = 0"),
             "fichas_espera_repuestos": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion = 'A LA ESPERA DE REPUESTOS' AND is_closed = 0"),
@@ -1397,16 +1406,22 @@ def apply_migrations():
 def raypac_list(readonly=False):
     user = get_current_user()
     db = get_db()
-    entries = db.execute("""
-        SELECT r.*, 
-               (SELECT COUNT(*) FROM dml_fichas f WHERE f.raypac_id = r.id) AS fichas_count,
-               (SELECT f.id FROM dml_fichas f WHERE f.raypac_id = r.id ORDER BY f.created_at DESC LIMIT 1) AS ficha_id,
-               (SELECT f.estado_reparacion FROM dml_fichas f WHERE f.raypac_id = r.id ORDER BY f.created_at DESC LIMIT 1) AS estado_ficha,
-               (SELECT t.id FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_id,
-               (SELECT t.numero_ticket FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_numero
-        FROM raypac_entries r
-        ORDER BY r.created_at DESC
-    """).fetchall()
+    
+    try:
+        entries = db.execute("""
+            SELECT r.*, 
+                   (SELECT COUNT(*) FROM dml_fichas f WHERE f.raypac_id = r.id) AS fichas_count,
+                   (SELECT f.id FROM dml_fichas f WHERE f.raypac_id = r.id ORDER BY f.created_at DESC LIMIT 1) AS ficha_id,
+                   (SELECT f.estado_reparacion FROM dml_fichas f WHERE f.raypac_id = r.id ORDER BY f.created_at DESC LIMIT 1) AS estado_ficha,
+                   (SELECT t.id FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_id,
+                   (SELECT t.numero_ticket FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_numero
+            FROM raypac_entries r
+            ORDER BY r.created_at DESC
+        """).fetchall()
+    except Exception as e:
+        # Si hay error en la query, mostrar mensaje y retornar lista vacía
+        flash(f"Error al cargar ingresos RAYPAC: {str(e)}", "error")
+        entries = []
     
     # Configuración de badges para estados de fichas DML
     estado_config = {
@@ -1489,7 +1504,10 @@ def raypac_view(id, readonly=False):
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac_list"))
     
-    return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly)
+    # Verificar si existe un ticket asociado
+    ticket = db.execute("SELECT numero_ticket FROM tickets WHERE raypac_id = ?", (id,)).fetchone()
+    
+    return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly, ticket=ticket)
 
 @app.route("/raypac/<int:id>/edit", methods=["GET", "POST"])
 @login_required
@@ -1890,16 +1908,50 @@ def dml_new(raypac_id):
             db.commit()
             
             # Crear partes estándar
-            partes = [
+            partes_nombres = [
                 "ESTADO DEL EQUIPO", "CARCAZA", "CUBRE FEEDWHEEL", "MANGO",
                 "BOTONES", "MOTOR DE ARRASTRE", "MOTOR DE SELLADO", "CUCHILLA",
                 "SERVO", "RUEDA DE ARRASTRE", "RESORTE DE MANIJA", "OTROS"
             ]
-            for parte in partes:
-                db.execute(
-                    "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (?, ?, ?)",
-                    (ficha_id, parte, "POR INSPECCIONAR")
-                )
+            
+            # Si hay ticket, usar los estados del equipo completados en el ticket
+            if ticket:
+                # Mapeo de columnas del ticket a nombres de partes
+                ticket_to_parte = {
+                    'estado_equipo': 'ESTADO DEL EQUIPO',
+                    'carcaza': 'CARCAZA',
+                    'cubre_feedwheel': 'CUBRE FEEDWHEEL',
+                    'mango': 'MANGO',
+                    'botones': 'BOTONES',
+                    'motor_arrastre': 'MOTOR DE ARRASTRE',
+                    'motor_sellado': 'MOTOR DE SELLADO',
+                    'cuchilla': 'CUCHILLA',
+                    'servo': 'SERVO',
+                    'rueda_arrastre': 'RUEDA DE ARRASTRE',
+                    'resorte_manija': 'RESORTE DE MANIJA',
+                    'otros': 'OTROS'
+                }
+                
+                for parte_nombre in partes_nombres:
+                    # Buscar el estado correspondiente en el ticket
+                    estado = "POR INSPECCIONAR"
+                    for ticket_col, parte_map in ticket_to_parte.items():
+                        if parte_map == parte_nombre and ticket.get(ticket_col):
+                            estado = ticket[ticket_col]
+                            break
+                    
+                    db.execute(
+                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (?, ?, ?)",
+                        (ficha_id, parte_nombre, estado)
+                    )
+            else:
+                # Sin ticket, crear partes con estado por defecto
+                for parte in partes_nombres:
+                    db.execute(
+                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (?, ?, ?)",
+                        (ficha_id, parte, "POR INSPECCIONAR")
+                    )
+            
             db.commit()
             
             log_action(user['id'], "CREATE", "dml_fichas", ficha_id, None,

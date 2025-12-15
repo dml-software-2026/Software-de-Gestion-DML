@@ -154,15 +154,30 @@
     <h4 class="mb-3"><i class="bi bi-gear-fill"></i> Flujo de Reparación</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-3">
+            <a href="{{ url_for('tickets_list') }}" class="text-decoration-none">
+                <div class="card shadow-sm h-100 position-relative {% if stats.tickets_revision_inicial > 0 %}border-warning{% endif %}" style="border-left: 5px solid #ffc107; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body text-center">
+                        <div class="mb-2">
+                            <i class="bi bi-ticket-perforated" style="font-size: 2.5rem; color: #ffc107;"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Tickets sin Ficha</h5>
+                        <h1 class="display-4 fw-bold text-warning">{{ stats.tickets_revision_inicial }}</h1>
+                        <p class="text-muted small mb-0">Equipos con ticket pendientes de crear ficha</p>
+                        <span class="stretched-link"></span>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
             <a href="{{ url_for('dml_list') }}" class="text-decoration-none">
                 <div class="card shadow-sm h-100 position-relative" style="border-left: 5px solid #17a2b8; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
                     <div class="card-body text-center">
                         <div class="mb-2">
                             <i class="bi bi-search" style="font-size: 2.5rem; color: #17a2b8;"></i>
                         </div>
-                        <h5 class="card-title fw-bold">Revisión Inicial</h5>
+                        <h5 class="card-title fw-bold">Revisión Inicial (Fichas)</h5>
                         <h1 class="display-4 fw-bold text-info">{{ stats.fichas_revision_inicial }}</h1>
-                        <p class="text-muted small mb-0">Equipos recién llegados pendientes de diagnóstico</p>
+                        <p class="text-muted small mb-0">Fichas pendientes de diagnóstico</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>

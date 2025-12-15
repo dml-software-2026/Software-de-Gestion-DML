@@ -128,17 +128,27 @@
         </div>
     </div>
 
-    <!-- CREAR FICHA DML (solo para DML_ST y ADMIN) -->
+    <!-- CREAR FICHA DML (solo para DML_ST y ADMIN, y solo si ya existe ticket) -->
     {% if entry.is_frozen and user_role in ['ADMIN', 'DML_ST'] %}
     <div class="card shadow-sm">
         <div class="card-header bg-success text-white">
             <h5>Crear Ficha de Servicio Técnico en DML</h5>
         </div>
         <div class="card-body">
-            <p>La máquina ya fue enviada a ST. Ahora registra en DML.</p>
+            {% if ticket %}
+            <p>La máquina ya fue enviada a ST y tiene ticket asociado: <strong>{{ ticket.numero_ticket }}</strong></p>
             <a href="{{ url_for('dml_new', raypac_id=entry.id) }}" class="btn btn-lg btn-success">
                 Crear Ficha DML
             </a>
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i> <strong>Debe crear un ticket primero</strong>
+                <p class="mb-2 mt-2">Antes de crear la ficha, es necesario generar un ticket de seguimiento para el cliente.</p>
+                <a href="{{ url_for('raypac_list') }}" class="btn btn-primary">
+                    <i class="bi bi-ticket"></i> Ir a crear ticket
+                </a>
+            </div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
