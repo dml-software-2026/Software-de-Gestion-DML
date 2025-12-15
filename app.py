@@ -970,8 +970,10 @@ def enviar_alerta_stock(codigo, item, cantidad, nivel, ubicacion="DML"):
     <p>Por favor, verifique el stock y considere reposición.</p>
     """
     
-    # Enviar a repuestos@dml.local
-    send_mail("repuestos@dml.local", f"🔔 Alerta de Stock: {item}", body)
+    # Enviar a email configurado del sistema (puede ser el mismo email de envío)
+    # En producción, debería enviarse a usuarios con rol DML_REPUESTOS
+    email_destino = app.config.get('MAIL_USERNAME') or "repuestos@dml.local"
+    send_mail(email_destino, f"🔔 Alerta de Stock: {item}", body)
 
 def actualizar_estado_alerta_stock(codigo, ubicacion="DML"):
     """Recalcula estado_alerta en stock_dml tras movimientos para la ubicación dada."""
@@ -2933,14 +2935,17 @@ def envios_confirmar(id):
                 f"<li>{det['codigo_repuesto']} - {det['item'] or ''} x {det['cantidad']}</li>" for det in detalles
             ])
             html_body = f"""
-            <h3>Confirmación de recepción de repuestos</h3>
+            <h3>✅ Confirmación de recepción de repuestos</h3>
             <p>Remito: <strong>{envio['numero_remito']}</strong></p>
             <p>Fecha recepción: {datetime.now().strftime('%Y-%m-%d')}</p>
             <p>Detalle:</p>
             {lineas}
             <p>Los repuestos fueron cargados en stock DML.</p>
             """
-            send_mail("raypac@dml.local", f"Recepción remito {envio['numero_remito']} en DML", html_body)
+            # Enviar a email configurado del sistema (puede ser el mismo email de envío)
+            # En producción, debería enviarse a usuarios con rol RAYPAC
+            email_destino = app.config.get('MAIL_USERNAME') or "raypac@dml.local"
+            send_mail(email_destino, f"✅ Recepción remito {envio['numero_remito']} en DML", html_body)
         except Exception as e:
             print(f"Error enviando mail de recepción a Raypac: {e}")
 
