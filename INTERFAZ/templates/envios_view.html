@@ -41,18 +41,29 @@
         {% endif %}
       {% endif %}
       
-      {# DEBUG: Mostrar valores de variables para diagnóstico #}
-      <!-- DEBUG INFO:
-           Rol actual: {{ session.get('role') }}
-           Estado envío: "{{ envio.estado_envio }}"
-           Fecha recepción: "{{ envio.fecha_recepcion_dml }}"
-           Condición rol: {{ session.get('role') in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] }}
-           Condición estado: {{ (not envio.estado_envio or envio.estado_envio != 'RECIBIDO') and not envio.fecha_recepcion_dml }}
+      {# DEBUG v2: Mostrar valores de variables para diagnóstico - VERSIÓN ACTUALIZADA #}
+      <!-- 
+      ═══════════════════════════════════════════════════════
+      DEBUG INFO v2 (2025-12-15 17:51):
+      Rol actual: {{ session.get('role') }}
+      User ID: {{ session.get('user_id') }}
+      Estado envío: "{{ envio.estado_envio }}"
+      Fecha recepción: "{{ envio.fecha_recepcion_dml }}"
+      
+      EVALUACIONES:
+      - Condición rol: {{ session.get('role') in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] }}
+      - not envio.estado_envio: {{ not envio.estado_envio }}
+      - estado_envio != 'RECIBIDO': {{ envio.estado_envio != 'RECIBIDO' }}
+      - not fecha_recepcion_dml: {{ not envio.fecha_recepcion_dml }}
+      - Condición completa: {{ (not envio.estado_envio or envio.estado_envio != 'RECIBIDO') and not envio.fecha_recepcion_dml }}
+      ═══════════════════════════════════════════════════════
       -->
       
       {# Botón de recepción: mostrar si NO ha sido recibido #}
       {% if session.get('role') in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] %}
+        <!-- DEBUG: Rol permitido, revisando condición de estado... -->
         {% if (not envio.estado_envio or envio.estado_envio != 'RECIBIDO') and not envio.fecha_recepcion_dml %}
+        <!-- DEBUG: ✅ Mostrando botón -->
       <form method="POST" action="{{ url_for('envios_confirmar', id=envio.id) }}" class="d-inline" 
             onsubmit="return confirm('¿Confirmar que todos los repuestos fueron recibidos correctamente según el remito?');">
         <button type="submit" class="btn btn-success">
@@ -60,10 +71,11 @@
         </button>
       </form>
         {% else %}
-      <!-- DEBUG: Botón NO mostrado - Condición de estado falló -->
+        <!-- DEBUG: ❌ Botón NO mostrado - Condición de estado falló -->
+        <!-- DEBUG: not envio.estado_envio={{ not envio.estado_envio }}, estado_envio != RECIBIDO={{ envio.estado_envio != 'RECIBIDO' }}, not fecha_recepcion={{ not envio.fecha_recepcion_dml }} -->
         {% endif %}
       {% else %}
-      <!-- DEBUG: Botón NO mostrado - Rol no permitido -->
+      <!-- DEBUG: ❌ Botón NO mostrado - Rol "{{ session.get('role') }}" no está en lista permitida -->
       {% endif %}
     </div>
   </div>
