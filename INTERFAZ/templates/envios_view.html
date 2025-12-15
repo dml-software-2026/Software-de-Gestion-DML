@@ -41,6 +41,15 @@
         {% endif %}
       {% endif %}
       
+      {# DEBUG: Mostrar valores de variables para diagnóstico #}
+      <!-- DEBUG INFO:
+           Rol actual: {{ session.get('role') }}
+           Estado envío: "{{ envio.estado_envio }}"
+           Fecha recepción: "{{ envio.fecha_recepcion_dml }}"
+           Condición rol: {{ session.get('role') in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] }}
+           Condición estado: {{ (not envio.estado_envio or envio.estado_envio != 'RECIBIDO') and not envio.fecha_recepcion_dml }}
+      -->
+      
       {# Botón de recepción: mostrar si NO ha sido recibido #}
       {% if session.get('role') in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] %}
         {% if (not envio.estado_envio or envio.estado_envio != 'RECIBIDO') and not envio.fecha_recepcion_dml %}
@@ -50,7 +59,11 @@
           <i class="bi bi-check-circle"></i> Dar Ingreso en DML
         </button>
       </form>
+        {% else %}
+      <!-- DEBUG: Botón NO mostrado - Condición de estado falló -->
         {% endif %}
+      {% else %}
+      <!-- DEBUG: Botón NO mostrado - Rol no permitido -->
       {% endif %}
     </div>
   </div>
