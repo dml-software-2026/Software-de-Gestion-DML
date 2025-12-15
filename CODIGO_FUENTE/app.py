@@ -2003,7 +2003,7 @@ def dml_new(raypac_id):
                     # Buscar el estado correspondiente en el ticket
                     estado = "POR INSPECCIONAR"
                     for ticket_col, parte_map in ticket_to_parte.items():
-                        if parte_map == parte_nombre and ticket.get(ticket_col):
+                        if parte_map == parte_nombre and ticket_col in ticket.keys() and ticket[ticket_col]:
                             estado = ticket[ticket_col]
                             break
                     
@@ -2946,7 +2946,13 @@ def envios_confirmar(id):
     if not envio:
         flash("Envío no encontrado.", "error")
         return redirect(url_for("envios_list"))
-    if envio.get('estado_envio') == 'RECIBIDO':
+    # Verificar si ya fue recibido
+    try:
+        estado_envio = envio['estado_envio']
+    except (KeyError, TypeError):
+        estado_envio = envio.get('estado', '')
+    
+    if estado_envio == 'RECIBIDO' or envio.get('fecha_recepcion_dml'):
         flash("El envío ya fue confirmado.", "warning")
         return redirect(url_for("envios_view", id=id))
 
