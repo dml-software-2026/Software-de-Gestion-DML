@@ -1931,9 +1931,11 @@ def dml_new(raypac_id):
                 flash("Completa los campos obligatorios: debe indicar un técnico responsable.", "error")
                 return render_template("dml_form.html", raypac=raypac, ticket=ticket)
             
-            # Si no hay tecnico_resp, usar el valor de tecnico
+            # Asegurar que ambos campos tengan valor (tecnico es NOT NULL en BD)
             if not tecnico_resp:
                 tecnico_resp = tecnico
+            if not tecnico:
+                tecnico = tecnico_resp
             
             numero_ficha = generate_ficha_number()
             
