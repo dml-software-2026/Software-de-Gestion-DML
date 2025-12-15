@@ -26,7 +26,7 @@
                 </div>
             </div>
             
-            {% if user.role in ['ADMIN', 'RAYPAC'] and not readonly %}
+            {% if user.role in ['ADMIN', 'RAYPAC', 'DML_ST'] and not readonly %}
             <div class="d-flex gap-2 mb-3">
                 <a href="{{ url_for('stock_new', ubicacion=ubicacion) }}" class="btn btn-success">+ Nuevo Repuesto</a>
                 {% if user.role in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] %}
@@ -96,7 +96,7 @@
                             <span class="badge bg-secondary">N/A</span>
                             {% endif %}
                         </td>
-                        {% if user.role in ['ADMIN', 'RAYPAC'] %}
+                        {% if user.role in ['ADMIN', 'RAYPAC', 'DML_ST'] %}
                         <td>
                             <a href="{{ url_for('stock_edit', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" class="btn btn-sm btn-primary">Editar</a>
                             {% if user.role == 'ADMIN' %}

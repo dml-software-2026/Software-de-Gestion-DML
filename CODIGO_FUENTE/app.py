@@ -2930,7 +2930,7 @@ def stock_list(readonly=False):
 
 @app.route("/stock/new", methods=["GET", "POST"])
 @login_required
-@role_required("ADMIN")
+@role_required("ADMIN", "DML_ST")
 def stock_new():
     user = get_current_user()
     db = get_db()
@@ -3006,7 +3006,7 @@ def stock_new():
 
 @app.route("/stock/<codigo>/edit", methods=["GET", "POST"])
 @login_required
-@role_required("ADMIN")
+@role_required("ADMIN", "DML_ST")
 def stock_edit(codigo):
     user = get_current_user()
     db = get_db()
