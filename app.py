@@ -1363,7 +1363,7 @@ def index():
         envios_repuestos_pendientes = db.execute("""
             SELECT COUNT(*) AS total 
             FROM envios_repuestos 
-            WHERE estado_envio = 'ENVIADO' AND is_frozen = 1
+            WHERE estado_envio = 'ENVIADO' AND is_frozen = 1 AND fecha_recepcion IS NULL
         """).fetchone()['total']
         
         stats = {
@@ -3161,9 +3161,9 @@ def stock_new():
                 numero = db.execute("SELECT MAX(numero) as max FROM matriz_repuestos").fetchone()['max'] or 0
                 db.execute("""
                     INSERT INTO matriz_repuestos 
-                    (numero, codigo_repuesto, item)
-                    VALUES (?, ?, ?)
-                """, (numero + 1, codigo, item))
+                    (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (numero + 1, codigo, item, cantidad, cantidad, ubicacion))
             
             # Verificar que no existe en esa ubicación
             existe_stock = db.execute(
