@@ -292,6 +292,15 @@ def migrate_db():
             db.execute("ALTER TABLE tickets ADD COLUMN tecnico_responsable TEXT")
             print("[MIGRATION] ✅ Columna tecnico_responsable agregada a tickets")
         
+        # Agregar columnas de información del ticket (una sola vez)
+        if 'fecha_ingreso' not in tickets_cols:
+            db.execute("ALTER TABLE tickets ADD COLUMN fecha_ingreso TEXT")
+            print("[MIGRATION] ✅ Columna fecha_ingreso agregada a tickets")
+        
+        if 'tecnico_responsable' not in tickets_cols:
+            db.execute("ALTER TABLE tickets ADD COLUMN tecnico_responsable TEXT")
+            print("[MIGRATION] ✅ Columna tecnico_responsable agregada a tickets")
+        
         if 'observaciones' not in tickets_cols:
             db.execute("ALTER TABLE tickets ADD COLUMN observaciones TEXT")
             print("[MIGRATION] ✅ Columna observaciones agregada a tickets")
@@ -305,19 +314,6 @@ def migrate_db():
             if componente not in tickets_cols:
                 db.execute(f"ALTER TABLE tickets ADD COLUMN {componente} TEXT DEFAULT 'BUENO'")
                 print(f"[MIGRATION] ✅ Columna {componente} agregada a tickets")
-        
-        # Agregar columnas de información del ticket
-        if 'fecha_ingreso' not in tickets_cols:
-            db.execute("ALTER TABLE tickets ADD COLUMN fecha_ingreso TEXT")
-            print("[MIGRATION] ✅ Columna fecha_ingreso agregada a tickets")
-        
-        if 'tecnico_responsable' not in tickets_cols:
-            db.execute("ALTER TABLE tickets ADD COLUMN tecnico_responsable TEXT")
-            print("[MIGRATION] ✅ Columna tecnico_responsable agregada a tickets")
-        
-        if 'observaciones' not in tickets_cols:
-            db.execute("ALTER TABLE tickets ADD COLUMN observaciones TEXT")
-            print("[MIGRATION] ✅ Columna observaciones agregada a tickets")
         
         # FIX CRÍTICO: En SQLite no se puede modificar constraint NOT NULL directamente
         # Necesitamos recrear la tabla si ficha_id es NOT NULL
@@ -2615,16 +2611,47 @@ def ticket_print(numero_ticket):
 @login_required
 @role_required("ADMIN", "RAYPAC", "DML_REPUESTOS", "DML_ST")
 def envios_list():
+    user = get_current_user()
     db = get_db()
-    envios = db.execute(
+    
+    # Obtener envíos de repuestos
+    envios_repuestos = db.execute(
         """
         SELECT e.*, 
+               'REPUESTO' as tipo_envio,
                (SELECT COUNT(*) FROM envios_repuestos_detalles d WHERE d.envio_id = e.id) AS items_count
         FROM envios_repuestos e
         ORDER BY e.created_at DESC
         """
     ).fetchall()
-    return render_template("envios_list.html", envios=envios)
+    
+    # Obtener ingresos RAYPAC (equipos/máquinas) que fueron enviados
+    envios_maquinas = db.execute(
+        """
+        SELECT 
+            id,
+            'MAQUINA' as tipo_envio,
+            numero_remito,
+            numero_serie as numero_remito,
+            fecha_recepcion as fecha_envio,
+            NULL as fecha_recepcion,
+            estado_envio_equipos as estado_envio,
+            NULL as tipo_entrega,
+            cliente || ' - ' || modelo_maquina as numero_remito_display,
+            frozen_at as created_at,
+            1 as items_count
+        FROM raypac_entries
+        WHERE is_frozen = 1
+        ORDER BY frozen_at DESC
+        """
+    ).fetchall()
+    
+    # Combinar ambos tipos de envíos
+    todos_envios = list(envios_repuestos) + list(envios_maquinas)
+    # Ordenar por fecha de creación descendente
+    todos_envios.sort(key=lambda x: x['created_at'] if x['created_at'] else '', reverse=True)
+    
+    return render_template("envios_list.html", envios=todos_envios)
 
 
 @app.route("/envios/new", methods=["GET", "POST"])

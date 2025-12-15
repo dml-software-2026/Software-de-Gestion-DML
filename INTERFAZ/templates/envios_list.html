@@ -25,9 +25,15 @@
     <tbody>
       {% for envio in envios %}
       <tr>
-        <td><strong>{{ envio.numero_remito }}</strong></td>
         <td>
-          {% if envio.tipo_entrega == 'MAQUINA' %}
+          {% if envio.tipo_envio == 'MAQUINA' %}
+          <strong>{{ envio.numero_remito }}</strong>
+          {% else %}
+          <strong>{{ envio.numero_remito }}</strong>
+          {% endif %}
+        </td>
+        <td>
+          {% if envio.tipo_envio == 'MAQUINA' %}
           <span class="badge" style="background-color: #6c757d; color: white;">Máquina</span>
           {% else %}
           <span class="badge" style="background-color: #17a2b8; color: white;">Repuestos</span>
@@ -46,9 +52,15 @@
         </td>
         <td>{{ envio.items_count }}</td>
         <td class="text-end">
+          {% if envio.tipo_envio == 'MAQUINA' %}
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('raypac_view', id=envio.id) }}">
+            <i class="bi bi-eye"></i> Ver
+          </a>
+          {% else %}
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('envios_view', id=envio.id) }}">
             <i class="bi bi-eye"></i> Ver
           </a>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
