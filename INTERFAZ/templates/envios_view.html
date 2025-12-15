@@ -41,7 +41,7 @@
         {% endif %}
       {% endif %}
       
-      {% set ya_recibido = (envio.estado_envio == 'RECIBIDO') or envio.fecha_recepcion_dml %}
+      {% set ya_recibido = (envio.estado_envio == 'RECIBIDO') or (envio.fecha_recepcion_dml and envio.fecha_recepcion_dml != '') %}
       {% if not ya_recibido and session.get('role') in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] %}
       <form method="POST" action="{{ url_for('envios_confirmar', id=envio.id) }}" class="d-inline" 
             onsubmit="return confirm('¿Confirmar que todos los repuestos fueron recibidos correctamente según el remito?');">

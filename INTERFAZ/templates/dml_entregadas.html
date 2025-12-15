@@ -38,25 +38,25 @@
             <tbody>
                 {% for ficha in fichas %}
                 <tr>
-                    <td style="color: black;"><strong>#{{ '%07d' % ficha.numero_ficha }}</strong></td>
-                    <td style="color: black;">{{ ficha.cliente }}</td>
-                    <td style="color: black;"><code>{{ ficha.numero_serie }}</code></td>
-                    <td style="color: black;">
+                    <td class="text-dark"><strong>#{{ '%07d' % ficha.numero_ficha }}</strong></td>
+                    <td class="text-dark">{{ ficha.cliente }}</td>
+                    <td class="text-dark"><code class="text-dark">{{ ficha.numero_serie }}</code></td>
+                    <td class="text-dark">
                         {% if ficha.fecha_entrega_cliente %}
                             {{ ficha.fecha_entrega_cliente }}
                         {% else %}
                             <span class="badge badge-warning">Sin fecha</span>
                         {% endif %}
                     </td>
-                    <td style="color: black;">
+                    <td class="text-dark">
                         {% if ficha.recibido_por %}
                             <strong>{{ ficha.recibido_por }}</strong>
                         {% else %}
                             <span class="badge badge-secondary">No especificado</span>
                         {% endif %}
                     </td>
-                    <td style="color: black;">{{ ficha.contacto_cliente or '-' }}</td>
-                    <td style="color: black;">{{ ficha.email_cliente or '-' }}</td>
+                    <td class="text-dark">{{ ficha.contacto_cliente or '-' }}</td>
+                    <td class="text-dark">{{ ficha.email_cliente or '-' }}</td>
                     <td>
                         <a href="{{ url_for('dml_view', id=ficha.id) }}" class="btn btn-sm btn-info" title="Ver Ficha">
                             <i class="fas fa-eye"></i> Ver
