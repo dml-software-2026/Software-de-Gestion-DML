@@ -1774,7 +1774,7 @@ def dml_entregadas():
         SELECT f.*, r.cliente, r.numero_serie, r.contacto_cliente, r.email_cliente
         FROM dml_fichas f
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
-        WHERE f.estado_reparacion = 'ENTREGADA'
+        WHERE f.estado_reparacion LIKE '%ENTREGAD%' OR f.is_closed = 1
         ORDER BY f.fecha_entrega_cliente DESC, f.updated_at DESC
     """).fetchall()
     
