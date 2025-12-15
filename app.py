@@ -580,6 +580,28 @@ def load_seed_data(db=None):
     if db is None:
         db = get_db()
     
+    # ======================== CREAR USUARIOS POR DEFECTO ========================
+    print("[SEED] 👥 Verificando usuarios...")
+    check_users = db.execute("SELECT COUNT(*) as total FROM users").fetchone()
+    if check_users and check_users['total'] == 0:
+        print("[SEED] 🔧 Creando usuarios por defecto...")
+        usuarios = [
+            ('admin@dml.local', 'admin', 'Administrador', 'ADMIN'),
+            ('raypac@dml.local', 'raypac', 'Casa Matriz RAYPAC', 'RAYPAC'),
+            ('tecnico@dml.local', 'tecnico', 'Juan Pérez', 'DML_ST'),
+            ('repuestos@dml.local', 'repuestos', 'Carlos López', 'DML_REPUESTOS'),
+        ]
+        
+        for email, pwd, nombre, role in usuarios:
+            db.execute("""
+                INSERT INTO users (email, password_hash, nombre, role, is_active)
+                VALUES (?, ?, ?, ?, 1)
+            """, (email, generate_password_hash(pwd), nombre, role))
+        db.commit()
+        print(f"[SEED] ✅ {len(usuarios)} usuarios creados")
+    else:
+        print(f"[SEED] ✓ Ya hay {check_users['total']} usuarios en el sistema")
+    
     # VERIFICAR SI YA HAY REPUESTOS CARGADOS
     check_repuestos = db.execute("SELECT COUNT(*) as total FROM matriz_repuestos").fetchone()
     if check_repuestos and check_repuestos['total'] > 0:
