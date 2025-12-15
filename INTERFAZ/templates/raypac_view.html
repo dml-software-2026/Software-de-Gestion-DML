@@ -58,6 +58,22 @@
                 </div>
             </div>
 
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <strong>Estado de Envío del Equipo:</strong>
+                    {% if entry.estado_envio_equipos == 'RECIBIDO' %}
+                    <span class="badge bg-success">Recibido en DML</span>
+                    {% elif entry.estado_envio_equipos == 'ENVIADO' or entry.estado_envio_equipos == 'EN_TRANSITO' %}
+                    <span class="badge bg-warning text-dark">En Tránsito</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Pendiente de Envío</span>
+                    {% endif %}
+                    {% if entry.fecha_envio_equipos %}
+                    <br><small class="text-muted">Enviado: {{ entry.fecha_envio_equipos }}</small>
+                    {% endif %}
+                </div>
+            </div>
+
             <div class="alert alert-warning">
                 {% if entry.is_frozen %}
                 <strong>✓ Freezado:</strong> {{ entry.frozen_at }}<br>

@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Envíos de repuestos RAYPAC a DML</h2>
+    <h2 class="mb-0">Envíos</h2>
     {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'RAYPAC'] %}
     <a class="btn btn-success" href="{{ url_for('envios_new') }}"><i class="bi bi-plus-circle"></i> Nuevo envío</a>
     {% endif %}
@@ -36,10 +36,12 @@
         <td>{{ envio.fecha_envio }}</td>
         <td>{{ envio.fecha_recepcion or '-' }}</td>
         <td>
-          {% if envio.estado == 'PENDIENTE' %}
-          <span class="badge bg-warning text-dark">Pendiente</span>
-          {% else %}
+          {% if envio.estado_envio == 'RECIBIDO' %}
           <span class="badge bg-success">Recibido</span>
+          {% elif envio.estado_envio == 'ENVIADO' %}
+          <span class="badge bg-warning text-dark">En Tránsito</span>
+          {% else %}
+          <span class="badge bg-secondary">Pendiente</span>
           {% endif %}
         </td>
         <td>{{ envio.items_count }}</td>

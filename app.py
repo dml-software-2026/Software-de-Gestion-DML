@@ -306,6 +306,19 @@ def migrate_db():
                 db.execute(f"ALTER TABLE tickets ADD COLUMN {componente} TEXT DEFAULT 'BUENO'")
                 print(f"[MIGRATION] ✅ Columna {componente} agregada a tickets")
         
+        # Agregar columnas de información del ticket
+        if 'fecha_ingreso' not in tickets_cols:
+            db.execute("ALTER TABLE tickets ADD COLUMN fecha_ingreso TEXT")
+            print("[MIGRATION] ✅ Columna fecha_ingreso agregada a tickets")
+        
+        if 'tecnico_responsable' not in tickets_cols:
+            db.execute("ALTER TABLE tickets ADD COLUMN tecnico_responsable TEXT")
+            print("[MIGRATION] ✅ Columna tecnico_responsable agregada a tickets")
+        
+        if 'observaciones' not in tickets_cols:
+            db.execute("ALTER TABLE tickets ADD COLUMN observaciones TEXT")
+            print("[MIGRATION] ✅ Columna observaciones agregada a tickets")
+        
         # FIX CRÍTICO: En SQLite no se puede modificar constraint NOT NULL directamente
         # Necesitamos recrear la tabla si ficha_id es NOT NULL
         # Verificar si necesitamos migrar la tabla
@@ -386,6 +399,28 @@ def migrate_db():
         
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error agregando tipo_entrega: {e}")
+        db.commit()
+    
+    # Migración: Agregar estado_envio_equipos a raypac_entries
+    try:
+        print("[MIGRATION] Verificando campo estado_envio_equipos en raypac_entries...")
+        
+        raypac_cols = db.execute("PRAGMA table_info(raypac_entries)").fetchall()
+        raypac_col_names = [col['name'] for col in raypac_cols]
+        
+        if 'estado_envio_equipos' not in raypac_col_names:
+            db.execute("ALTER TABLE raypac_entries ADD COLUMN estado_envio_equipos TEXT DEFAULT 'PENDIENTE'")
+            print("[MIGRATION] ✅ Columna estado_envio_equipos agregada a raypac_entries")
+        
+        if 'fecha_envio_equipos' not in raypac_col_names:
+            db.execute("ALTER TABLE raypac_entries ADD COLUMN fecha_envio_equipos TEXT")
+            print("[MIGRATION] ✅ Columna fecha_envio_equipos agregada a raypac_entries")
+        
+        db.commit()
+        print("[MIGRATION] ✅ Campos de estado de envío de equipos verificados")
+        
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando campos de envío de equipos: {e}")
         db.commit()
     
     except Exception as e:
@@ -1392,6 +1427,8 @@ def raypac_new():
             mail_comercial = request.form.get("mail_comercial")
             contacto_cliente = request.form.get("contacto_cliente")
             email_cliente = request.form.get("email_cliente")
+            estado_envio_equipos = request.form.get("estado_envio_equipos") or "PENDIENTE"
+            fecha_envio_equipos = request.form.get("fecha_envio_equipos")
             
             # Validación básica
             if not all([tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina, comercial, mail_comercial]):
@@ -1410,10 +1447,12 @@ def raypac_new():
             db.execute("""
                 INSERT INTO raypac_entries 
                 (numero_correlativo, fecha_recepcion, tipo_solicitud, cliente, numero_serie, modelo_maquina, tipo_maquina,
-                 numero_bateria, numero_cargador, diagnostico_ingreso, comercial, mail_comercial, contacto_cliente, email_cliente)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 numero_bateria, numero_cargador, diagnostico_ingreso, comercial, mail_comercial, contacto_cliente, email_cliente,
+                 estado_envio_equipos, fecha_envio_equipos)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (correlativo, fecha, tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina,
-                  numero_bateria, numero_cargador, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente))
+                  numero_bateria, numero_cargador, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente,
+                  estado_envio_equipos, fecha_envio_equipos))
             db.commit()
             
             raypac_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
@@ -1474,13 +1513,17 @@ def raypac_edit(id):
             mail_comercial = request.form.get("mail_comercial")
             contacto_cliente = request.form.get("contacto_cliente")
             email_cliente = request.form.get("email_cliente")
+            estado_envio_equipos = request.form.get("estado_envio_equipos") or "PENDIENTE"
+            fecha_envio_equipos = request.form.get("fecha_envio_equipos")
             
             db.execute("""
                 UPDATE raypac_entries 
                 SET fecha_recepcion=?, tipo_solicitud=?, cliente=?, numero_serie=?,
-                    diagnostico_ingreso=?, comercial=?, mail_comercial=?, contacto_cliente=?, email_cliente=?, updated_at=CURRENT_TIMESTAMP
+                    diagnostico_ingreso=?, comercial=?, mail_comercial=?, contacto_cliente=?, email_cliente=?,
+                    estado_envio_equipos=?, fecha_envio_equipos=?, updated_at=CURRENT_TIMESTAMP
                 WHERE id = ?
-            """, (fecha, tipo_solicitud, cliente, numero_serie, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente, id))
+            """, (fecha, tipo_solicitud, cliente, numero_serie, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente,
+                  estado_envio_equipos, fecha_envio_equipos, id))
             db.commit()
             
             log_action(user['id'], "UPDATE", "raypac_entries", id, None, 
