@@ -284,15 +284,7 @@ def migrate_db():
         columns_tickets = db.execute("PRAGMA table_info(tickets)").fetchall()
         tickets_cols = [col['name'] for col in columns_tickets]
         
-        if 'fecha_ingreso' not in tickets_cols:
-            db.execute("ALTER TABLE tickets ADD COLUMN fecha_ingreso TEXT")
-            print("[MIGRATION] ✅ Columna fecha_ingreso agregada a tickets")
-        
-        if 'tecnico_responsable' not in tickets_cols:
-            db.execute("ALTER TABLE tickets ADD COLUMN tecnico_responsable TEXT")
-            print("[MIGRATION] ✅ Columna tecnico_responsable agregada a tickets")
-        
-        # Agregar columnas de información del ticket (una sola vez)
+        # Agregar columnas de información del ticket (una sola vez, sin duplicados)
         if 'fecha_ingreso' not in tickets_cols:
             db.execute("ALTER TABLE tickets ADD COLUMN fecha_ingreso TEXT")
             print("[MIGRATION] ✅ Columna fecha_ingreso agregada a tickets")
