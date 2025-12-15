@@ -1644,10 +1644,16 @@ def raypac_freeze(id):
         flash("⚠️ Formato de remito inválido. Ingresa solo los últimos 4 dígitos (ej: 4222) o el formato completo ####-#### (ej: 00001-04222).", "error")
         return redirect(url_for("raypac_view", id=id))
     
-    # Verificar que no exista ya
+    # Verificar que no exista ya en raypac_entries
     existe = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = ?", (numero_remito,)).fetchone()
     if existe and existe['id'] != id:
-        flash("El número de remito ya existe.", "error")
+        flash("El número de remito ya existe en otro equipo.", "error")
+        return redirect(url_for("raypac_view", id=id))
+    
+    # Verificar que no exista en envios_repuestos
+    existe_envio = db.execute("SELECT id FROM envios_repuestos WHERE numero_remito = ?", (numero_remito,)).fetchone()
+    if existe_envio:
+        flash("El número de remito ya existe en un envío de repuestos. Usa un remito diferente.", "error")
         return redirect(url_for("raypac_view", id=id))
     
     db.execute("""
@@ -1920,9 +1926,14 @@ def dml_new(raypac_id):
             n_ciclos = request.form.get("n_ciclos") or 0
             tecnico_resp = request.form.get("tecnico_resp")
             
-            if not all([tecnico, tecnico_resp]):
-                flash("Completa los campos obligatorios.", "error")
+            # Validar que exista al menos un técnico (tecnico o tecnico_resp)
+            if not tecnico and not tecnico_resp:
+                flash("Completa los campos obligatorios: debe indicar un técnico responsable.", "error")
                 return render_template("dml_form.html", raypac=raypac, ticket=ticket)
+            
+            # Si no hay tecnico_resp, usar el valor de tecnico
+            if not tecnico_resp:
+                tecnico_resp = tecnico
             
             numero_ficha = generate_ficha_number()
             
@@ -3192,8 +3203,8 @@ def stock_new():
                 numero = db.execute("SELECT MAX(numero) as max FROM matriz_repuestos").fetchone()['max'] or 0
                 db.execute("""
                     INSERT INTO matriz_repuestos 
-                    (numero, codigo_repuesto, item)
-                    VALUES (?, ?, ?)
+                    (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
+                    VALUES (?, ?, ?, 0, 0, 'RAYPAC')
                 """, (numero + 1, codigo, item))
             
             # Verificar que no existe en esa ubicación
