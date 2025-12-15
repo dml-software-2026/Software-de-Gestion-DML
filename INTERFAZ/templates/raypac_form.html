@@ -111,25 +111,6 @@
 
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label for="estado_envio_equipos" class="form-label">Estado de Envío del Equipo</label>
-                                <select class="form-control" id="estado_envio_equipos" name="estado_envio_equipos">
-                                    <option value="PENDIENTE" {% if not entry or entry.estado_envio_equipos == 'PENDIENTE' %}selected{% endif %}>Pendiente de Envío</option>
-                                    <option value="ENVIADO" {% if entry and entry.estado_envio_equipos == 'ENVIADO' %}selected{% endif %}>Enviado a DML</option>
-                                    <option value="EN_TRANSITO" {% if entry and entry.estado_envio_equipos == 'EN_TRANSITO' %}selected{% endif %}>En Tránsito</option>
-                                    <option value="RECIBIDO" {% if entry and entry.estado_envio_equipos == 'RECIBIDO' %}selected{% endif %}>Recibido en DML</option>
-                                </select>
-                                <small class="text-muted">Actualiza el estado del envío del equipo para coordinar con DML</small>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="fecha_envio_equipos" class="form-label">Fecha de Envío</label>
-                                <input type="date" class="form-control" id="fecha_envio_equipos" name="fecha_envio_equipos" 
-                                       value="{{ entry.fecha_envio_equipos if entry else '' }}">
-                                <small class="text-muted">Fecha en que el equipo fue enviado a DML</small>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <div class="col-md-6">
                                 <label for="comercial" class="form-label">Comercial Responsable *</label>
                                 <select class="form-control" id="comercial" name="comercial" required>
                                     <option value="">Selecciona</option>

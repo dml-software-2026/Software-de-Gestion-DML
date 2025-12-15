@@ -1427,8 +1427,6 @@ def raypac_new():
             mail_comercial = request.form.get("mail_comercial")
             contacto_cliente = request.form.get("contacto_cliente")
             email_cliente = request.form.get("email_cliente")
-            estado_envio_equipos = request.form.get("estado_envio_equipos") or "PENDIENTE"
-            fecha_envio_equipos = request.form.get("fecha_envio_equipos")
             
             # Validación básica
             if not all([tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina, comercial, mail_comercial]):
@@ -1447,12 +1445,10 @@ def raypac_new():
             db.execute("""
                 INSERT INTO raypac_entries 
                 (numero_correlativo, fecha_recepcion, tipo_solicitud, cliente, numero_serie, modelo_maquina, tipo_maquina,
-                 numero_bateria, numero_cargador, diagnostico_ingreso, comercial, mail_comercial, contacto_cliente, email_cliente,
-                 estado_envio_equipos, fecha_envio_equipos)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 numero_bateria, numero_cargador, diagnostico_ingreso, comercial, mail_comercial, contacto_cliente, email_cliente)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (correlativo, fecha, tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina,
-                  numero_bateria, numero_cargador, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente,
-                  estado_envio_equipos, fecha_envio_equipos))
+                  numero_bateria, numero_cargador, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente))
             db.commit()
             
             raypac_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
@@ -1513,17 +1509,13 @@ def raypac_edit(id):
             mail_comercial = request.form.get("mail_comercial")
             contacto_cliente = request.form.get("contacto_cliente")
             email_cliente = request.form.get("email_cliente")
-            estado_envio_equipos = request.form.get("estado_envio_equipos") or "PENDIENTE"
-            fecha_envio_equipos = request.form.get("fecha_envio_equipos")
             
             db.execute("""
                 UPDATE raypac_entries 
                 SET fecha_recepcion=?, tipo_solicitud=?, cliente=?, numero_serie=?,
-                    diagnostico_ingreso=?, comercial=?, mail_comercial=?, contacto_cliente=?, email_cliente=?,
-                    estado_envio_equipos=?, fecha_envio_equipos=?, updated_at=CURRENT_TIMESTAMP
+                    diagnostico_ingreso=?, comercial=?, mail_comercial=?, contacto_cliente=?, email_cliente=?, updated_at=CURRENT_TIMESTAMP
                 WHERE id = ?
-            """, (fecha, tipo_solicitud, cliente, numero_serie, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente,
-                  estado_envio_equipos, fecha_envio_equipos, id))
+            """, (fecha, tipo_solicitud, cliente, numero_serie, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente, id))
             db.commit()
             
             log_action(user['id'], "UPDATE", "raypac_entries", id, None, 
@@ -1574,13 +1566,14 @@ def raypac_freeze(id):
     
     db.execute("""
         UPDATE raypac_entries 
-        SET is_frozen = 1, frozen_at = CURRENT_TIMESTAMP, numero_remito = ?
+        SET is_frozen = 1, frozen_at = CURRENT_TIMESTAMP, numero_remito = ?, 
+            estado_envio_equipos = 'ENVIADO', fecha_envio_equipos = CURRENT_TIMESTAMP
         WHERE id = ?
     """, (numero_remito, id))
     db.commit()
     
     log_action(user['id'], "FREEZE", "raypac_entries", id, None, 
-              f"Freezado con remito {numero_remito}")
+              f"Freezado con remito {numero_remito} - Equipo enviado a DML")
     
     flash("Máquina freezada y enviada a ST.", "success")
     return redirect(url_for("raypac_view", id=id))
@@ -1625,6 +1618,40 @@ def raypac_unfreeze(id):
     log_action(user['id'], "UNFREEZE", "raypac_entries", id, None, "Descongelado")
     
     flash("✅ Máquina descongelada correctamente.", "success")
+    return redirect(url_for("raypac_view", id=id))
+
+@app.route("/raypac/<int:id>/recepcionar", methods=["POST"])
+@login_required
+@role_required("ADMIN", "DML_ST")
+def raypac_recepcionar_dml(id):
+    """DML recepciona el equipo y actualiza estado a RECIBIDO"""
+    user = get_current_user()
+    db = get_db()
+    entry = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (id,)).fetchone()
+    
+    if not entry:
+        flash("Registro no encontrado.", "error")
+        return redirect(url_for("raypac_list"))
+    
+    if not entry['is_frozen']:
+        flash("El equipo debe estar enviado (freezado) para poder recepcionarlo.", "error")
+        return redirect(url_for("raypac_view", id=id))
+    
+    if entry['estado_envio_equipos'] == 'RECIBIDO':
+        flash("Este equipo ya fue recepcionado en DML.", "warning")
+        return redirect(url_for("raypac_view", id=id))
+    
+    db.execute("""
+        UPDATE raypac_entries 
+        SET estado_envio_equipos = 'RECIBIDO', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    """, (id,))
+    db.commit()
+    
+    log_action(user['id'], "RECEPCIONAR", "raypac_entries", id, None, 
+              f"Equipo recepcionado en DML - Remito: {entry['numero_remito']}")
+    
+    flash("✅ Equipo recepcionado correctamente en DML.", "success")
     return redirect(url_for("raypac_view", id=id))
 
 # ======================== DML - FICHAS ========================

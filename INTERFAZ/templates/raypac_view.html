@@ -63,13 +63,22 @@
                     <strong>Estado de Envío del Equipo:</strong>
                     {% if entry.estado_envio_equipos == 'RECIBIDO' %}
                     <span class="badge bg-success">Recibido en DML</span>
-                    {% elif entry.estado_envio_equipos == 'ENVIADO' or entry.estado_envio_equipos == 'EN_TRANSITO' %}
-                    <span class="badge bg-warning text-dark">En Tránsito</span>
-                    {% else %}
-                    <span class="badge bg-secondary">Pendiente de Envío</span>
-                    {% endif %}
+                    <br><small class="text-muted">Recepcionado por DML</small>
+                    {% elif entry.estado_envio_equipos == 'ENVIADO' %}
+                    <span class="badge bg-warning text-dark">Enviado desde RAYPAC</span>
                     {% if entry.fecha_envio_equipos %}
                     <br><small class="text-muted">Enviado: {{ entry.fecha_envio_equipos }}</small>
+                    {% endif %}
+                    {% if user_role in ['ADMIN', 'DML_ST'] and entry.is_frozen %}
+                    <br><br>
+                    <form method="POST" action="{{ url_for('raypac_recepcionar_dml', id=entry.id) }}" class="d-inline">
+                        <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('¿Confirmar recepción del equipo en DML?')">
+                            <i class="bi bi-check-circle"></i> Dar de Alta en DML
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% else %}
+                    <span class="badge bg-secondary">Pendiente de Envío</span>
                     {% endif %}
                 </div>
             </div>
