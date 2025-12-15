@@ -64,9 +64,20 @@ body { padding-bottom: 40px; }
     }
 }
 
-/* Force dark text in entregadas table */
+/* Force dark text in entregadas table - ULTRA SPECIFIC */
 table.table td.text-dark,
+table.table td.text-dark *,
 table.table td.text-dark strong,
-table.table td.text-dark code {
+table.table td.text-dark code,
+table.table td.text-dark span,
+table.table tbody td.text-dark,
+table.table-hover tbody td.text-dark,
+table.table-striped tbody td.text-dark {
+    color: #212529 !important;
+    background-color: transparent !important;
+}
+
+/* Additional force for all table cells regardless of class */
+table.table tbody td {
     color: #212529 !important;
 }
