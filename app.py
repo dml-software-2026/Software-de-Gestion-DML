@@ -1385,7 +1385,7 @@ def index():
         envios_repuestos_pendientes = db.execute("""
             SELECT COUNT(*) AS total 
             FROM envios_repuestos 
-            WHERE estado_envio = 'ENVIADO' AND is_frozen = 1 AND fecha_recepcion IS NULL
+            WHERE estado_envio = 'ENVIADO' AND is_frozen = 1 AND fecha_recepcion_dml IS NULL
         """).fetchone()['total']
         
         stats = {
