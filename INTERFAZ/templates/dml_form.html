@@ -62,10 +62,19 @@
                                 <label for="n_ciclos" class="form-label">N° de Ciclos</label>
                                 <input type="number" class="form-control" id="n_ciclos" name="n_ciclos">
                             </div>
+                            {% if not ticket %}
                             <div class="col-md-6">
                                 <label for="tecnico_resp" class="form-label">Técnico ST Responsable *</label>
                                 <input type="text" class="form-control" id="tecnico_resp" name="tecnico_resp" required>
                             </div>
+                            {% else %}
+                            <div class="col-md-6">
+                                <div class="alert alert-info mb-0">
+                                    <strong>Técnico ST Responsable:</strong> {{ ticket.tecnico_responsable }}<br>
+                                    <small class="text-muted">(Traído del ticket)</small>
+                                </div>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

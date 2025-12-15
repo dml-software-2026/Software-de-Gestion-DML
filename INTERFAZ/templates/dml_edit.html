@@ -180,9 +180,9 @@
         <div class="form-group" style="border: 2px solid #ffc107; padding: 15px; background-color: #fff3cd; border-radius: 5px;">
             <label style="color: #856404; font-weight: bold;">⚠️ Número de Remito de Salida (DML→RAYPAC):</label>
             <input type="text" name="numero_remito_salida" value="{{ ficha.numero_remito_salida or '' }}" 
-                   placeholder="ej. REM-2025-001" class="form-control">
+                   placeholder="Ej: 4222 (se convertirá a 00001-04222)" pattern="[0-9]{1,5}" maxlength="5" class="form-control">
             <small style="color: #856404; display: block; margin-top: 5px;">
-                📋 <strong>Opcional durante edición. Requerido solo para CERRAR la ficha.</strong> Indica el remito de transporte cuando el equipo vuelve a RAYPAC.
+                📋 <strong>Opcional durante edición. Requerido solo para CERRAR la ficha.</strong> Ingresa solo los últimos 4 dígitos del remito de salida (diferente al de entrada).
             </small>
         </div>
 

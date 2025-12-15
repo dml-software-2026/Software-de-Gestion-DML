@@ -31,11 +31,15 @@
                            placeholder="ej. HT TENSION MOTOR GROUP">
                 </div>
                 
+                {% if ubicacion != 'RAYPAC' %}
                 <div class="form-group">
                     <label for="cantidad">Cantidad Inicial:</label>
                     <input type="number" class="form-control" id="cantidad" name="cantidad" 
                            value="0" required min="0">
                 </div>
+                {% else %}
+                <input type="hidden" name="cantidad" value="999999">
+                {% endif %}
                 
                 <button type="submit" class="btn btn-success">Crear Repuesto</button>
                 <a href="{{ url_for('stock_list') }}" class="btn btn-secondary">Cancelar</a>

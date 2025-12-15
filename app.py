@@ -1357,6 +1357,13 @@ def index():
             AND su.cantidad >= dr.cantidad_utilizada
         """).fetchone()['total']
         
+        # Envíos de repuestos pendientes de recibir desde RAYPAC
+        envios_repuestos_pendientes = db.execute("""
+            SELECT COUNT(*) AS total 
+            FROM envios_repuestos 
+            WHERE estado_envio = 'ENVIADO' AND is_frozen = 1
+        """).fetchone()['total']
+        
         stats = {
             "tickets_revision_inicial": tickets_revision_inicial,
             "fichas_revision_inicial": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'A LA ESPERA DE REVISI_N' AND is_closed = 0"),
@@ -1364,6 +1371,7 @@ def index():
             "fichas_espera_repuestos": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion = 'A LA ESPERA DE REPUESTOS' AND is_closed = 0"),
             "fichas_listas": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'M_QUINA LISTA PARA RETIRAR' AND is_closed = 0"),
             "equipos_raypac_pendientes": equipos_pendientes,
+            "envios_repuestos_pendientes": envios_repuestos_pendientes,
             "tickets_activos": count("SELECT COUNT(*) AS total FROM tickets WHERE estado != 'CERRADO'"),
             "repuestos_disponibles": repuestos_disponibles
         }
@@ -1714,7 +1722,7 @@ def dml_entregadas():
         SELECT f.*, r.cliente, r.numero_serie, r.contacto_cliente, r.email_cliente
         FROM dml_fichas f
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
-        WHERE f.estado_reparacion = 'ENTREGADA'
+        WHERE f.estado_reparacion LIKE '%ENTREGADA%' OR f.estado_reparacion LIKE 'M_QUINA ENTREGADA'
         ORDER BY f.fecha_entrega_cliente DESC, f.updated_at DESC
     """).fetchall()
     
@@ -1860,14 +1868,18 @@ def dml_new(raypac_id):
     if request.method == "POST":
         try:
             fecha_ingreso = request.form.get("fecha_ingreso") or datetime.now().strftime("%Y-%m-%d")
-            tecnico = request.form.get("tecnico")
             # CAMBIO DAVID: No usar diagnostico_inicial, ya viene de RAYPAC (diagnostico_ingreso)
             observaciones = request.form.get("observaciones")
             n_ciclos = request.form.get("n_ciclos") or 0
-            tecnico_resp = request.form.get("tecnico_resp")
             
-            if not all([tecnico, tecnico_resp]):
-                flash("Completa los campos obligatorios.", "error")
+            # Si hay ticket, usar el técnico responsable del ticket; si no, pedir tecnico_resp
+            if ticket:
+                tecnico_resp = ticket.get('tecnico_responsable') or request.form.get("tecnico_resp")
+            else:
+                tecnico_resp = request.form.get("tecnico_resp")
+            
+            if not tecnico_resp:
+                flash("Técnico ST Responsable es obligatorio.", "error")
                 return render_template("dml_form.html", raypac=raypac, ticket=ticket)
             
             numero_ficha = generate_ficha_number()
@@ -1876,11 +1888,11 @@ def dml_new(raypac_id):
             if ticket:
                 db.execute("""
                     INSERT INTO dml_fichas 
-                    (numero_ficha, raypac_id, ticket_id, numero_ticket, fecha_ingreso, tecnico,
+                    (numero_ficha, raypac_id, ticket_id, numero_ticket, fecha_ingreso,
                      observaciones, n_ciclos, tecnico_resp,
                      estado_reparacion)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso, tecnico,
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso,
                       observaciones, n_ciclos, tecnico_resp, 'REVISION_INICIAL'))
                 
                 ficha_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
@@ -1893,11 +1905,11 @@ def dml_new(raypac_id):
                 # Flujo antiguo: crear ficha sin ticket previo
                 db.execute("""
                     INSERT INTO dml_fichas 
-                    (numero_ficha, raypac_id, fecha_ingreso, tecnico,
+                    (numero_ficha, raypac_id, fecha_ingreso,
                      observaciones, n_ciclos, tecnico_resp,
                      estado_reparacion)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (numero_ficha, raypac_id, fecha_ingreso, tecnico,
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (numero_ficha, raypac_id, fecha_ingreso,
                       observaciones, n_ciclos, tecnico_resp, 'REVISION_INICIAL'))
                 
                 ficha_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
@@ -3121,7 +3133,13 @@ def stock_new():
             
             codigo = request.form.get("codigo_repuesto")
             item = request.form.get("item")
-            cantidad = int(request.form.get("cantidad", 0))
+            cantidad_form = request.form.get("cantidad", "0")
+            
+            # Para RAYPAC, siempre cantidad infinita (999999)
+            if ubicacion == "RAYPAC":
+                cantidad = 999999
+            else:
+                cantidad = int(cantidad_form)
             
             if not codigo or not item:
                 flash("Código e Item son obligatorios.", "error")

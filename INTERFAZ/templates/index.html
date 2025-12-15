@@ -233,6 +233,23 @@
     <h4 class="mb-3 mt-4"><i class="bi bi-bell-fill"></i> Alertas y Pendientes</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-4">
+            <a href="{{ url_for('envios_list') }}" class="text-decoration-none">
+                <div class="card shadow-sm h-100 position-relative {% if stats.envios_repuestos_pendientes > 0 %}border-danger{% endif %}" style="transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <i class="bi bi-truck" style="font-size: 2rem; color: #dc3545;"></i>
+                            </div>
+                            <h2 class="display-6 fw-bold text-danger mb-0">{{ stats.envios_repuestos_pendientes }}</h2>
+                        </div>
+                        <h6 class="fw-bold">Envíos de Repuestos Pendientes</h6>
+                        <p class="text-muted small mb-0"><i class="bi bi-box-arrow-in-down"></i> Repuestos enviados por RAYPAC para dar de alta</p>
+                        <span class="stretched-link"></span>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
             <a href="{{ url_for('raypac_list') }}" class="text-decoration-none">
                 <div class="card shadow-sm h-100 position-relative {% if stats.equipos_raypac_pendientes > 0 %}border-warning{% endif %}" style="transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
                     <div class="card-body">
