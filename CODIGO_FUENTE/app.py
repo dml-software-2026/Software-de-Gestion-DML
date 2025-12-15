@@ -2952,9 +2952,12 @@ def envios_confirmar(id):
     try:
         estado_envio = envio['estado_envio']
     except (KeyError, TypeError):
-        estado_envio = envio.get('estado', '')
+        estado_envio = None
     
-    if estado_envio == 'RECIBIDO' or envio.get('fecha_recepcion_dml'):
+    # Acceso directo sin .get() para sqlite3.Row
+    fecha_recepcion_actual = envio['fecha_recepcion_dml'] if 'fecha_recepcion_dml' in envio.keys() else None
+    
+    if estado_envio == 'RECIBIDO' or fecha_recepcion_actual:
         flash("El envío ya fue confirmado.", "warning")
         return redirect(url_for("envios_view", id=id))
 
