@@ -1483,7 +1483,8 @@ def raypac_list(readonly=False):
         "EN_REPARACION": {"color": "#ffc107", "texto": "En Reparación"},
         "PAUSADA": {"color": "#fd7e14", "texto": "Pausada"},
         "FINALIZADA": {"color": "#28a745", "texto": "Finalizada"},
-        "ENTREGADA": {"color": "#6c757d", "texto": "Entregada"}
+        "ENTREGADA": {"color": "#6c757d", "texto": "Entregada"},
+        "MÁQUINA ENTREGADA": {"color": "#6c757d", "texto": "Máquina Entregada"}
     }
     
     return render_template("raypac_list.html", entries=entries, user_role=user['role'], readonly=readonly, estado_config=estado_config)
