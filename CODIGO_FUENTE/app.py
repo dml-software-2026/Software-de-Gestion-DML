@@ -2830,10 +2830,16 @@ def envios_new():
                 flash("⚠️ Formato de remito inválido. Ingresa solo los últimos 4 dígitos (ej: 4222) o el formato completo ####-#### (ej: 00001-04222).", "error")
                 return render_template("envios_form.html", stock=stock_raypac)
             
-            # Verificar que no exista ya
+            # Verificar que no exista ya en envios_repuestos
             existe = db.execute("SELECT id FROM envios_repuestos WHERE numero_remito = ?", (numero_remito,)).fetchone()
             if existe:
-                flash(f"⚠️ El número de remito {numero_remito} ya existe en el sistema.", "error")
+                flash(f"⚠️ El número de remito {numero_remito} ya existe en otro envío de repuestos.", "error")
+                return render_template("envios_form.html", stock=stock_raypac)
+            
+            # Verificar que no exista en raypac_entries
+            existe_raypac = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = ?", (numero_remito,)).fetchone()
+            if existe_raypac:
+                flash(f"⚠️ El número de remito {numero_remito} ya fue usado para enviar un equipo. Usa un remito diferente.", "error")
                 return render_template("envios_form.html", stock=stock_raypac)
             
             seleccionados = []
