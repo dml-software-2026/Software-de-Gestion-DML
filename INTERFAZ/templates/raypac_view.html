@@ -83,13 +83,7 @@
         <div class="col-md-12">
             {% if not readonly and user_role in ['ADMIN', 'RAYPAC'] %}
             
-            {% if entry.is_frozen %}
-            <!-- Modo freezado: solo botón para correcciones rápidas -->
-            <a href="{{ url_for('raypac_edit', id=entry.id) }}" class="btn btn-warning">
-                <i class="fas fa-edit"></i> Editar (Corregir errores de tipeo)
-            </a>
-            <small class="text-muted d-block mt-1">💡 Permite corregir errores sin desfreezar</small>
-            {% else %}
+            {% if not entry.is_frozen %}
             <!-- Modo editable: botón editar normal y opción de freezar -->
             <a href="{{ url_for('raypac_edit', id=entry.id) }}" class="btn btn-primary">
                 <i class="fas fa-edit"></i> Editar
