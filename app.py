@@ -316,15 +316,26 @@ def migrate_db():
                 print(f"[MIGRATION] ✅ Columna {componente} agregada a tickets")
         
         # FIX CRÍTICO: En SQLite no se puede modificar constraint NOT NULL directamente
-        # Necesitamos recrear la tabla si ficha_id es NOT NULL
+        # Necesitamos recrear la tabla si ficha_id es NOT NULL o faltan columnas
         # Verificar si necesitamos migrar la tabla
+        columnas_requeridas = ['fecha_ingreso', 'tecnico_responsable', 'observaciones', 
+                               'estado_equipo', 'carcaza', 'cubre_feedwheel', 'mango', 'botones',
+                               'motor_arrastre', 'motor_sellado', 'cuchilla', 'servo',
+                               'rueda_arrastre', 'resorte_manija', 'otros']
+        
+        faltan_columnas = any(col not in tickets_cols for col in columnas_requeridas)
+        
         try:
             # Intentar insertar un ticket de prueba con ficha_id NULL
             db.execute("INSERT INTO tickets (numero_ticket, numero_serie, estado, ficha_id, raypac_id) VALUES ('TEST-MIGRATION', 'TEST', 'ACTIVO', NULL, NULL)")
             db.execute("DELETE FROM tickets WHERE numero_ticket = 'TEST-MIGRATION'")
-            print("[MIGRATION] ✅ Tabla tickets ya permite ficha_id NULL")
+            
+            if faltan_columnas:
+                raise Exception("Faltan columnas en la tabla tickets")
+            
+            print("[MIGRATION] ✅ Tabla tickets ya permite ficha_id NULL y tiene todas las columnas")
         except Exception as test_error:
-            if "NOT NULL constraint failed" in str(test_error):
+            if "NOT NULL constraint failed" in str(test_error) or faltan_columnas or "no column named" in str(test_error):
                 print("[MIGRATION] ⚠️  Detectado constraint NOT NULL en ficha_id. Recreando tabla tickets...")
                 
                 # Respaldar datos existentes
@@ -3027,7 +3038,7 @@ def stock_list(readonly=False):
 
 @app.route("/stock/new", methods=["GET", "POST"])
 @login_required
-@role_required("ADMIN", "DML_ST")
+@role_required("ADMIN", "DML_ST", "RAYPAC")
 def stock_new():
     user = get_current_user()
     db = get_db()
