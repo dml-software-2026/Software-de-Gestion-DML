@@ -63,3 +63,10 @@ body { padding-bottom: 40px; }
         font-size: 1rem;
     }
 }
+
+/* Force dark text in entregadas table */
+table.table td.text-dark,
+table.table td.text-dark strong,
+table.table td.text-dark code {
+    color: #212529 !important;
+}
