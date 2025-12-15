@@ -366,7 +366,9 @@
                 }
             }
         });
-        </script>
+
+        // Validación adicional del campo código
+        document.getElementById('codigo_repuesto').addEventListener('blur', function() {
             const alertDiv = document.getElementById('stock_alert');
             
             if (!codigo) {
