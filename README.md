@@ -1,5 +1,22 @@
 # 🎯 Sistema DML ST & Gestión de Repuestos
 
+## Continuación del proyecto
+
+Este repositorio es la continuación del trabajo iniciado por la cohorte anterior del Instituto (2024-2025).
+
+**Cohorte anterior:**
+- Tomás Palumbo
+- Salvador Merayo
+- Docente: Hugo Rodriguez
+
+**Cohorte actual (2025-2026):**
+- Facundo Coca
+- Ivo Albacete
+- Sebastián Lopez
+
+El repositorio original puede consultarse como referencia histórica en:
+https://github.com/Tosabe033/Software-de-Gestion-DML
+
 Sistema integral de gestión para reparación de equipos RAYPAC y mantenimiento de stock de repuestos en DML.
 
 **Versión:** 1.0 - Production Ready  
