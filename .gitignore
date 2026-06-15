@@ -56,7 +56,6 @@ logs/
 .env
 .env.local
 .env.*.local
-
 # Build artifacts
 CODIGO_FUENTE/build/
 build/
@@ -64,3 +63,5 @@ build/
 # OS
 Thumbs.db
 .DS_Store
+
+app_malo_con_correcciones.py
