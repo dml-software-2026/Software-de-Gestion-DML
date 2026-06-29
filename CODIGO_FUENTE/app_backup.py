@@ -23,12 +23,8 @@ from flask import (
 
 load_dotenv()
 
-# Detectar si es ejecutable compilado
-IS_EXECUTABLE = getattr(sys, 'frozen', False)
-if IS_EXECUTABLE:
-    BASE_DIR = os.path.dirname(sys.executable)
-else:
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Ruta base del proyecto (se calcula desde la ubicación de este archivo)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 app = Flask(
     __name__,
