@@ -993,7 +993,7 @@ def enviar_alerta_stock(codigo, item, cantidad, nivel, ubicacion="DML"):
     """
     
     # Enviar a repuestos@dml.local
-    send_mail("repuestos@dml.local", f"🔔 Alerta de Stock: {item}", body)
+    send_mail(os.getenv("MAIL_ALERT_RECIPIENT"), f"🔔 Alerta de Stock: {item}", body)
 
 def actualizar_estado_alerta_stock(codigo, ubicacion="DML"):
     """Recalcula estado_alerta en stock_dml tras movimientos para la ubicación dada."""
@@ -1584,7 +1584,7 @@ def raypac_edit(id):
     if request.method == "POST":
         try:
             unfreeze_code = request.form.get("unfreeze_code")
-            if entry['is_frozen'] and unfreeze_code != "ADMIN2024":
+            if entry['is_frozen'] and unfreeze_code != os.getenv("UNFREEZE_CODE"):
                 flash("Código de desbloqueo incorrecto.", "error")
                 return render_template("raypac_view.html", entry=entry)
             
@@ -2087,7 +2087,7 @@ def dml_edit(id):
     if request.method == "POST":
         try:
             unfreeze_code = request.form.get("unfreeze_code")
-            if ficha['is_closed'] and unfreeze_code != "ADMIN2024":
+            if ficha['is_closed'] and unfreeze_code != os.getenv("UNFREEZE_CODE"):
                 flash("Código incorrecto.", "error")
                 return redirect(url_for("dml_view", id=id))
             
@@ -3199,7 +3199,7 @@ def stock_new():
             # Solo ADMIN necesita contraseña
             if user['role'] == 'ADMIN':
                 admin_password = (request.form.get("admin_password") or "").strip()
-                if admin_password != "ADMIN2024":
+                if admin_password != os.getenv("UNFREEZE_CODE"):
                     flash("Contraseña de administración incorrecta.", "error")
                     return render_template("stock_new.html", ubicacion=ubicacion, user=user)
             
@@ -3284,7 +3284,7 @@ def stock_edit(codigo):
             # Solo ADMIN necesita contraseña
             if user['role'] == 'ADMIN':
                 admin_password = (request.form.get("admin_password") or "").strip()
-                if admin_password != "ADMIN2024":
+                if admin_password != os.getenv("UNFREEZE_CODE"):
                     flash("Contraseña de administración incorrecta.", "error")
                     return render_template("stock_edit.html", stock=stock, ubicacion=ubicacion, user=user)
 
@@ -3319,7 +3319,7 @@ def stock_delete(codigo):
     
     # Solo ADMIN necesita contraseña
     admin_password = (request.form.get("admin_password") or "").strip()
-    if admin_password != "ADMIN2024":
+    if admin_password != os.getenv("UNFREEZE_CODE"):
         flash("Contraseña de administración incorrecta.", "error")
         return redirect(url_for("stock_list", ubicacion=ubicacion))
     
