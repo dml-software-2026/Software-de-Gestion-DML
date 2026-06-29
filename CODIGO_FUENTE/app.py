@@ -3671,64 +3671,6 @@ def usuarios_list():
     usuarios = db.execute("SELECT * FROM users ORDER BY email").fetchall()
     return render_template("usuarios_list.html", usuarios=usuarios, user=user)
 
-@app.route("/admin/reset-database-with-seeds", methods=["POST", "GET"])
-def reset_database_temp():
-    """Endpoint temporal para resetear BD con seeds (SOLO PRODUCCIÓN)"""
-    import sys
-    
-    output = []
-    try:
-        # Borrar BD actual
-        db_path = app.config["DATABASE"]
-        output.append(f"[RESET] Ruta BD: {db_path}")
-        print(f"[RESET] Ruta BD: {db_path}", file=sys.stderr, flush=True)
-        
-        if os.path.exists(db_path):
-            os.remove(db_path)
-            output.append("[RESET] ✅ Base de datos eliminada")
-            print("[RESET] ✅ Base de datos eliminada", file=sys.stderr, flush=True)
-        else:
-            output.append("[RESET] ⚠️ BD no existía")
-            print("[RESET] ⚠️ BD no existía", file=sys.stderr, flush=True)
-        
-        # Recrear con seeds
-        output.append("[RESET] Iniciando recreación...")
-        print("[RESET] Iniciando recreación...", file=sys.stderr, flush=True)
-        
-        # Forzar reset del flag de migraciones
-        if hasattr(app, '_migrations_applied'):
-            delattr(app, '_migrations_applied')
-        
-        init_db()
-        output.append("[RESET] ✅ Base de datos recreada con seeds")
-        print("[RESET] ✅ Base de datos recreada con seeds", file=sys.stderr, flush=True)
-        
-        # Verificar datos
-        db = get_db()
-        user_count = db.execute("SELECT COUNT(*) as c FROM users").fetchone()['c']
-        stock_count = db.execute("SELECT COUNT(*) as c FROM stock_ubicaciones").fetchone()['c']
-        
-        output.append(f"[RESET] Usuarios creados: {user_count}")
-        output.append(f"[RESET] Items en stock: {stock_count}")
-        print(f"[RESET] Usuarios: {user_count}, Stock: {stock_count}", file=sys.stderr, flush=True)
-        
-        result = "<br>".join(output)
-        result += "<br><br><strong>Login: admin@dml.local / admin</strong>"
-        result += "<br><a href='/login'>Ir al login</a>"
-        return result, 200
-        
-    except Exception as e:
-        import traceback
-        error_msg = str(e)
-        trace = traceback.format_exc()
-        output.append(f"[RESET] ❌ Error: {error_msg}")
-        print(f"[RESET] ❌ Error: {error_msg}", file=sys.stderr, flush=True)
-        print(trace, file=sys.stderr, flush=True)
-        
-        result = "<br>".join(output)
-        result += f"<br><br><pre>{trace}</pre>"
-        return result, 500
-
 @app.route("/admin/cargar-stock-csv", methods=["POST", "GET"])
 def cargar_stock_desde_web():
     """Endpoint para cargar stock desde el CSV en producción"""
