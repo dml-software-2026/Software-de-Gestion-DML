@@ -235,20 +235,24 @@ python scripts/smoke_test.py
 ### 1. Higiene de git (bloqueante — primero de todo)
 **Por qué primero:** hasta que dev esté nivelada con main, cualquier branch nueva arrastra basura en el diff.
 
-- [ ] Aprobar y mergear PR #82 (squash). Verificar después:
+- [x] Aprobar y mergear PR #82 (squash). Verificar después:
+
   ```
   git fetch origin
   git ls-tree origin/dev | grep app_backup  # NO debe devolver nada
   ```
-- [ ] Borrar branch `chore/eliminar-app-backup-obsoleto` (ya mergeada como #81):
+
+- [x] Borrar branch `chore/eliminar-app-backup-obsoleto` (ya mergeada como #81):
+
   ```
   git push origin --delete chore/eliminar-app-backup-obsoleto
   ```
 
 ### 2. Higiene de kanban (XS cada uno)
-- [ ] Cerrar #60 con comentario "Duplicado de #61" (reason: not planned)
-- [ ] Cerrar #33 con comentario "Obsoleto post-#74, RNF01 del Acta excluye .exe" (reason: not planned)
-- [ ] Cerrar #22, #23, #24, #26 con comentario "Es categoría, no tarea. Ya está el field Épica en el Project"
+
+- [x] Cerrar #60 con comentario "Duplicado de #61" (reason: not planned)
+- [x] Cerrar #33 con comentario "Obsoleto post-#74, RNF01 del Acta excluye .exe" (reason: not planned)
+- [x] Cerrar #22, #23, #24, #26 con comentario "Es categoría, no tarea. Ya está el field Épica en el Project"
 
 ### 3. Crear 3 issues nuevos para el sprint siguiente (backlog, sin asignar)
 
