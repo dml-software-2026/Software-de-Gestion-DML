@@ -1,12 +1,13 @@
 from datetime import datetime
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify
+from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, send_file
 
 from extensions import get_db
 from decorators import login_required, role_required, permission_required, get_current_user, log_action
 from services.mail import send_mail
 from services.numeracion import generate_ficha_number, crear_ticket
 from services.stock import ajustar_stock_ubicacion, actualizar_estadistica_repuesto, verificar_alerta_stock
+from services.pdf import generar_ficha_pdf, generate_ficha_pdf
 
 dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
 
@@ -808,3 +809,107 @@ def dml_registrar_acuse(id):
         flash(f"Error al cerrar ficha: {str(e)}", "error")
 
     return redirect(url_for("dml.dml_view", id=id))
+
+
+# ======================== PDF DE FICHA ========================
+# NOTA: estas 2 rutas se agregaron en un checkpoint posterior al resto del
+# archivo - en la primera pasada de extracción no se habían visto todavía
+# (estaban ubicadas mas adelante en el app.py original, cerca del bloque de
+# usuarios/admin, aunque su URL es /dml/... y por eso corresponden aca).
+
+@dml_bp.route("/<int:id>/generar-ficha", methods=["POST"])
+@login_required
+@role_required("ADMIN", "DML_ST")
+def generar_ficha(id):
+    user = get_current_user()
+    db = get_db()
+
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    if not ficha:
+        flash("Ficha no encontrada.", "error")
+        return redirect(url_for("dml.dml_list"))
+
+    # Verificar que esté en "MÁQUINA LISTA PARA RETIRAR"
+    if ficha['estado_reparacion'] != 'MÁQUINA LISTA PARA RETIRAR':
+        flash("La máquina debe estar en estado 'MÁQUINA LISTA PARA RETIRAR'.", "error")
+        return redirect(url_for("dml.dml_view", id=id))
+
+    try:
+        # Generar PDF para validar que no hay errores
+        pdf_buffer = generate_ficha_pdf(id)
+
+        # Guardar en BD
+        db.execute(
+            "UPDATE dml_fichas SET ficha_generada = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (id,)
+        )
+        db.commit()
+
+        # Intentar enviar correo al comercial (no bloquear si falla)
+        try:
+            raypac = db.execute(
+                "SELECT mail_comercial FROM raypac_entries WHERE id = ?",
+                (ficha['raypac_id'],)
+            ).fetchone()
+
+            if raypac and raypac['mail_comercial']:
+                html_body = f"""
+                <html>
+                <body>
+                <h2>Máquina Lista para Entregar</h2>
+                <p>La máquina <strong>{ficha['numero_ficha']}</strong> se encuentra lista para retirar.</p>
+                <p>Datos del ticket: {ficha['numero_ticket']}</p>
+                <p>Saludos, DML</p>
+                </body>
+                </html>
+                """
+                send_mail(raypac['mail_comercial'],
+                         f"Máquina {ficha['numero_ticket']} - Lista para Retirar",
+                         html_body)
+
+                db.execute(
+                    "UPDATE dml_fichas SET ticket_enviado = 1 WHERE id = ?",
+                    (id,)
+                )
+                db.commit()
+        except Exception as e:
+            print(f"Error al enviar email: {str(e)}")
+
+        log_action(user['id'], "GENERATE_FICHA", "dml_fichas", id, None,
+                  f"Ficha #{ficha['numero_ficha']}")
+
+        flash("Ficha generada exitosamente. Descarga el PDF con el botón disponible.", "success")
+        return redirect(url_for("dml.dml_view", id=id))
+
+    except Exception as e:
+        flash(f"Error al generar ficha: {str(e)}", "error")
+        return redirect(url_for("dml.dml_view", id=id))
+
+
+@dml_bp.route("/<int:id>/pdf", methods=["GET"])
+@login_required
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
+def descargar_ficha_pdf(id):
+    """Genera y descarga el PDF de una ficha de reparación."""
+    user = get_current_user()
+    db = get_db()
+
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    if not ficha:
+        flash("Ficha no encontrada.", "error")
+        return redirect(url_for("dml.dml_list"))
+
+    # Generar PDF on-demand
+    pdf_buffer = generar_ficha_pdf(id)
+
+    if not pdf_buffer:
+        flash("No se pudo generar el PDF.", "error")
+        return redirect(url_for("dml.dml_view", id=id))
+
+    log_action(user['id'], "DOWNLOAD_FICHA_PDF", "dml_fichas", id, None,
+              f"Ficha #{ficha['numero_ficha']}")
+
+    # Devolver PDF
+    return send_file(pdf_buffer, mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name=f"ficha_{ficha['numero_ficha']:07d}.pdf")
