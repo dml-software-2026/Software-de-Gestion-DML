@@ -11,12 +11,11 @@ import sys
 import os
 
 # Determinar la ruta de la base de datos
-if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
-else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DB_PATH = os.path.join(BASE_DIR, "dml.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+PROJECT_ROOT = os.path.join(BASE_DIR, "..")  # Directorio raíz del proyecto
+
 CSV_PATH = os.path.join(BASE_DIR, "DOCUMENTOS DML", "Copia de NUEVO STOCK DE REPUESTOS COMPLETO.csv")
 
 def cargar_stock_desde_csv():
