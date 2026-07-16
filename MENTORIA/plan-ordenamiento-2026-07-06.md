@@ -269,7 +269,7 @@ python scripts/smoke_test.py
 
 **Por qué rebase y no branch nueva:** ya tenés 4 commits reales en `fix/remove-hardcoded-credentials`. Rebranchar es tirarlos. Rebase los reaplica sobre el `dev` actualizado y el diff queda limpio (sin las 4221 líneas ajenas que hundieron el PR #72).
 
-- [ ] Rebase:
+- [x] Rebase:
   ```
   git fetch origin
   git checkout fix/remove-hardcoded-credentials
@@ -280,23 +280,23 @@ python scripts/smoke_test.py
   git log origin/dev..HEAD --oneline
   # Debe listar SOLO tus 4 commits.
   ```
-- [ ] Eliminar el bloque `CORRECT_HASHES` de `CODIGO_FUENTE/app.py` líneas 449-465 aprox (es lo que se te había pasado — causa raíz de #65)
-- [ ] Verificar:
+- [x] Eliminar el bloque `CORRECT_HASHES` de `CODIGO_FUENTE/app.py` líneas 449-465 aprox (es lo que se te había pasado — causa raíz de #65)
+- [x] Verificar:
   ```
   git diff origin/dev --stat
   # Debe mostrar SOLO tus cambios: .env.example, app.py con hardcodes reemplazados + CORRECT_HASHES eliminado.
   ```
-- [ ] Push forzado (obligatorio tras rebase):
+- [x] Push forzado (obligatorio tras rebase):
   ```
   git push --force-with-lease origin fix/remove-hardcoded-credentials
   # --force-with-lease es seguro: falla si alguien pusheó mientras rebaseabas.
   ```
-- [ ] PR contra `dev`:
+- [x] PR contra `dev`:
   ```
   gh pr create --base dev \
     --title "fix: mover credenciales a .env + eliminar CORRECT_HASHES (cierra #64 y #65)"
   ```
-- [ ] Merge squash → #64 y #65 se auto-cierran.
+- [x] Merge squash → #64 y #65 se auto-cierran.
 
 ### 5. Reestructura no-DB de la raíz
 
@@ -304,23 +304,23 @@ Ordenar los archivos de la raíz que no usan `import sqlite3` (los sqlite3 los m
 
 **Mover a `scripts/` (Seba crea la carpeta en su PR, vos aprovechás):**
 
-- [ ] `git mv test_email.py scripts/` (test SMTP puro, sin BD)
+- [x] `git mv test_email.py scripts/` (test SMTP puro, sin BD)
 
 **Borrar (obsoletos de la era del ejecutable y huérfanos):**
 
-- [ ] `git rm launcher.py` (raíz — wrapper del ex-.exe, RNF01 del Acta excluye ejecutable local)
-- [ ] `git rm reset_db.html` (endpoint eliminado en #77, quedó huérfano el HTML)
+- [x] `git rm launcher.py` (raíz — wrapper del ex-.exe, RNF01 del Acta excluye ejecutable local)
+- [x] `git rm reset_db.html` (endpoint eliminado en #77, quedó huérfano el HTML)
 
 **Actualizar (sin mover):**
 
-- [ ] `.env.production`: eliminar la línea `DATABASE_URL=sqlite:////var/data/dml.db`. Es residuo de la era SQLite y confunde. La var se define recién en Fase 2.
+- [x] `.env.production`: eliminar la línea `DATABASE_URL=sqlite:////var/data/dml.db`. Es residuo de la era SQLite y confunde. La var se define recién en Fase 2.
 
 **Ordenamiento del PR:** hacer estos cambios en tu misma rama del rebase de #64 (o sea, el PR del rebase incluye también esta reestructura no-DB). Si preferís separar en dos PRs porque temés que se choquen, dale.
 
-- [ ] Ivo: `test_email.py` movido a `scripts/`
-- [ ] Ivo: `launcher.py` (raíz) borrado
-- [ ] Ivo: `reset_db.html` borrado
-- [ ] Ivo: `.env.production` actualizado
+- [x] Ivo: `test_email.py` movido a `scripts/`
+- [x] Ivo: `launcher.py` (raíz) borrado
+- [x] Ivo: `reset_db.html` borrado
+- [x] Ivo: `.env.production` actualizado
 
 ---
 
