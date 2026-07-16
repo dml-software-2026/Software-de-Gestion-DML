@@ -22,13 +22,13 @@ Restricción: **nadie toca `CODIGO_FUENTE/app.py` excepto Facu.**
 ### Blueprints faltantes
 Un blueprint es un módulo de Flask que agrupa rutas por dominio (ver `blueprints/auth.py` y `blueprints/raypac.py` como referencia).
 
-- [ ] `blueprints/dml.py` — `/dml/*` (fichas, partes, repuestos)
-- [ ] `blueprints/tickets.py` — `/tickets`, `/ticket/*`
-- [ ] `blueprints/envios.py` — `/envios/*`
-- [ ] `blueprints/stock.py` — `/stock/*`
-- [ ] `blueprints/admin.py` — `/admin` (ABM usuarios, carga stock)
-- [ ] `blueprints/estadisticas.py` — dashboard + exports
-- [ ] `blueprints/api.py` — `/api/*`
+- [x] `blueprints/dml.py` — `/dml/*` (fichas, partes, repuestos)
+- [x] `blueprints/tickets.py` — `/tickets`, `/ticket/*`
+- [x] `blueprints/envios.py` — `/envios/*`
+- [x] `blueprints/stock.py` — `/stock/*`
+- [x] `blueprints/admin.py` — `/admin` (ABM usuarios, carga stock)
+- [x] `blueprints/estadisticas.py` — dashboard + exports
+- [x] `blueprints/api.py` — `/api/*`
 
 ### Cierre del refactor
 - [ ] `app.py` nuevo chico: crea Flask app, registra los 9 blueprints, hook `apply_migrations`
