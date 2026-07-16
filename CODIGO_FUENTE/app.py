@@ -436,37 +436,6 @@ def migrate_db():
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error agregando campos de acuse: {e}")
         db.commit()
-    
-    # Migración de hashes de contraseñas (actualización automática)
-    try:
-        print("[MIGRATION] Verificando hashes de contraseñas...")
-        
-        # Hashes correctos actualizados (pbkdf2:sha256:600000)
-        CORRECT_HASHES = {
-            'admin@dml.local': 'pbkdf2:sha256:600000$6A2RbBVTCNKXL7de$75969207ac15a7e7c63186bd53b919c17b722a89500a7fc6eb60cb3b20cdef7d',
-            'raypac@dml.local': 'pbkdf2:sha256:600000$aSrOi7eCprUIyoPQ$86de1f158beaf6d954e51fc29a03f8e33749c4993ed3327256b821e5a4fab30d',
-            'tecnico@dml.local': 'pbkdf2:sha256:600000$bQ5PGbB2osS0xFi3$9cc5715d44a91e16db07e75d67842d981132af4d2d385164d2c5c0a906c3b8a7',
-            'repuestos@dml.local': 'pbkdf2:sha256:600000$SyoM7kdkrIC3rxrS$e5e182cfd55f3482cbc5665339081ec5a90b3234a2d591634bd1ce89ea17cf47'
-        }
-        
-        users_updated = 0
-        for email, correct_hash in CORRECT_HASHES.items():
-            current_user = db.execute("SELECT password_hash FROM users WHERE email = ?", (email,)).fetchone()
-            
-            if current_user and current_user['password_hash'] != correct_hash:
-                db.execute("UPDATE users SET password_hash = ? WHERE email = ?", (correct_hash, email))
-                users_updated += 1
-                print(f"[MIGRATION] ✅ Hash actualizado para: {email}")
-        
-        if users_updated > 0:
-            db.commit()
-            print(f"[MIGRATION] ✅ {users_updated} contraseñas actualizadas")
-        else:
-            print("[MIGRATION] ✅ Todos los hashes están actualizados")
-            
-    except Exception as e:
-        print(f"[MIGRATION] ⚠️  Error actualizando hashes: {e}")
-        db.commit()
 
 def init_db():
     import sys
@@ -582,10 +551,10 @@ def load_seed_data(db=None):
     if check_users and check_users['total'] == 0:
         print("[SEED] 🔧 Creando usuarios por defecto...")
         usuarios = [
-            ('admin@dml.local', 'admin', 'Administrador', 'ADMIN'),
-            ('raypac@dml.local', 'raypac', 'Casa Matriz RAYPAC', 'RAYPAC'),
-            ('tecnico@dml.local', 'tecnico', 'Juan Pérez', 'DML_ST'),
-            ('repuestos@dml.local', 'repuestos', 'Carlos López', 'DML_REPUESTOS'),
+            ('admin@dml.local', os.getenv('PASSWORD_ADMIN', 'admin'), 'Administrador', 'ADMIN'),
+            ('raypac@dml.local', os.getenv('PASSWORD_RAYPAC', 'raypac'), 'Casa Matriz RAYPAC', 'RAYPAC'),
+            ('tecnico@dml.local', os.getenv('PASSWORD_TECNICO', 'tecnico'), 'Juan Pérez', 'DML_ST'),
+            ('repuestos@dml.local', os.getenv('PASSWORD_REPUESTOS', 'repuestos'), 'Carlos López', 'DML_REPUESTOS'),
         ]
         
         for email, pwd, nombre, role in usuarios:
@@ -989,7 +958,7 @@ def enviar_alerta_stock(codigo, item, cantidad, nivel, ubicacion="DML"):
     """
     
     # Enviar a repuestos@dml.local
-    send_mail("repuestos@dml.local", f"🔔 Alerta de Stock: {item}", body)
+    send_mail(os.getenv("MAIL_ALERT_RECIPIENT"), f"🔔 Alerta de Stock: {item}", body)
 
 def actualizar_estado_alerta_stock(codigo, ubicacion="DML"):
     """Recalcula estado_alerta en stock_dml tras movimientos para la ubicación dada."""
@@ -1580,7 +1549,7 @@ def raypac_edit(id):
     if request.method == "POST":
         try:
             unfreeze_code = request.form.get("unfreeze_code")
-            if entry['is_frozen'] and unfreeze_code != "ADMIN2024":
+            if entry['is_frozen'] and unfreeze_code != os.getenv("UNFREEZE_CODE"):
                 flash("Código de desbloqueo incorrecto.", "error")
                 return render_template("raypac_view.html", entry=entry)
             
@@ -2083,7 +2052,7 @@ def dml_edit(id):
     if request.method == "POST":
         try:
             unfreeze_code = request.form.get("unfreeze_code")
-            if ficha['is_closed'] and unfreeze_code != "ADMIN2024":
+            if ficha['is_closed'] and unfreeze_code != os.getenv("UNFREEZE_CODE"):
                 flash("Código incorrecto.", "error")
                 return redirect(url_for("dml_view", id=id))
             
@@ -3195,7 +3164,7 @@ def stock_new():
             # Solo ADMIN necesita contraseña
             if user['role'] == 'ADMIN':
                 admin_password = (request.form.get("admin_password") or "").strip()
-                if admin_password != "ADMIN2024":
+                if admin_password != os.getenv("UNFREEZE_CODE"):
                     flash("Contraseña de administración incorrecta.", "error")
                     return render_template("stock_new.html", ubicacion=ubicacion, user=user)
             
@@ -3280,7 +3249,7 @@ def stock_edit(codigo):
             # Solo ADMIN necesita contraseña
             if user['role'] == 'ADMIN':
                 admin_password = (request.form.get("admin_password") or "").strip()
-                if admin_password != "ADMIN2024":
+                if admin_password != os.getenv("UNFREEZE_CODE"):
                     flash("Contraseña de administración incorrecta.", "error")
                     return render_template("stock_edit.html", stock=stock, ubicacion=ubicacion, user=user)
 
@@ -3315,7 +3284,7 @@ def stock_delete(codigo):
     
     # Solo ADMIN necesita contraseña
     admin_password = (request.form.get("admin_password") or "").strip()
-    if admin_password != "ADMIN2024":
+    if admin_password != os.getenv("UNFREEZE_CODE"):
         flash("Contraseña de administración incorrecta.", "error")
         return redirect(url_for("stock_list", ubicacion=ubicacion))
     
