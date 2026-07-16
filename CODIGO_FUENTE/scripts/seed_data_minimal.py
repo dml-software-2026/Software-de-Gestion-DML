@@ -8,7 +8,7 @@ import os
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'CODIGO_FUENTE'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'CODIGO_FUENTE'))
 
 from app import app, get_db, generate_ficha_number, crear_ticket, init_db
 
