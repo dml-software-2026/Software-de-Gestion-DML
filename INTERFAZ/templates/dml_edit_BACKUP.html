@@ -86,7 +86,7 @@
 <div class="edit-container">
     <h2>Editar Ficha DML #{{ ficha.numero_ficha }}</h2>
     
-    <form method="POST" action="{{ url_for('dml_edit', id=ficha.id) }}">
+    <form method="POST" action="{{ url_for('dml.dml_edit', id=ficha.id) }}">
         <!-- SECCIÓN 1: DATOS BÁSICOS -->
         <div class="section-title">DATOS BÁSICOS</div>
         
@@ -194,7 +194,7 @@
                     <small>(Cantidad: {{ repuesto.cantidad_utilizada if repuesto.cantidad_utilizada else repuesto.cantidad }})</small>
                 </div>
                 <div>
-                    <form method="POST" action="{{ url_for('eliminar_repuesto', ficha_id=ficha.id, repuesto_id=repuesto.id) }}" 
+                    <form method="POST" action="{{ url_for('dml.eliminar_repuesto', ficha_id=ficha.id, repuesto_id=repuesto.id) }}" 
                           style="display: inline;">
                         <button type="submit" class="btn btn-danger btn-sm" 
                                 onclick="return confirm('¿Eliminar repuesto?')">
@@ -209,7 +209,7 @@
 
         <div style="background-color: #f0f8ff; padding: 12px; border: 1px solid #b3d9ff; border-radius: 4px; margin-bottom: 15px;">
             <h6 style="margin: 0 0 10px 0; color: #003366; font-weight: bold;">Agregar Nuevo Repuesto</h6>
-            <form method="POST" action="{{ url_for('agregar_repuesto', id=ficha.id) }}" style="display: inline;">
+            <form method="POST" action="{{ url_for('dml.agregar_repuesto', id=ficha.id) }}" style="display: inline;">
                 <div class="three-col">
                     <div class="form-group" style="margin-bottom: 10px;">
                         <label>Código Repuesto:</label>
@@ -244,7 +244,7 @@
             <button type="submit" class="btn btn-primary btn-lg" style="margin-right: 10px;">
                 Guardar Cambios
             </button>
-            <a href="{{ url_for('dml_view', id=ficha.id) }}" class="btn btn-secondary btn-lg" style="margin-right: 10px;">
+            <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-secondary btn-lg" style="margin-right: 10px;">
                 Cancelar
             </a>
         </div>

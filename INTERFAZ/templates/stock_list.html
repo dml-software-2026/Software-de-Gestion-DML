@@ -10,13 +10,13 @@
                     {% if readonly %}
                     <span class="badge badge-info" style="font-size: 14px; margin-right: 10px;">Modo Solo Lectura</span>
                     {% endif %}
-                    <a href="{{ url_for('export_stock_csv') }}" class="btn btn-success btn-sm" title="Exportar a CSV">
+                    <a href="{{ url_for('estadisticas.export_stock_csv') }}" class="btn btn-success btn-sm" title="Exportar a CSV">
                         <i class="bi bi-file-earmark-spreadsheet"></i> CSV
                     </a>
                     {% if ubicaciones_disponibles %}
                     <div class="btn-group ms-2" role="group">
                         {% for ubi in ubicaciones_disponibles %}
-                        <a href="{{ url_for('stock_list', ubicacion=ubi) }}" 
+                        <a href="{{ url_for('stock.stock_list', ubicacion=ubi) }}" 
                            class="btn btn-{{ 'primary' if ubi == ubicacion else 'outline-primary' }}">
                             {{ ubi }}
                         </a>
@@ -28,14 +28,14 @@
             
             {% if user.role in ['ADMIN', 'RAYPAC', 'DML_ST'] and not readonly %}
             <div class="d-flex gap-2 mb-3">
-                <a href="{{ url_for('stock_new', ubicacion=ubicacion) }}" class="btn btn-success">+ Nuevo Repuesto</a>
+                <a href="{{ url_for('stock.stock_new', ubicacion=ubicacion) }}" class="btn btn-success">+ Nuevo Repuesto</a>
                 {% if user.role in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] %}
-                <a href="{{ url_for('estadisticas') }}" class="btn btn-info">📊 Estadísticas de uso</a>
+                <a href="{{ url_for('estadisticas.estadisticas') }}" class="btn btn-info">📊 Estadísticas de uso</a>
                 {% endif %}
             </div>
             {% elif user.role in ['DML_ST', 'DML_REPUESTOS'] and readonly or user.role == 'DML_REPUESTOS' %}
             <div class="d-flex gap-2 mb-3">
-                <a href="{{ url_for('estadisticas') }}" class="btn btn-info">📊 Estadísticas de uso</a>
+                <a href="{{ url_for('estadisticas.estadisticas') }}" class="btn btn-info">📊 Estadísticas de uso</a>
                 {% if user.role == 'DML_REPUESTOS' %}
                 <div class="alert alert-info py-2 mb-0 ms-3">
                     <i class="bi bi-eye"></i> <strong>Modo Solo Lectura:</strong> Puedes ver stock y estadísticas, sin editar.
@@ -57,7 +57,7 @@
                     <input type="hidden" name="ubicacion" value="{{ ubicacion }}">
                     <button type="submit" class="btn btn-primary">🔍 Buscar</button>
                     {% if request.args.get('buscar') %}
-                    <a href="{{ url_for('stock_list', ubicacion=ubicacion) }}" class="btn btn-secondary">Limpiar</a>
+                    <a href="{{ url_for('stock.stock_list', ubicacion=ubicacion) }}" class="btn btn-secondary">Limpiar</a>
                     {% endif %}
                 </div>
             </form>
@@ -102,9 +102,9 @@
                         {% endif %}
                         {% if user.role in ['ADMIN', 'DML_ST'] %}
                         <td>
-                            <a href="{{ url_for('stock_edit', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" class="btn btn-sm btn-primary">Editar</a>
+                            <a href="{{ url_for('stock.stock_edit', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" class="btn btn-sm btn-primary">Editar</a>
                             {% if user.role == 'ADMIN' %}
-                            <form method="POST" action="{{ url_for('stock_delete', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" style="display:inline-block; width:180px;">
+                            <form method="POST" action="{{ url_for('stock.stock_delete', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" style="display:inline-block; width:180px;">
                                 <input type="password" name="admin_password" class="form-control form-control-sm mb-1" placeholder="Contraseña" required>
                                 <button type="submit" class="btn btn-sm btn-danger w-100" onclick="return confirm('¿Eliminar este repuesto?')">Eliminar</button>
                             </form>

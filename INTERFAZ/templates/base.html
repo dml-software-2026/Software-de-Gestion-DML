@@ -11,7 +11,7 @@
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
+    <a class="navbar-brand fw-bold" href="{{ url_for('auth.index') }}">
       <img src="{{ url_for('static', filename='logo.png') }}" alt="DML Logo" height="35" class="me-2">
       DML Servicios Tecnicos
     </a>
@@ -22,54 +22,54 @@
       <ul class="navbar-nav me-auto nav-pills-custom">
         {% if session.get('user_id') %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('index') }}">
+          <a class="nav-link nav-link-enhanced" href="{{ url_for('auth.index') }}">
             <i class="bi bi-house-fill"></i>
             <span class="nav-text">Inicio</span>
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('raypac_list') }}">
+          <a class="nav-link nav-link-enhanced" href="{{ url_for('raypac.raypac_list') }}">
             <i class="bi bi-box-seam-fill"></i>
             <span class="nav-text">RAYPAC</span>
           </a>
         </li>
         {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'RAYPAC', 'DML_REPUESTOS', 'DML_ST'] %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('envios_list') }}">
+          <a class="nav-link nav-link-enhanced" href="{{ url_for('envios.envios_list') }}">
             <i class="bi bi-truck"></i>
             <span class="nav-text">Envíos</span>
           </a>
         </li>
         {% endif %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('dml_list') }}">
+          <a class="nav-link nav-link-enhanced" href="{{ url_for('dml.dml_list') }}">
             <i class="bi bi-wrench-adjustable"></i>
             <span class="nav-text">Fichas ST</span>
           </a>
         </li>
         {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'RAYPAC'] %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('dml_entregadas') }}">
+          <a class="nav-link nav-link-enhanced" href="{{ url_for('dml.dml_entregadas') }}">
             <i class="bi bi-clipboard-check-fill"></i>
             <span class="nav-text">Entregadas</span>
           </a>
         </li>
         {% endif %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('tickets_list') }}">
+          <a class="nav-link nav-link-enhanced" href="{{ url_for('tickets.tickets_list') }}">
             <i class="bi bi-ticket-perforated-fill"></i>
             <span class="nav-text">Tickets</span>
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('stock_list') }}">
+          <a class="nav-link nav-link-enhanced" href="{{ url_for('stock.stock_list') }}">
             <i class="bi bi-box2-fill"></i>
             <span class="nav-text">Stock</span>
           </a>
         </li>
         {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'DML_REPUESTOS'] %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('estadisticas') }}">
+          <a class="nav-link nav-link-enhanced" href="{{ url_for('estadisticas.estadisticas') }}">
             <i class="bi bi-graph-up-arrow"></i>
             <span class="nav-text">Estadísticas</span>
           </a>
@@ -81,9 +81,9 @@
             <i class="bi bi-gear"></i> Admin
           </a>
           <ul class="dropdown-menu">
-            <li><a class="dropdown-item" href="{{ url_for('usuarios_list') }}">👥 Usuarios</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin.usuarios_list') }}">👥 Usuarios</a></li>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="{{ url_for('raypac_new') }}">➕ Nuevo Ingreso RAYPAC</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('raypac.raypac_new') }}">➕ Nuevo Ingreso RAYPAC</a></li>
           </ul>
         </li>
         {% endif %}
@@ -96,9 +96,9 @@
             <i class="bi bi-person-circle"></i> {{ get_current_user()['email'] }}
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" href="{{ url_for('index') }}">Mi Perfil</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('auth.index') }}">Mi Perfil</a></li>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="{{ url_for('logout') }}">🚪 Cerrar Sesión</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">🚪 Cerrar Sesión</a></li>
           </ul>
         </li>
         {% endif %}

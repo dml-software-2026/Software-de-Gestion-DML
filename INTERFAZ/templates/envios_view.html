@@ -23,12 +23,12 @@
       {% endif %}
     </div>
     <div class="text-end">
-      <a class="btn btn-outline-secondary" href="{{ url_for('envios_list') }}">Volver al listado</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('envios.envios_list') }}">Volver al listado</a>
       
       {% if session.get('user_id') and session.get('role') in ['ADMIN', 'RAYPAC'] %}
         {% if envio.is_frozen %}
         <!-- Modo congelado: permitir editar para correcciones -->
-        <a href="{{ url_for('envios_edit', id=envio.id) }}" class="btn btn-warning">
+        <a href="{{ url_for('envios.envios_edit', id=envio.id) }}" class="btn btn-warning">
           <i class="bi bi-pencil"></i> Editar (Corregir errores)
         </a>
         
@@ -44,7 +44,7 @@
       {# Botón de recepción: mostrar si NO ha sido recibido #}
       {% if session.get('role') in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] %}
         {% if (not envio.estado_envio or envio.estado_envio != 'RECIBIDO') and not envio.fecha_recepcion_dml %}
-      <form method="POST" action="{{ url_for('envios_confirmar', id=envio.id) }}" class="d-inline" 
+      <form method="POST" action="{{ url_for('envios.envios_confirmar', id=envio.id) }}" class="d-inline" 
             onsubmit="return confirm('¿Confirmar que todos los repuestos fueron recibidos correctamente según el remito?');">
         <button type="submit" class="btn btn-success">
           <i class="bi bi-check-circle"></i> Dar Ingreso en DML
@@ -96,7 +96,7 @@
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form method="POST" action="{{ url_for('envios_unfreeze', id=envio.id) }}">
+      <form method="POST" action="{{ url_for('envios.envios_unfreeze', id=envio.id) }}">
         <div class="modal-body">
           <div class="alert alert-warning">
             <i class="bi bi-exclamation-triangle"></i> <strong>Acción sensible:</strong> 
