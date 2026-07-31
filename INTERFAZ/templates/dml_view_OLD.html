@@ -277,7 +277,7 @@
     {% if ficha.estado_reparacion != 'MÁQUINA LISTA PARA RETIRAR' %}
     <div class="form-agregar-repuesto" style="margin-top: 20px;">
         <h6 style="color: #003366; font-weight: bold; margin-bottom: 10px;">Agregar Nuevo Repuesto</h6>
-        <form id="formAgregarRepuesto" method="POST" action="{{ url_for('agregar_repuesto', id=ficha.id) }}">
+        <form id="formAgregarRepuesto" method="POST" action="{{ url_for('dml.agregar_repuesto', id=ficha.id) }}">
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
                 <div>
                     <label style="font-weight: bold; font-size: 12px;">Código Repuesto:</label>
@@ -311,11 +311,11 @@
     <!-- ACCIONES -->
     <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
         {% if ficha.estado_reparacion != 'MÁQUINA LISTA PARA RETIRAR' %}
-        <a href="{{ url_for('dml_edit', id=ficha.id) }}" class="btn btn-primary btn-sm">Editar Ficha Completa</a>
+        <a href="{{ url_for('dml.dml_edit', id=ficha.id) }}" class="btn btn-primary btn-sm">Editar Ficha Completa</a>
         {% endif %}
         
         {% if ficha.estado_reparacion == 'MÁQUINA LISTA PARA RETIRAR' and not ficha.ficha_generada %}
-        <form method="POST" action="{{ url_for('generar_ficha', id=ficha.id) }}" style="display: inline;">
+        <form method="POST" action="{{ url_for('dml.generar_ficha', id=ficha.id) }}" style="display: inline;">
             <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('¿Generar ficha y PDF?')">
                 Generar Ficha PDF
             </button>
@@ -323,12 +323,12 @@
         {% endif %}
         
         {% if ficha.ficha_generada %}
-        <a href="{{ url_for('descargar_ficha_pdf', id=ficha.id) }}" class="btn btn-success btn-sm">
+        <a href="{{ url_for('dml.descargar_ficha_pdf', id=ficha.id) }}" class="btn btn-success btn-sm">
             ✓ Descargar Ficha PDF
         </a>
         {% endif %}
         
-        <a href="{{ url_for('dml_list') }}" class="btn btn-secondary btn-sm">Volver</a>
+        <a href="{{ url_for('dml.dml_list') }}" class="btn btn-secondary btn-sm">Volver</a>
     </div>
 </div>
 
