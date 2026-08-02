@@ -4,10 +4,10 @@ from flask import Blueprint, request, render_template, redirect, url_for, flash,
 
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
-from services.mail import send_mail
-from services.numeracion import generate_ficha_number, crear_ticket
-from services.stock import ajustar_stock_ubicacion, actualizar_estadistica_repuesto, verificar_alerta_stock
-from services.pdf import generar_ficha_pdf, generate_ficha_pdf
+from CODIGO_FUENTE.services.mail import send_mail
+from CODIGO_FUENTE.services.numeracion import generate_ficha_number, crear_ticket
+from CODIGO_FUENTE.services.stock import ajustar_stock_ubicacion, actualizar_estadistica_repuesto, verificar_alerta_stock
+from CODIGO_FUENTE.services.pdf import generar_ficha_pdf, generate_ficha_pdf
 
 dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
 
