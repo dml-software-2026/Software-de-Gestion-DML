@@ -4,9 +4,9 @@ import sys
 from dotenv import load_dotenv
 from flask import Flask
 
-from config import Config, BASE_DIR
-from extensions import close_db, init_db, migrate_db
-from decorators import get_current_user_jinja
+from CODIGO_FUENTE.config import Config, BASE_DIR
+from CODIGO_FUENTE.extensions import close_db, init_db, migrate_db
+from CODIGO_FUENTE.decorators import get_current_user_jinja
 
 from blueprints.auth import auth_bp
 from blueprints.raypac import raypac_bp
