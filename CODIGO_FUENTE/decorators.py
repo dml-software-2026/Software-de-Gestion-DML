@@ -2,7 +2,7 @@ from functools import wraps
 
 from flask import session, redirect, url_for, flash
 
-from extensions import get_db
+from CODIGO_FUENTE.extensions import get_db
 
 
 def get_current_user():
