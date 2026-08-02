@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from extensions import get_db
+from CODIGO_FUENTE.extensions import get_db
 
 
 def generate_ficha_number():
