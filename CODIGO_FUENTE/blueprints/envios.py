@@ -5,8 +5,8 @@ from flask import Blueprint, request, render_template, redirect, url_for, flash
 
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.decorators import login_required, role_required, get_current_user, log_action
-from services.mail import send_mail
-from services.stock import ajustar_stock_ubicacion, actualizar_estado_alerta_stock
+from CODIGO_FUENTE.services.mail import send_mail
+from CODIGO_FUENTE.services.stock import ajustar_stock_ubicacion, actualizar_estado_alerta_stock
 
 envios_bp = Blueprint("envios", __name__, url_prefix="/envios")
 
