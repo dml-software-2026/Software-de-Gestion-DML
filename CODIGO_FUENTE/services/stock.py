@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from extensions import get_db
-from services.mail import send_mail
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.mail import send_mail
 
 
 def check_stock_alert(codigo, ubicacion="DML"):
