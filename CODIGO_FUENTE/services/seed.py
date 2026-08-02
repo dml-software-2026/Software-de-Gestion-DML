@@ -3,7 +3,7 @@ import csv
 
 from werkzeug.security import generate_password_hash
 
-from config import BASE_DIR
+from CODIGO_FUENTE.config import BASE_DIR
 
 
 def cargar_stock_completo_desde_csv(db):
