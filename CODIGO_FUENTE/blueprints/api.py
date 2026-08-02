@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify
 
-from decorators import login_required
+from CODIGO_FUENTE.decorators import login_required
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 

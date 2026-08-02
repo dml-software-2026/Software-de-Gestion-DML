@@ -1,8 +1,8 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash
 
-from extensions import get_db
-from decorators import login_required, role_required, permission_required, get_current_user, log_action
-from services.stock import check_stock_alert
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
+from CODIGO_FUENTE.services.stock import check_stock_alert
 
 stock_bp = Blueprint("stock", __name__, url_prefix="/stock")
 

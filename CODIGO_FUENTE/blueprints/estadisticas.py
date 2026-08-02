@@ -4,8 +4,8 @@ from io import StringIO
 
 from flask import Blueprint, request, render_template, make_response
 
-from extensions import get_db
-from decorators import login_required, role_required, permission_required, get_current_user
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user
 
 estadisticas_bp = Blueprint("estadisticas", __name__)
 
