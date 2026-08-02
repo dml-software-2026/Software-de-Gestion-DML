@@ -3,8 +3,8 @@ from datetime import datetime
 
 from flask import Blueprint, request, render_template, redirect, url_for, flash
 
-from extensions import get_db
-from decorators import login_required, role_required, permission_required, get_current_user, log_action
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
 
