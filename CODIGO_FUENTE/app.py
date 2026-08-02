@@ -59,6 +59,12 @@ def apply_migrations():
             else:
                 # Si existe, aplicar migraciones
                 migrate_db()
+
+            # Verificar/crear usuarios siempre, exista o no la base
+            from CODIGO_FUENTE.extensions import get_db
+            from CODIGO_FUENTE.services.seed import load_seed_data
+            load_seed_data(get_db())
+
         except Exception as e:
             print(f"Error en migraciones: {e}")
             import traceback
