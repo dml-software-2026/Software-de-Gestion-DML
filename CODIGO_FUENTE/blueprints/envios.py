@@ -45,7 +45,7 @@ def envios_list():
             frozen_at as created_at,
             1 as items_count
         FROM raypac_entries
-        WHERE is_frozen = 1
+        WHERE is_frozen = TRUE
         ORDER BY frozen_at DESC
         """
     ).fetchall()
@@ -99,13 +99,13 @@ def envios_new():
                 return render_template("envios_form.html", stock=stock_raypac)
 
             # Verificar que no exista ya en envios_repuestos
-            existe = db.execute("SELECT id FROM envios_repuestos WHERE numero_remito = ?", (numero_remito,)).fetchone()
+            existe = db.execute("SELECT id FROM envios_repuestos WHERE numero_remito = %s", (numero_remito,)).fetchone()
             if existe:
                 flash(f"⚠️ El número de remito {numero_remito} ya existe en otro envío de repuestos.", "error")
                 return render_template("envios_form.html", stock=stock_raypac)
 
             # Verificar que no exista en raypac_entries
-            existe_raypac = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = ?", (numero_remito,)).fetchone()
+            existe_raypac = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = %s", (numero_remito,)).fetchone()
             if existe_raypac:
                 flash(f"⚠️ El número de remito {numero_remito} ya fue usado para enviar un equipo. Usa un remito diferente.", "error")
                 return render_template("envios_form.html", stock=stock_raypac)
@@ -138,7 +138,7 @@ def envios_new():
                     if codigo and qty > 0:
                         # Si no tiene descripción, buscarla en la matriz
                         if not descripcion:
-                            rep = db.execute("SELECT item FROM matriz_repuestos WHERE codigo_repuesto = ?", (codigo,)).fetchone()
+                            rep = db.execute("SELECT item FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,)).fetchone()
                             descripcion = rep['item'] if rep else f"Repuesto {codigo}"
 
                         seleccionados.append((codigo, descripcion, qty))
@@ -149,19 +149,20 @@ def envios_new():
 
             fecha_envio = datetime.now().strftime("%Y-%m-%d")
 
-            db.execute(
+            row = db.execute(
                 """INSERT INTO envios_repuestos
                    (numero_remito, fecha_envio, tipo_entrega, estado_envio, is_frozen)
-                   VALUES (?, ?, ?, 'ENVIADO', 1)""",
+                   VALUES (%s, %s, %s, 'ENVIADO', TRUE)
+                   RETURNING id""",
                 (numero_remito, fecha_envio, tipo_entrega)
-            )
-            envio_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
+            ).fetchone()
+            envio_id = row['id']
 
             # Guardar detalles del envío
             # IMPORTANTE: NO descontamos stock de RAYPAC (ellos no controlan stock desde este software)
             for codigo, item, qty in seleccionados:
                 db.execute(
-                    "INSERT INTO envios_repuestos_detalles (envio_id, codigo_repuesto, cantidad) VALUES (?, ?, ?)",
+                    "INSERT INTO envios_repuestos_detalles (envio_id, codigo_repuesto, cantidad) VALUES (%s, %s, %s)",
                     (envio_id, codigo, qty)
                 )
 
@@ -185,7 +186,7 @@ def envios_new():
 @role_required("ADMIN", "RAYPAC", "DML_REPUESTOS", "DML_ST")
 def envios_view(id):
     db = get_db()
-    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = ?", (id,)).fetchone()
+    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s", (id,)).fetchone()
     if not envio:
         flash("Envío no encontrado.", "error")
         return redirect(url_for("envios.envios_list"))
@@ -194,7 +195,7 @@ def envios_view(id):
         SELECT d.*, m.item
         FROM envios_repuestos_detalles d
         LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto
-        WHERE d.envio_id = ?
+        WHERE d.envio_id = %s
         ORDER BY d.codigo_repuesto
         """,
         (id,)
@@ -208,7 +209,7 @@ def envios_view(id):
 def envios_confirmar(id):
     user = get_current_user()
     db = get_db()
-    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = ?", (id,)).fetchone()
+    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s", (id,)).fetchone()
     if not envio:
         flash("Envío no encontrado.", "error")
         return redirect(url_for("envios.envios_list"))
@@ -226,7 +227,7 @@ def envios_confirmar(id):
         return redirect(url_for("envios.envios_view", id=id))
 
     detalles = db.execute(
-        "SELECT d.*, m.item FROM envios_repuestos_detalles d LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto WHERE d.envio_id = ?",
+        "SELECT d.*, m.item FROM envios_repuestos_detalles d LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto WHERE d.envio_id = %s",
         (id,)
     ).fetchall()
     if not detalles:
@@ -249,10 +250,10 @@ def envios_confirmar(id):
         db.execute(
             """UPDATE envios_repuestos
                SET estado_envio = 'RECIBIDO',
-                   fecha_recepcion_dml = ?,
-                   usuario_recepcion_id = ?,
+                   fecha_recepcion_dml = %s,
+                   usuario_recepcion_id = %s,
                    updated_at = CURRENT_TIMESTAMP
-               WHERE id = ?""",
+               WHERE id = %s""",
             (fecha_recepcion, user['id'], id)
         )
         db.commit()
@@ -296,7 +297,7 @@ def envios_edit(id):
     user = get_current_user()
     db = get_db()
 
-    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = ?", (id,)).fetchone()
+    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s", (id,)).fetchone()
     if not envio:
         flash("Envío no encontrado.", "error")
         return redirect(url_for("envios.envios_list"))
@@ -311,7 +312,7 @@ def envios_edit(id):
 
             # Verificar que no exista otro envío con ese remito
             existe = db.execute(
-                "SELECT id FROM envios_repuestos WHERE numero_remito = ? AND id != ?",
+                "SELECT id FROM envios_repuestos WHERE numero_remito = %s AND id != %s",
                 (nuevo_remito, id)
             ).fetchone()
 
@@ -320,7 +321,7 @@ def envios_edit(id):
                 return redirect(url_for("envios.envios_edit", id=id))
 
             db.execute(
-                "UPDATE envios_repuestos SET numero_remito = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE envios_repuestos SET numero_remito = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                 (nuevo_remito, id)
             )
             db.commit()
@@ -341,7 +342,7 @@ def envios_edit(id):
         """SELECT d.*, m.item
            FROM envios_repuestos_detalles d
            LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto
-           WHERE d.envio_id = ?
+           WHERE d.envio_id = %s
            ORDER BY d.codigo_repuesto""",
         (id,)
     ).fetchall()
@@ -357,7 +358,7 @@ def envios_unfreeze(id):
     user = get_current_user()
     db = get_db()
 
-    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = ?", (id,)).fetchone()
+    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s", (id,)).fetchone()
     if not envio:
         flash("Envío no encontrado.", "error")
         return redirect(url_for("envios.envios_list"))
@@ -372,7 +373,7 @@ def envios_unfreeze(id):
 
     try:
         db.execute(
-            "UPDATE envios_repuestos SET is_frozen = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE envios_repuestos SET is_frozen = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
             (id,)
         )
         db.commit()

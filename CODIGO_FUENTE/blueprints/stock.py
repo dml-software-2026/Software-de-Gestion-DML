@@ -30,12 +30,12 @@ def stock_list(readonly=False):
     # Query con filtro por ubicación
     query = """SELECT DISTINCT m.*, COALESCE(su.cantidad, 0) as cantidad
               FROM matriz_repuestos m
-              LEFT JOIN stock_ubicaciones su ON su.codigo_repuesto = m.codigo_repuesto AND su.ubicacion = ?
+              LEFT JOIN stock_ubicaciones su ON su.codigo_repuesto = m.codigo_repuesto AND su.ubicacion = %s
               WHERE 1=1"""
     params = [ubicacion]
 
     if buscar:
-        query += " AND (m.codigo_repuesto LIKE ? OR m.item LIKE ?)"
+        query += " AND (m.codigo_repuesto LIKE %s OR m.item LIKE %s)"
         params.extend([f"%{buscar}%", f"%{buscar}%"])
 
     stocks = db.execute(query + " ORDER BY m.codigo_repuesto", params).fetchall()
@@ -101,7 +101,7 @@ def stock_new():
 
             # Verificar que el repuesto existe en matriz o crearlo
             existe_matriz = db.execute(
-                "SELECT id FROM matriz_repuestos WHERE codigo_repuesto = ?",
+                "SELECT id FROM matriz_repuestos WHERE codigo_repuesto = %s",
                 (codigo,)
             ).fetchone()
 
@@ -111,12 +111,12 @@ def stock_new():
                 db.execute("""
                     INSERT INTO matriz_repuestos
                     (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
-                    VALUES (?, ?, ?, 0, 0, 'RAYPAC')
+                    VALUES (%s, %s, %s, 0, 0, 'RAYPAC')
                 """, (numero + 1, codigo, item))
 
             # Verificar que no existe en esa ubicación
             existe_stock = db.execute(
-                "SELECT id FROM stock_ubicaciones WHERE codigo_repuesto = ? AND ubicacion = ?",
+                "SELECT id FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = %s",
                 (codigo, ubicacion)
             ).fetchone()
 
@@ -128,7 +128,7 @@ def stock_new():
             db.execute("""
                 INSERT INTO stock_ubicaciones
                 (codigo_repuesto, ubicacion, cantidad)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
             """, (codigo, ubicacion, cantidad))
             db.commit()
 
@@ -160,7 +160,7 @@ def stock_edit(codigo):
         ubicacion = request.args.get("ubicacion", "DML")
 
     stock = db.execute(
-        "SELECT * FROM stock_ubicaciones WHERE codigo_repuesto = ? AND ubicacion = ?",
+        "SELECT * FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = %s",
         (codigo, ubicacion)
     ).fetchone()
 
@@ -183,8 +183,8 @@ def stock_edit(codigo):
 
             db.execute("""
                 UPDATE stock_ubicaciones
-                SET cantidad = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE codigo_repuesto = ? AND ubicacion = ?
+                SET cantidad = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE codigo_repuesto = %s AND ubicacion = %s
             """, (cantidad, codigo, ubicacion))
             db.commit()
 
@@ -218,7 +218,7 @@ def stock_delete(codigo):
         return redirect(url_for("stock.stock_list", ubicacion=ubicacion))
 
     db.execute(
-        "DELETE FROM stock_ubicaciones WHERE codigo_repuesto = ? AND ubicacion = ?",
+        "DELETE FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = %s",
         (codigo, ubicacion)
     )
     db.commit()

@@ -1,15 +1,62 @@
 import os
 import sys
-import sqlite3
+
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 from flask import current_app, g
 
 
+class PgConnection:
+    """
+    Wrapper fino sobre la conexión de psycopg2 que imita la API de
+    sqlite3.Connection (db.execute(...), db.commit(), etc.) para minimizar
+    los cambios necesarios en blueprints/services que ya llaman
+    db.execute(...) directamente en todo el proyecto.
+
+    OJO: las queries en esos archivos todavía usan placeholders `?` (estilo
+    sqlite3). Con psycopg2 hay que pasar `%s`. Eso queda pendiente de otra
+    sesión (auth.py, seed.py, scripts/*.py, etc.) — este wrapper no lo
+    soluciona mágicamente, solo evita tener que tocar la forma en que se
+    LLAMA a db.execute().
+    """
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, query, params=None):
+        cur = self._conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(query, params or ())
+        return cur
+
+    def executescript(self, script):
+        # psycopg2 permite mandar varios statements separados por ';' en un
+        # solo execute() siempre que no se usen parámetros (%s).
+        cur = self._conn.cursor()
+        cur.execute(script)
+        cur.close()
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+    def cursor(self, *args, **kwargs):
+        return self._conn.cursor(*args, **kwargs)
+
+    def __getattr__(self, name):
+        # Delega cualquier otro atributo/método a la conexión real de psycopg2
+        return getattr(self._conn, name)
+
+
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(current_app.config["DATABASE"])
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
+        raw_conn = psycopg2.connect(current_app.config["DATABASE_URL"])
+        g.db = PgConnection(raw_conn)
     return g.db
 
 
@@ -19,129 +66,63 @@ def close_db(exception=None):
         db.close()
 
 
+def _columnas_de(db, tabla):
+    """Reemplazo de PRAGMA table_info(tabla) usando information_schema."""
+    cur = db.execute(
+        """
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = %s
+        """,
+        (tabla,),
+    )
+    return [row["column_name"] for row in cur.fetchall()]
+
+
 def migrate_db():
     """Ejecuta migraciones de esquema necesarias."""
     db = get_db()
     try:
-        # Verificar si la columna cantidad_utilizada existe
-        cursor = db.execute("PRAGMA table_info(dml_repuestos)")
-        columns = [row[1] for row in cursor.fetchall()]
+        columns = _columnas_de(db, "dml_repuestos")
 
-        if 'cantidad_utilizada' not in columns:
-            db.execute("ALTER TABLE dml_repuestos ADD COLUMN cantidad_utilizada INTEGER DEFAULT 1")
+        if "cantidad_utilizada" not in columns:
+            db.execute("ALTER TABLE dml_repuestos ADD COLUMN IF NOT EXISTS cantidad_utilizada INTEGER DEFAULT 1")
             db.commit()
 
-        if 'estado_repuesto' not in columns:
-            db.execute("ALTER TABLE dml_repuestos ADD COLUMN estado_repuesto TEXT DEFAULT 'INSPECCIONADO'")
+        if "estado_repuesto" not in columns:
+            db.execute("ALTER TABLE dml_repuestos ADD COLUMN IF NOT EXISTS estado_repuesto TEXT DEFAULT 'INSPECCIONADO'")
             db.commit()
 
-        # Verificar si codigo_ubicacion_fisica existe en stock_ubicaciones
-        cursor = db.execute("PRAGMA table_info(stock_ubicaciones)")
-        columns_stock = [row[1] for row in cursor.fetchall()]
+        columns_stock = _columnas_de(db, "stock_ubicaciones")
 
-        if 'codigo_ubicacion_fisica' not in columns_stock:
-            db.execute("ALTER TABLE stock_ubicaciones ADD COLUMN codigo_ubicacion_fisica TEXT DEFAULT 'SIN UBICACIÓN'")
+        if "codigo_ubicacion_fisica" not in columns_stock:
+            db.execute("ALTER TABLE stock_ubicaciones ADD COLUMN IF NOT EXISTS codigo_ubicacion_fisica TEXT DEFAULT 'SIN UBICACIÓN'")
             db.commit()
             print("[MIGRATION] Agregada columna codigo_ubicacion_fisica a stock_ubicaciones")
 
-        # Crear tabla tickets si no existe
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS tickets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                numero_ticket TEXT UNIQUE NOT NULL,
-                ficha_id INTEGER NOT NULL,
-                numero_serie TEXT NOT NULL,
-                estado TEXT DEFAULT 'ACTIVO',
-                fecha_creacion TEXT DEFAULT CURRENT_TIMESTAMP,
-                fecha_cierre TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(ficha_id) REFERENCES dml_fichas(id) ON DELETE CASCADE,
-                UNIQUE(numero_ticket)
-            )
-        """)
-
-        # Crear tabla ticket_historial si no existe
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS ticket_historial (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id INTEGER NOT NULL,
-                estado_anterior TEXT,
-                estado_nuevo TEXT NOT NULL,
-                motivo TEXT,
-                usuario_id INTEGER,
-                fecha TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
-                FOREIGN KEY(usuario_id) REFERENCES users(id)
-            )
-        """)
-
-        # Crear tabla stock_alertas si no existe
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS stock_alertas (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                codigo_repuesto TEXT NOT NULL,
-                item TEXT,
-                cantidad_actual INTEGER,
-                nivel_alerta TEXT NOT NULL,
-                email_enviado INTEGER DEFAULT 0,
-                fecha_alerta TEXT DEFAULT CURRENT_TIMESTAMP,
-                fecha_resuelto TEXT,
-                FOREIGN KEY(codigo_repuesto) REFERENCES matriz_repuestos(codigo_repuesto)
-            )
-        """)
-
-        # Crear tabla estadisticas_repuestos si no existe
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS estadisticas_repuestos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                codigo_repuesto TEXT NOT NULL,
-                item TEXT,
-                cantidad_utilizada INTEGER DEFAULT 0,
-                fecha_ultimo_uso TEXT,
-                total_usos INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(codigo_repuesto) REFERENCES matriz_repuestos(codigo_repuesto)
-            )
-        """)
-
-        # Crear tabla freezing_log si no existe
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS freezing_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tabla_nombre TEXT NOT NULL,
-                registro_id INTEGER NOT NULL,
-                estado_freezing INTEGER NOT NULL,
-                usuario_freeze INTEGER,
-                fecha_freeze TEXT,
-                usuario_unfreeze INTEGER,
-                fecha_unfreeze TEXT,
-                motivo_unfreeze TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(usuario_freeze) REFERENCES users(id),
-                FOREIGN KEY(usuario_unfreeze) REFERENCES users(id)
-            )
-        """)
+        # NOTA: las tablas tickets, ticket_historial, stock_alertas,
+        # estadisticas_repuestos y freezing_log ya NO se crean acá.
+        # Esos CREATE TABLE quedaron cubiertos por schema-postgre.sql,
+        # que ya fue corrido en el SQL Editor de Supabase. Mantenerlos
+        # acá duplicados era redundante y una segunda fuente de verdad
+        # del schema que se podía desincronizar de Supabase con el tiempo.
 
         db.commit()
         print("[MIGRATIONS] Completadas exitosamente")
     except Exception as e:
         print(f"Error en migraciones: {e}")
-        db.commit()
+        db.rollback()
 
     # Migración: Agregar campos contacto_cliente y email_cliente a raypac_entries
     try:
         print("[MIGRATION] Verificando campos contacto_cliente y email_cliente...")
-        columns = db.execute("PRAGMA table_info(raypac_entries)").fetchall()
-        column_names = [col['name'] for col in columns]
+        column_names = _columnas_de(db, "raypac_entries")
 
-        if 'contacto_cliente' not in column_names:
-            db.execute("ALTER TABLE raypac_entries ADD COLUMN contacto_cliente TEXT")
+        if "contacto_cliente" not in column_names:
+            db.execute("ALTER TABLE raypac_entries ADD COLUMN IF NOT EXISTS contacto_cliente TEXT")
             print("[MIGRATION] ✅ Columna contacto_cliente agregada")
 
-        if 'email_cliente' not in column_names:
-            db.execute("ALTER TABLE raypac_entries ADD COLUMN email_cliente TEXT")
+        if "email_cliente" not in column_names:
+            db.execute("ALTER TABLE raypac_entries ADD COLUMN IF NOT EXISTS email_cliente TEXT")
             print("[MIGRATION] ✅ Columna email_cliente agregada")
 
         db.commit()
@@ -149,28 +130,27 @@ def migrate_db():
 
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error agregando campos de contacto: {e}")
-        db.commit()
+        db.rollback()
 
     # Migración: Agregar campos de estado a envios_repuestos
     try:
         print("[MIGRATION] Verificando campos de estado en envios_repuestos...")
-        columns = db.execute("PRAGMA table_info(envios_repuestos)").fetchall()
-        column_names = [col['name'] for col in columns]
+        column_names = _columnas_de(db, "envios_repuestos")
 
-        if 'estado_envio' not in column_names:
-            db.execute("ALTER TABLE envios_repuestos ADD COLUMN estado_envio TEXT DEFAULT 'ENVIADO'")
+        if "estado_envio" not in column_names:
+            db.execute("ALTER TABLE envios_repuestos ADD COLUMN IF NOT EXISTS estado_envio TEXT DEFAULT 'ENVIADO'")
             print("[MIGRATION] ✅ Columna estado_envio agregada")
 
-        if 'is_frozen' not in column_names:
-            db.execute("ALTER TABLE envios_repuestos ADD COLUMN is_frozen INTEGER DEFAULT 1")
-            print("[MIGRATION] ✅ Columna is_frozen agregada (1=congelado por defecto)")
+        if "is_frozen" not in column_names:
+            db.execute("ALTER TABLE envios_repuestos ADD COLUMN IF NOT EXISTS is_frozen BOOLEAN DEFAULT TRUE")
+            print("[MIGRATION] ✅ Columna is_frozen agregada (TRUE=congelado por defecto)")
 
-        if 'fecha_recepcion_dml' not in column_names:
-            db.execute("ALTER TABLE envios_repuestos ADD COLUMN fecha_recepcion_dml TEXT")
+        if "fecha_recepcion_dml" not in column_names:
+            db.execute("ALTER TABLE envios_repuestos ADD COLUMN IF NOT EXISTS fecha_recepcion_dml TIMESTAMP")
             print("[MIGRATION] ✅ Columna fecha_recepcion_dml agregada")
 
-        if 'usuario_recepcion_id' not in column_names:
-            db.execute("ALTER TABLE envios_repuestos ADD COLUMN usuario_recepcion_id INTEGER REFERENCES users(id)")
+        if "usuario_recepcion_id" not in column_names:
+            db.execute("ALTER TABLE envios_repuestos ADD COLUMN IF NOT EXISTS usuario_recepcion_id INTEGER REFERENCES users(id)")
             print("[MIGRATION] ✅ Columna usuario_recepcion_id agregada")
 
         db.commit()
@@ -178,21 +158,19 @@ def migrate_db():
 
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error agregando campos de estado: {e}")
-        db.commit()
+        db.rollback()
 
     # Migración: Agregar campos de acuse de recibo a dml_fichas
     try:
         print("[MIGRATION] Verificando campos de acuse de recibo...")
+        column_names = _columnas_de(db, "dml_fichas")
 
-        columns = db.execute("PRAGMA table_info(dml_fichas)").fetchall()
-        column_names = [col['name'] for col in columns]
-
-        if 'fecha_entrega_cliente' not in column_names:
-            db.execute("ALTER TABLE dml_fichas ADD COLUMN fecha_entrega_cliente TEXT")
+        if "fecha_entrega_cliente" not in column_names:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS fecha_entrega_cliente TIMESTAMP")
             print("[MIGRATION] ✅ Columna fecha_entrega_cliente agregada")
 
-        if 'recibido_por' not in column_names:
-            db.execute("ALTER TABLE dml_fichas ADD COLUMN recibido_por TEXT")
+        if "recibido_por" not in column_names:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS recibido_por TEXT")
             print("[MIGRATION] ✅ Columna recibido_por agregada")
 
         db.commit()
@@ -200,134 +178,52 @@ def migrate_db():
 
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error agregando campos de acuse: {e}")
-        db.commit()
+        db.rollback()
 
     # Migración: Rediseñar flujo Ticket → Ficha
+    #
+    # NOTA: el original recreaba toda la tabla `tickets` (CREATE ... AS SELECT
+    # + DROP + CREATE + INSERT) porque SQLite no permite modificar un
+    # constraint NOT NULL con ALTER TABLE. Postgres sí lo permite
+    # directamente con ALTER COLUMN ... DROP NOT NULL, así que ese hack
+    # completo (backup/drop/recreate) se elimina.
     try:
         print("[MIGRATION] Rediseñando flujo Ticket → Ficha...")
 
-        # Verificar si raypac_id existe en tickets
-        columns = db.execute("PRAGMA table_info(tickets)").fetchall()
-        column_names = [col['name'] for col in columns]
-
-        if 'raypac_id' not in column_names:
-            db.execute("ALTER TABLE tickets ADD COLUMN raypac_id INTEGER REFERENCES raypac_entries(id)")
+        cols_tickets = _columnas_de(db, "tickets")
+        if "raypac_id" not in cols_tickets:
+            db.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS raypac_id INTEGER REFERENCES raypac_entries(id)")
             print("[MIGRATION] ✅ Columna raypac_id agregada a tickets")
 
-        # Verificar si ticket_id existe en dml_fichas
-        columns = db.execute("PRAGMA table_info(dml_fichas)").fetchall()
-        column_names = [col['name'] for col in columns]
-
-        if 'ticket_id' not in column_names:
-            db.execute("ALTER TABLE dml_fichas ADD COLUMN ticket_id INTEGER REFERENCES tickets(id)")
+        cols_fichas = _columnas_de(db, "dml_fichas")
+        if "ticket_id" not in cols_fichas:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS ticket_id INTEGER REFERENCES tickets(id)")
             print("[MIGRATION] ✅ Columna ticket_id agregada a dml_fichas")
 
-        # Agregar campos adicionales a tickets si no existen
-        columns_tickets = db.execute("PRAGMA table_info(tickets)").fetchall()
-        tickets_cols = [col['name'] for col in columns_tickets]
+        cols_tickets = _columnas_de(db, "tickets")
 
-        if 'fecha_ingreso' not in tickets_cols:
-            db.execute("ALTER TABLE tickets ADD COLUMN fecha_ingreso TEXT")
-            print("[MIGRATION] ✅ Columna fecha_ingreso agregada a tickets")
-
-        if 'tecnico_responsable' not in tickets_cols:
-            db.execute("ALTER TABLE tickets ADD COLUMN tecnico_responsable TEXT")
-            print("[MIGRATION] ✅ Columna tecnico_responsable agregada a tickets")
-
-        if 'observaciones' not in tickets_cols:
-            db.execute("ALTER TABLE tickets ADD COLUMN observaciones TEXT")
-            print("[MIGRATION] ✅ Columna observaciones agregada a tickets")
+        campos_texto = ["fecha_ingreso", "tecnico_responsable", "observaciones"]
+        for campo in campos_texto:
+            if campo not in cols_tickets:
+                db.execute(f"ALTER TABLE tickets ADD COLUMN IF NOT EXISTS {campo} TEXT")
+                print(f"[MIGRATION] ✅ Columna {campo} agregada a tickets")
 
         # Componentes del estado del equipo
-        componentes = ['estado_equipo', 'carcaza', 'cubre_feedwheel', 'mango', 'botones',
-                      'motor_arrastre', 'motor_sellado', 'cuchilla', 'servo',
-                      'rueda_arrastre', 'resorte_manija', 'otros']
+        componentes = [
+            "estado_equipo", "carcaza", "cubre_feedwheel", "mango", "botones",
+            "motor_arrastre", "motor_sellado", "cuchilla", "servo",
+            "rueda_arrastre", "resorte_manija", "otros",
+        ]
 
         for componente in componentes:
-            if componente not in tickets_cols:
-                db.execute(f"ALTER TABLE tickets ADD COLUMN {componente} TEXT DEFAULT 'BUENO'")
+            if componente not in cols_tickets:
+                db.execute(f"ALTER TABLE tickets ADD COLUMN IF NOT EXISTS {componente} TEXT DEFAULT 'BUENO'")
                 print(f"[MIGRATION] ✅ Columna {componente} agregada a tickets")
 
-        # FIX CRÍTICO: En SQLite no se puede modificar constraint NOT NULL directamente
-        # Necesitamos recrear la tabla si ficha_id es NOT NULL o faltan columnas
-        columnas_requeridas = ['fecha_ingreso', 'tecnico_responsable', 'observaciones',
-                               'estado_equipo', 'carcaza', 'cubre_feedwheel', 'mango', 'botones',
-                               'motor_arrastre', 'motor_sellado', 'cuchilla', 'servo',
-                               'rueda_arrastre', 'resorte_manija', 'otros']
-
-        faltan_columnas = any(col not in tickets_cols for col in columnas_requeridas)
-
-        try:
-            # Intentar insertar un ticket de prueba con ficha_id NULL
-            db.execute("INSERT INTO tickets (numero_ticket, numero_serie, estado, ficha_id, raypac_id) VALUES ('TEST-MIGRATION', 'TEST', 'ACTIVO', NULL, NULL)")
-            db.execute("DELETE FROM tickets WHERE numero_ticket = 'TEST-MIGRATION'")
-
-            if faltan_columnas:
-                raise Exception("Faltan columnas en la tabla tickets")
-
-            print("[MIGRATION] ✅ Tabla tickets ya permite ficha_id NULL y tiene todas las columnas")
-        except Exception as test_error:
-            if "NOT NULL constraint failed" in str(test_error) or faltan_columnas or "no column named" in str(test_error):
-                print("[MIGRATION] ⚠️  Detectado constraint NOT NULL en ficha_id. Recreando tabla tickets...")
-
-                # Respaldar datos existentes
-                db.execute("""
-                    CREATE TABLE tickets_backup AS
-                    SELECT id, numero_ticket, ficha_id, numero_serie, estado,
-                           fecha_creacion, fecha_cierre, created_at, updated_at, raypac_id
-                    FROM tickets
-                """)
-
-                # Eliminar tabla original
-                db.execute("DROP TABLE tickets")
-
-                # Recrear tabla con ficha_id NULLABLE y todas las columnas necesarias
-                db.execute("""
-                    CREATE TABLE tickets (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        numero_ticket TEXT UNIQUE NOT NULL,
-                        ficha_id INTEGER,
-                        numero_serie TEXT NOT NULL,
-                        estado TEXT DEFAULT 'ACTIVO',
-                        fecha_creacion TEXT DEFAULT CURRENT_TIMESTAMP,
-                        fecha_cierre TEXT,
-                        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                        raypac_id INTEGER REFERENCES raypac_entries(id),
-                        fecha_ingreso TEXT,
-                        tecnico_responsable TEXT,
-                        observaciones TEXT,
-                        estado_equipo TEXT DEFAULT 'BUENO',
-                        carcaza TEXT DEFAULT 'BUENO',
-                        cubre_feedwheel TEXT DEFAULT 'BUENO',
-                        mango TEXT DEFAULT 'BUENO',
-                        botones TEXT DEFAULT 'BUENO',
-                        motor_arrastre TEXT DEFAULT 'BUENO',
-                        motor_sellado TEXT DEFAULT 'BUENO',
-                        cuchilla TEXT DEFAULT 'BUENO',
-                        servo TEXT DEFAULT 'BUENO',
-                        rueda_arrastre TEXT DEFAULT 'BUENO',
-                        resorte_manija TEXT DEFAULT 'BUENO',
-                        otros TEXT DEFAULT 'BUENO',
-                        FOREIGN KEY(ficha_id) REFERENCES dml_fichas(id) ON DELETE CASCADE,
-                        UNIQUE(numero_ticket)
-                    )
-                """)
-
-                # Restaurar datos
-                db.execute("""
-                    INSERT INTO tickets
-                    (id, numero_ticket, ficha_id, numero_serie, estado, fecha_creacion, fecha_cierre, created_at, updated_at, raypac_id)
-                    SELECT id, numero_ticket, ficha_id, numero_serie, estado, fecha_creacion, fecha_cierre, created_at, updated_at, raypac_id
-                    FROM tickets_backup
-                """)
-
-                # Eliminar backup
-                db.execute("DROP TABLE tickets_backup")
-
-                print("[MIGRATION] ✅ Tabla tickets recreada con ficha_id NULLABLE")
-            else:
-                raise test_error
+        # Postgres permite modificar el constraint NOT NULL directamente,
+        # sin recrear la tabla como había que hacer en SQLite.
+        db.execute("ALTER TABLE tickets ALTER COLUMN ficha_id DROP NOT NULL")
+        print("[MIGRATION] ✅ ficha_id en tickets ahora es NULLABLE")
 
         db.commit()
         print("[MIGRATION] ✅ Flujo Ticket → Ficha configurado")
@@ -335,17 +231,14 @@ def migrate_db():
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error en migración de flujo: {e}")
         db.rollback()
-        db.commit()
 
     # Migración: Agregar tipo_entrega a envios_repuestos
     try:
         print("[MIGRATION] Verificando campo tipo_entrega en envios_repuestos...")
+        column_names = _columnas_de(db, "envios_repuestos")
 
-        columns = db.execute("PRAGMA table_info(envios_repuestos)").fetchall()
-        column_names = [col['name'] for col in columns]
-
-        if 'tipo_entrega' not in column_names:
-            db.execute("ALTER TABLE envios_repuestos ADD COLUMN tipo_entrega TEXT DEFAULT 'REPUESTOS'")
+        if "tipo_entrega" not in column_names:
+            db.execute("ALTER TABLE envios_repuestos ADD COLUMN IF NOT EXISTS tipo_entrega TEXT DEFAULT 'REPUESTOS'")
             print("[MIGRATION] ✅ Columna tipo_entrega agregada a envios_repuestos")
 
         db.commit()
@@ -353,21 +246,19 @@ def migrate_db():
 
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error agregando tipo_entrega: {e}")
-        db.commit()
+        db.rollback()
 
     # Migración: Agregar estado_envio_equipos a raypac_entries
     try:
         print("[MIGRATION] Verificando campo estado_envio_equipos en raypac_entries...")
+        raypac_col_names = _columnas_de(db, "raypac_entries")
 
-        raypac_cols = db.execute("PRAGMA table_info(raypac_entries)").fetchall()
-        raypac_col_names = [col['name'] for col in raypac_cols]
-
-        if 'estado_envio_equipos' not in raypac_col_names:
-            db.execute("ALTER TABLE raypac_entries ADD COLUMN estado_envio_equipos TEXT DEFAULT 'PENDIENTE'")
+        if "estado_envio_equipos" not in raypac_col_names:
+            db.execute("ALTER TABLE raypac_entries ADD COLUMN IF NOT EXISTS estado_envio_equipos TEXT DEFAULT 'PENDIENTE'")
             print("[MIGRATION] ✅ Columna estado_envio_equipos agregada a raypac_entries")
 
-        if 'fecha_envio_equipos' not in raypac_col_names:
-            db.execute("ALTER TABLE raypac_entries ADD COLUMN fecha_envio_equipos TEXT")
+        if "fecha_envio_equipos" not in raypac_col_names:
+            db.execute("ALTER TABLE raypac_entries ADD COLUMN IF NOT EXISTS fecha_envio_equipos TIMESTAMP")
             print("[MIGRATION] ✅ Columna fecha_envio_equipos agregada a raypac_entries")
 
         db.commit()
@@ -375,7 +266,7 @@ def migrate_db():
 
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error agregando campos de envío de equipos: {e}")
-        db.commit()
+        db.rollback()
 
     # TODO SEGURIDAD (Épica 2): acá el app.py original tiene un bloque
     # "Migración de hashes de contraseñas" que re-escribe el password_hash de
@@ -400,7 +291,7 @@ def init_db():
     # Cargar datos iniciales (asumimos BD nueva)
     try:
         print("[SEED] 🌱 Cargando datos iniciales...", file=sys.stderr, flush=True)
-        from services.seed import load_seed_data  # se crea en el siguiente checkpoint
+        from CODIGO_FUENTE.services.seed import load_seed_data  # se crea en el siguiente checkpoint
         db = get_db()
         load_seed_data(db)
         db.commit()

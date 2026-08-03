@@ -28,7 +28,7 @@ def verificar_stock_api(codigo):
     services/stock.py::check_stock_alert como base.
     """
     repuesto = db.execute(
-        "SELECT codigo_repuesto, descripcion, stock FROM stock_repuestos WHERE codigo_repuesto = ?",
+        "SELECT codigo_repuesto, descripcion, stock FROM stock_repuestos WHERE codigo_repuesto = %s",
         (codigo.upper(),)
     )
 

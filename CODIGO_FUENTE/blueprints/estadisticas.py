@@ -54,7 +54,7 @@ def estadisticas(readonly=False):
             su.ubicacion
         FROM stock_ubicaciones su
         LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = su.codigo_repuesto
-        WHERE su.cantidad <= 2 AND su.ubicacion = ?
+        WHERE su.cantidad <= 2 AND su.ubicacion = %s
         ORDER BY su.cantidad ASC
     """, (ubicacion,)).fetchall()
 
@@ -62,11 +62,11 @@ def estadisticas(readonly=False):
     stats = {
         "total_repuestos": db.execute("SELECT COUNT(*) as cnt FROM matriz_repuestos").fetchone()['cnt'],
         "repuestos_en_ubicacion": db.execute(
-            "SELECT COUNT(*) as cnt FROM stock_ubicaciones WHERE ubicacion = ?",
+            "SELECT COUNT(*) as cnt FROM stock_ubicaciones WHERE ubicacion = %s",
             (ubicacion,)
         ).fetchone()['cnt'],
         "total_movimientos": db.execute("SELECT SUM(total_usos) as total FROM estadisticas_repuestos").fetchone()['total'] or 0 if ubicacion == "DML" else 0,
-        "fichas_completadas": db.execute("SELECT COUNT(*) as cnt FROM dml_fichas WHERE is_closed = 1").fetchone()['cnt'] if ubicacion == "DML" else 0,
+        "fichas_completadas": db.execute("SELECT COUNT(*) as cnt FROM dml_fichas WHERE is_closed = TRUE").fetchone()['cnt'] if ubicacion == "DML" else 0,
     }
 
     return render_template(

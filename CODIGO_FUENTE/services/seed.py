@@ -91,7 +91,7 @@ def cargar_stock_completo_desde_csv(db):
 def load_seed_data(db=None):
     """Carga datos iniciales en la base de datos - BASADO EN seed_data_minimal.py"""
     if db is None:
-        from extensions import get_db
+        from CODIGO_FUENTE.extensions import get_db
         db = get_db()
 
     # ======================== CREAR USUARIOS POR DEFECTO ========================
