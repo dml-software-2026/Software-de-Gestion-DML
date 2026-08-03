@@ -48,16 +48,18 @@ def cargar_stock_completo_desde_csv(db):
 
                 # 1. Insertar en matriz_repuestos
                 db.execute("""
-                    INSERT OR IGNORE INTO matriz_repuestos
+                    INSERT INTO matriz_repuestos
                     (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
-                    VALUES (?, ?, ?, ?, ?, 'DML')
+                    VALUES (%s, %s, %s, %s, %s, 'DML')
+                    ON CONFLICT (codigo_repuesto) DO NOTHING
                 """, (idx, codigo, item, cantidad, cantidad))
 
                 # 2. Insertar en stock_ubicaciones (ubicación DML)
                 db.execute("""
-                    INSERT OR IGNORE INTO stock_ubicaciones
+                    INSERT INTO stock_ubicaciones
                     (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
-                    VALUES (?, 'DML', ?, ?)
+                    VALUES (%s, 'DML', %s, %s)
+                    ON CONFLICT (codigo_repuesto, ubicacion) DO NOTHING
                 """, (codigo, cantidad, codigo_ubicacion))
 
                 repuestos_cargados += 1
@@ -70,10 +72,11 @@ def cargar_stock_completo_desde_csv(db):
         # 3. Inicializar stock RAYPAC con cantidades desde matriz_repuestos
         print("[STOCK CSV] 📦 Inicializando stock RAYPAC...")
         db.execute("""
-            INSERT OR IGNORE INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
+            INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
             SELECT codigo_repuesto, 'RAYPAC', cantidad_actual, 'SIN UBICACIÓN'
             FROM matriz_repuestos
             WHERE codigo_repuesto NOT IN (SELECT codigo_repuesto FROM stock_ubicaciones WHERE ubicacion = 'RAYPAC')
+            ON CONFLICT (codigo_repuesto, ubicacion) DO NOTHING
         """)
         db.commit()
 
@@ -109,7 +112,7 @@ def load_seed_data(db=None):
         for email, pwd, nombre, role in usuarios:
             db.execute("""
                 INSERT INTO users (email, password_hash, nombre, role, is_active)
-                VALUES (?, ?, ?, ?, 1)
+                VALUES (%s, %s, %s, %s, TRUE)
             """, (email, generate_password_hash(pwd), nombre, role))
         db.commit()
         print(f"[SEED] ✅ {len(usuarios)} usuarios creados")
@@ -147,7 +150,7 @@ def load_seed_data(db=None):
         for idx, (codigo, item) in enumerate(repuestos, start=1):
             db.execute("""
                 INSERT INTO matriz_repuestos (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
-                VALUES (?, ?, ?, 0, 0, 'DML')
+                VALUES (%s, %s, %s, 0, 0, 'DML')
             """, (idx, codigo, item))
         db.commit()
 
@@ -160,7 +163,7 @@ def load_seed_data(db=None):
         for codigo, cant in stock_raypac:
             db.execute("""
                 INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad)
-                VALUES (?, 'RAYPAC', ?)
+                VALUES (%s, 'RAYPAC', %s)
             """, (codigo, cant))
         db.commit()
 
@@ -173,13 +176,13 @@ def load_seed_data(db=None):
         for codigo, cant in stock_dml:
             db.execute("""
                 INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad)
-                VALUES (?, 'DML', ?)
+                VALUES (%s, 'DML', %s)
             """, (codigo, cant))
             # Legacy stock_dml para compatibilidad
             db.execute("""
                 INSERT INTO stock_dml (codigo_repuesto, item, cantidad, cantidad_minima, estado_alerta)
-                SELECT ?, item, ?, 2, 'OK'
-                FROM matriz_repuestos WHERE codigo_repuesto = ?
+                SELECT %s, item, %s, 2, 'OK'
+                FROM matriz_repuestos WHERE codigo_repuesto = %s
             """, (codigo, cant, codigo))
 
     # DATOS DE EJEMPLO REMOVIDOS - Solo CSV carga permanente
