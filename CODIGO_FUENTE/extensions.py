@@ -282,10 +282,6 @@ def migrate_db():
 
 def init_db():
     db = get_db()
-    schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
-    with open(schema_path, "r", encoding="utf-8") as f:
-        db.executescript(f.read())
-    db.commit()
     migrate_db()  # Aplicar migraciones
 
     # Cargar datos iniciales (asumimos BD nueva)
