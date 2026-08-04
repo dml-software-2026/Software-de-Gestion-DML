@@ -305,7 +305,7 @@ def dml_edit(id):
             flash("Ficha actualizada correctamente.", "success")
             return redirect(url_for("dml.dml_view", id=id))
         except Exception as e:
-            db.rollback
+            db.rollback()  # Revertir la transacción en caso de error
             flash(f"Error: {str(e)}", "error")
 
     partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s", (id,)).fetchall()
