@@ -26,7 +26,7 @@ class PgConnection:
 
     def execute(self, query, params=None):
         cur = self._conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(query, params or ())
+        cur.execute(query, params)
         return cur
 
     def executescript(self, script):

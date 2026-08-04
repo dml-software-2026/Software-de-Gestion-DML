@@ -70,7 +70,7 @@
                         <span class="text-muted">Sin ficha</span>
                         {% endif %}
                     </td>
-                    <td>{{ ticket.fecha_creacion[:10] }}</td>
+                    <td>{{ ticket.fecha_creacion.strftime('%Y-%m-%d') if ticket.fecha_creacion else '' }}</td>
                     <td>
                         {% if ticket.estado == 'ACTIVO' %}
                         <span class="badge bg-success">ACTIVO</span>
