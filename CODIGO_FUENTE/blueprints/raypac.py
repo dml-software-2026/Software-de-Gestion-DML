@@ -28,6 +28,7 @@ def raypac_list(readonly=False):
             ORDER BY r.created_at DESC
         """).fetchall()
     except Exception as e:
+        db.rollback()  # En caso de error, revertir la transacción
         # Si hay error en la query, mostrar mensaje y retornar lista vacía
         flash(f"Error al cargar ingresos RAYPAC: {str(e)}", "error")
         entries = []
@@ -103,6 +104,7 @@ def raypac_new():
             flash("Ingreso RAYPAC registrado correctamente.", "success")
             return redirect(url_for("raypac.raypac_view", id=raypac_id))
         except Exception as e:
+            db.rollback()  # Revertir la transacción en caso de error
             flash(f"Error al guardar: {str(e)}", "error")
             return render_template("raypac_form.html")
 
@@ -177,6 +179,7 @@ def raypac_edit(id):
             flash("Ingreso RAYPAC actualizado.", "success")
             return redirect(url_for("raypac.raypac_view", id=id))
         except Exception as e:
+            db.rollback()
             flash(f"Error: {str(e)}", "error")
 
     return render_template("raypac_form.html", entry=entry, edit=True)
