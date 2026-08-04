@@ -190,4 +190,4 @@ def actualizar_estadistica_repuesto(codigo_repuesto, cantidad=1):
             VALUES (%s, %s, %s, %s, 1)
         """, (codigo_repuesto, item['item'] if item else None, cantidad, datetime.now().isoformat()))
 
-     db.commit()
+    db.commit()
