@@ -248,9 +248,17 @@ def dml_edit(id):
             # CAMBIO DAVID: No usar diagnostico_inicial, ya viene de RAYPAC
             diagnostico_rep = request.form.get("diagnostico_reparacion")
             observaciones = request.form.get("observaciones")
-            n_ciclos = request.form.get("n_ciclos")
+            n_ciclos_raw = request.form.get("n_ciclos")
+            try:
+                n_ciclos = int(n_ciclos_raw) if n_ciclos_raw else None
+            except ValueError:
+                n_ciclos = None  # texto no numérico (ej. "NO APLICA")
             mecanizado = request.form.get("mecanizado_adic") or "NO APLICA"
-            horas = request.form.get("horas_adic") or 0
+            horas_raw = request.form.get("horas_adic")
+            try:
+                horas = float(horas_raw) if horas_raw else None
+            except ValueError:
+                horas = None  # texto no numérico (ej. "NO APLICA")
             numero_remito = request.form.get("numero_remito_salida")
             tecnico_resp = request.form.get("tecnico_resp") or ""
 
