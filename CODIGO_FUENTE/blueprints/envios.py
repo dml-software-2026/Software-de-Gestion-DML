@@ -69,7 +69,8 @@ def envios_list():
         if isinstance(val, date):
             return datetime.combine(val, datetime.min.time(), tzinfo=timezone.utc)
         return datetime.min.replace(tzinfo=timezone.utc)
-
+    todos_envios.sort(key=_sort_key, reverse=True)
+    return render_template("envios_list.html", envios=todos_envios)
 
 @envios_bp.route("/new", methods=["GET", "POST"])
 @login_required
