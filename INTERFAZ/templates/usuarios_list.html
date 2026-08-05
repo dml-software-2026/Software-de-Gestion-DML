@@ -33,7 +33,7 @@
                                 {{ "Activo" if u.is_active else "Inactivo" }}
                             </span>
                         </td>
-                        <td>{{ u.created_at[:10] if u.created_at else "N/A" }}</td>
+                        <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else "N/A" }}</td>
                         <td>
                             <a href="{{ url_for('admin.usuario_edit', id=u.id) }}" class="btn btn-sm btn-info">Editar</a>
                             {% if u.id != user.id %}

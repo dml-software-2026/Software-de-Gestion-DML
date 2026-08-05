@@ -1,9 +1,10 @@
 import os
 import csv
 
+from psycopg2.extras import execute_values
 from werkzeug.security import generate_password_hash
 
-from config import BASE_DIR
+from CODIGO_FUENTE.config import BASE_DIR
 
 
 def cargar_stock_completo_desde_csv(db):
@@ -26,6 +27,15 @@ def cargar_stock_completo_desde_csv(db):
             for _ in range(4):
                 next(reader, None)
 
+            # Se acumulan las filas del CSV en memoria y se insertan todas
+            # juntas al final con execute_values, en vez de hacer 2 inserts
+            # por fila (494 round-trips a Supabase en total, uno por uno).
+            # Eso era lo que provocaba el WORKER TIMEOUT de Gunicorn: el
+            # server tardaba más de 30s en arrancar porque init_db() quedaba
+            # trabado ahí. Con batch, son solo 2 viajes a la base en total.
+            matriz_rows = []
+            stock_rows = []
+
             for idx, row in enumerate(reader, start=1):
                 if len(row) < 11:
                     continue
@@ -46,34 +56,40 @@ def cargar_stock_completo_desde_csv(db):
                 except ValueError:
                     cantidad = 0
 
-                # 1. Insertar en matriz_repuestos
-                db.execute("""
-                    INSERT OR IGNORE INTO matriz_repuestos
-                    (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
-                    VALUES (?, ?, ?, ?, ?, 'DML')
-                """, (idx, codigo, item, cantidad, cantidad))
-
-                # 2. Insertar en stock_ubicaciones (ubicación DML)
-                db.execute("""
-                    INSERT OR IGNORE INTO stock_ubicaciones
-                    (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
-                    VALUES (?, 'DML', ?, ?)
-                """, (codigo, cantidad, codigo_ubicacion))
-
+                matriz_rows.append((idx, codigo, item, cantidad, cantidad, 'DML'))
+                stock_rows.append((codigo, 'DML', cantidad, codigo_ubicacion))
                 repuestos_cargados += 1
 
-                if idx % 50 == 0:
-                    db.commit()
+        if matriz_rows:
+            cur = db.cursor()
+            execute_values(cur, """
+                INSERT INTO matriz_repuestos
+                (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
+                VALUES %s
+                ON CONFLICT (codigo_repuesto) DO NOTHING
+            """, matriz_rows)
+            cur.close()
+
+        if stock_rows:
+            cur = db.cursor()
+            execute_values(cur, """
+                INSERT INTO stock_ubicaciones
+                (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
+                VALUES %s
+                ON CONFLICT (codigo_repuesto, ubicacion) DO NOTHING
+            """, stock_rows)
+            cur.close()
 
         db.commit()
 
         # 3. Inicializar stock RAYPAC con cantidades desde matriz_repuestos
         print("[STOCK CSV] 📦 Inicializando stock RAYPAC...")
         db.execute("""
-            INSERT OR IGNORE INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
+            INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
             SELECT codigo_repuesto, 'RAYPAC', cantidad_actual, 'SIN UBICACIÓN'
             FROM matriz_repuestos
             WHERE codigo_repuesto NOT IN (SELECT codigo_repuesto FROM stock_ubicaciones WHERE ubicacion = 'RAYPAC')
+            ON CONFLICT (codigo_repuesto, ubicacion) DO NOTHING
         """)
         db.commit()
 
@@ -91,7 +107,7 @@ def cargar_stock_completo_desde_csv(db):
 def load_seed_data(db=None):
     """Carga datos iniciales en la base de datos - BASADO EN seed_data_minimal.py"""
     if db is None:
-        from extensions import get_db
+        from CODIGO_FUENTE.extensions import get_db
         db = get_db()
 
     # ======================== CREAR USUARIOS POR DEFECTO ========================
@@ -109,7 +125,7 @@ def load_seed_data(db=None):
         for email, pwd, nombre, role in usuarios:
             db.execute("""
                 INSERT INTO users (email, password_hash, nombre, role, is_active)
-                VALUES (?, ?, ?, ?, 1)
+                VALUES (%s, %s, %s, %s, TRUE)
             """, (email, generate_password_hash(pwd), nombre, role))
         db.commit()
         print(f"[SEED] ✅ {len(usuarios)} usuarios creados")
@@ -147,7 +163,7 @@ def load_seed_data(db=None):
         for idx, (codigo, item) in enumerate(repuestos, start=1):
             db.execute("""
                 INSERT INTO matriz_repuestos (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
-                VALUES (?, ?, ?, 0, 0, 'DML')
+                VALUES (%s, %s, %s, 0, 0, 'DML')
             """, (idx, codigo, item))
         db.commit()
 
@@ -160,7 +176,7 @@ def load_seed_data(db=None):
         for codigo, cant in stock_raypac:
             db.execute("""
                 INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad)
-                VALUES (?, 'RAYPAC', ?)
+                VALUES (%s, 'RAYPAC', %s)
             """, (codigo, cant))
         db.commit()
 
@@ -173,13 +189,13 @@ def load_seed_data(db=None):
         for codigo, cant in stock_dml:
             db.execute("""
                 INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad)
-                VALUES (?, 'DML', ?)
+                VALUES (%s, 'DML', %s)
             """, (codigo, cant))
             # Legacy stock_dml para compatibilidad
             db.execute("""
                 INSERT INTO stock_dml (codigo_repuesto, item, cantidad, cantidad_minima, estado_alerta)
-                SELECT ?, item, ?, 2, 'OK'
-                FROM matriz_repuestos WHERE codigo_repuesto = ?
+                SELECT %s, item, %s, 2, 'OK'
+                FROM matriz_repuestos WHERE codigo_repuesto = %s
             """, (codigo, cant, codigo))
 
     # DATOS DE EJEMPLO REMOVIDOS - Solo CSV carga permanente

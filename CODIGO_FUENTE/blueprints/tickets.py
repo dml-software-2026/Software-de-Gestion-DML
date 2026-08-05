@@ -2,10 +2,10 @@ from datetime import datetime
 
 from flask import Blueprint, request, render_template, redirect, url_for, flash
 
-from extensions import get_db
-from decorators import login_required, role_required, get_current_user, log_action
-from services.mail import send_mail
-from services.numeracion import generate_ticket_number
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.decorators import login_required, role_required, get_current_user, log_action
+from CODIGO_FUENTE.services.mail import send_mail
+from CODIGO_FUENTE.services.numeracion import generate_ticket_number
 
 tickets_bp = Blueprint("tickets", __name__)
 
@@ -18,7 +18,7 @@ def ticket_nuevo(raypac_id):
     user = get_current_user()
     db = get_db()
 
-    raypac = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (raypac_id,)).fetchone()
+    raypac = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (raypac_id,)).fetchone()
     if not raypac:
         flash("Ingreso RAYPAC no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
@@ -29,7 +29,7 @@ def ticket_nuevo(raypac_id):
 
     # Verificar si ya existe ticket para este RAYPAC
     ticket_existente = db.execute(
-        "SELECT * FROM tickets WHERE raypac_id = ?", (raypac_id,)
+        "SELECT * FROM tickets WHERE raypac_id = %s", (raypac_id,)
     ).fetchone()
 
     if ticket_existente:
@@ -66,23 +66,24 @@ def ticket_nuevo(raypac_id):
             numero_ticket = generate_ticket_number(raypac['numero_serie'])
 
             # Crear ticket sin ficha_id (será NULL hasta que se cree la ficha)
-            db.execute("""
+            row = db.execute("""
                 INSERT INTO tickets
                 (numero_ticket, raypac_id, numero_serie, estado, ficha_id,
                  fecha_ingreso, tecnico_responsable, observaciones,
                  estado_equipo, carcaza, cubre_feedwheel, mango, botones,
                  motor_arrastre, motor_sellado, cuchilla, servo,
                  rueda_arrastre, resorte_manija, otros)
-                VALUES (?, ?, ?, 'ACTIVO', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, 'ACTIVO', NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
             """, (numero_ticket, raypac_id, raypac['numero_serie'],
                   fecha_ingreso, tecnico_responsable, observaciones,
                   estado_equipo, carcaza, cubre_feedwheel, mango, botones,
                   motor_arrastre, motor_sellado, cuchilla, servo,
-                  rueda_arrastre, resorte_manija, otros))
+                  rueda_arrastre, resorte_manija, otros)).fetchone()
 
             db.commit()
 
-            ticket_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
+            ticket_id = row['id']
 
             log_action(user['id'], "CREATE", "tickets", ticket_id, None,
                       f"Ticket inicial creado: {numero_ticket}")
@@ -160,11 +161,11 @@ def tickets_list():
         query += " AND (t.estado IS NULL OR t.estado != 'CERRADO')"
 
     if buscar:
-        query += " AND (t.numero_ticket LIKE ? OR t.numero_serie LIKE ?)"
+        query += " AND (t.numero_ticket LIKE %s OR t.numero_serie LIKE %s)"
         params.extend([f"%{buscar}%", f"%{buscar}%"])
 
     if estado:
-        query += " AND t.estado = ?"
+        query += " AND t.estado = %s"
         params.append(estado)
 
     query += " ORDER BY t.fecha_creacion DESC"
@@ -192,7 +193,7 @@ def ticket_view(numero_ticket):
         FROM tickets t
         LEFT JOIN dml_fichas f ON t.ficha_id = f.id
         LEFT JOIN raypac_entries r ON t.raypac_id = r.id
-        WHERE t.numero_ticket = ?
+        WHERE t.numero_ticket = %s
     """, (numero_ticket,)).fetchone()
 
     if not ticket:
@@ -201,7 +202,7 @@ def ticket_view(numero_ticket):
 
     # Obtener historial
     historial = db.execute("""
-        SELECT * FROM ticket_historial WHERE ticket_id = ? ORDER BY fecha DESC
+        SELECT * FROM ticket_historial WHERE ticket_id = %s ORDER BY fecha DESC
     """, (ticket['id'],)).fetchall()
 
     return render_template("ticket_view.html", ticket=ticket, historial=historial)
@@ -222,7 +223,7 @@ def ticket_print(numero_ticket):
         FROM tickets t
         LEFT JOIN dml_fichas f ON t.ficha_id = f.id
         LEFT JOIN raypac_entries r ON t.raypac_id = r.id
-        WHERE t.numero_ticket = ?
+        WHERE t.numero_ticket = %s
     """, (numero_ticket,)).fetchone()
 
     if not ticket:

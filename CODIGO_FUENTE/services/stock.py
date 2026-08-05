@@ -1,21 +1,21 @@
 from datetime import datetime
 
-from extensions import get_db
-from services.mail import send_mail
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.mail import send_mail
 
 
 def check_stock_alert(codigo, ubicacion="DML"):
     """Verifica nivel de stock por ubicación y retorna estado de alerta."""
     db = get_db()
     stock = db.execute(
-        "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = ? AND ubicacion = ?",
+        "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = %s",
         (codigo, ubicacion)
     ).fetchone()
 
     # Fallback: si no existe en la ubicación, usar cualquier ubicación (último registro)
     if not stock:
         stock = db.execute(
-            "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = ? ORDER BY updated_at DESC LIMIT 1",
+            "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = %s ORDER BY updated_at DESC LIMIT 1",
             (codigo,)
         ).fetchone()
 
@@ -53,7 +53,7 @@ def ajustar_stock_ubicacion(codigo_repuesto, ubicacion, delta):
     """Suma/resta stock en una ubicación específica, evitando negativos."""
     db = get_db()
     row = db.execute(
-        "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = ? AND ubicacion = ?",
+        "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = %s",
         (codigo_repuesto, ubicacion)
     ).fetchone()
     if row:
@@ -61,14 +61,14 @@ def ajustar_stock_ubicacion(codigo_repuesto, ubicacion, delta):
         if nueva_cantidad < 0:
             raise ValueError(f"Stock insuficiente en {ubicacion} para {codigo_repuesto}")
         db.execute(
-            "UPDATE stock_ubicaciones SET cantidad = ?, updated_at = CURRENT_TIMESTAMP WHERE codigo_repuesto = ? AND ubicacion = ?",
+            "UPDATE stock_ubicaciones SET cantidad = %s, updated_at = CURRENT_TIMESTAMP WHERE codigo_repuesto = %s AND ubicacion = %s",
             (nueva_cantidad, codigo_repuesto, ubicacion)
         )
     else:
         if delta < 0:
             raise ValueError(f"No existe stock en {ubicacion} para {codigo_repuesto}")
         db.execute(
-            "INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad) VALUES (?, ?, ?)",
+            "INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad) VALUES (%s, %s, %s)",
             (codigo_repuesto, ubicacion, delta)
         )
 
@@ -81,7 +81,7 @@ def verificar_alerta_stock(codigo_repuesto, ubicacion="DML"):
         SELECT su.cantidad, su.ubicacion, m.item
         FROM stock_ubicaciones su
         LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = su.codigo_repuesto
-        WHERE su.codigo_repuesto = ? AND su.ubicacion = ?
+        WHERE su.codigo_repuesto = %s AND su.ubicacion = %s
         """,
         (codigo_repuesto, ubicacion)
     ).fetchone()
@@ -92,7 +92,7 @@ def verificar_alerta_stock(codigo_repuesto, ubicacion="DML"):
             SELECT su.cantidad, su.ubicacion, m.item
             FROM stock_ubicaciones su
             LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = su.codigo_repuesto
-            WHERE su.codigo_repuesto = ?
+            WHERE su.codigo_repuesto = %s
             ORDER BY su.updated_at DESC
             LIMIT 1
             """,
@@ -109,7 +109,7 @@ def verificar_alerta_stock(codigo_repuesto, ubicacion="DML"):
         # Registrar alerta
         db.execute("""
             INSERT INTO stock_alertas (codigo_repuesto, item, cantidad_actual, nivel_alerta)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
         """, (codigo_repuesto, item_nombre, stock['cantidad'], nivel_alerta))
         db.commit()
 
@@ -146,7 +146,7 @@ def actualizar_estado_alerta_stock(codigo, ubicacion="DML"):
     """Recalcula estado_alerta en stock_dml tras movimientos para la ubicación dada."""
     db = get_db()
     existe = db.execute(
-        "SELECT 1 FROM stock_dml WHERE codigo_repuesto = ?",
+        "SELECT 1 FROM stock_dml WHERE codigo_repuesto = %s",
         (codigo,)
     ).fetchone()
     if not existe:
@@ -154,7 +154,7 @@ def actualizar_estado_alerta_stock(codigo, ubicacion="DML"):
 
     nivel = check_stock_alert(codigo, ubicacion)
     db.execute(
-        "UPDATE stock_dml SET estado_alerta = ?, updated_at = CURRENT_TIMESTAMP WHERE codigo_repuesto = ?",
+        "UPDATE stock_dml SET estado_alerta = %s, updated_at = CURRENT_TIMESTAMP WHERE codigo_repuesto = %s",
         (nivel, codigo)
     )
     db.commit()
@@ -165,29 +165,29 @@ def actualizar_estadistica_repuesto(codigo_repuesto, cantidad=1):
     db = get_db()
 
     stats = db.execute(
-        "SELECT * FROM estadisticas_repuestos WHERE codigo_repuesto = ?",
+        "SELECT * FROM estadisticas_repuestos WHERE codigo_repuesto = %s",
         (codigo_repuesto,)
     ).fetchone()
 
     if stats:
         db.execute("""
             UPDATE estadisticas_repuestos
-            SET cantidad_utilizada = cantidad_utilizada + ?,
-                fecha_ultimo_uso = ?,
+            SET cantidad_utilizada = cantidad_utilizada + %s,
+                fecha_ultimo_uso = %s,
                 total_usos = total_usos + 1
-            WHERE codigo_repuesto = ?
+            WHERE codigo_repuesto = %s
         """, (cantidad, datetime.now().isoformat(), codigo_repuesto))
     else:
         # Obtener item de matriz
         item = db.execute(
-            "SELECT item FROM matriz_repuestos WHERE codigo_repuesto = ?",
+            "SELECT item FROM matriz_repuestos WHERE codigo_repuesto = %s",
             (codigo_repuesto,)
         ).fetchone()
 
         db.execute("""
             INSERT INTO estadisticas_repuestos
             (codigo_repuesto, item, cantidad_utilizada, fecha_ultimo_uso, total_usos)
-            VALUES (?, ?, ?, ?, 1)
+            VALUES (%s, %s, %s, %s, 1)
         """, (codigo_repuesto, item['item'] if item else None, cantidad, datetime.now().isoformat()))
 
     db.commit()

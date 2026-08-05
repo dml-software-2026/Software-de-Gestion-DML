@@ -8,7 +8,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 
-from extensions import get_db
+from CODIGO_FUENTE.extensions import get_db
 
 
 def generar_ficha_pdf(ficha_id):

@@ -2,12 +2,12 @@ from datetime import datetime
 
 from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, send_file
 
-from extensions import get_db
-from decorators import login_required, role_required, permission_required, get_current_user, log_action
-from services.mail import send_mail
-from services.numeracion import generate_ficha_number, crear_ticket
-from services.stock import ajustar_stock_ubicacion, actualizar_estadistica_repuesto, verificar_alerta_stock
-from services.pdf import generar_ficha_pdf, generate_ficha_pdf
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
+from CODIGO_FUENTE.services.mail import send_mail
+from CODIGO_FUENTE.services.numeracion import generate_ficha_number, crear_ticket
+from CODIGO_FUENTE.services.stock import ajustar_stock_ubicacion, actualizar_estadistica_repuesto, verificar_alerta_stock
+from CODIGO_FUENTE.services.pdf import generar_ficha_pdf, generate_ficha_pdf
 
 dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
 
@@ -22,7 +22,7 @@ def dml_list(readonly=False):
         SELECT f.*, r.cliente, r.numero_serie
         FROM dml_fichas f
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
-        WHERE f.is_closed = 0
+        WHERE f.is_closed = FALSE
         ORDER BY f.created_at DESC
     """).fetchall()
 
@@ -39,7 +39,7 @@ def dml_entregadas():
         SELECT f.*, r.cliente, r.numero_serie, r.contacto_cliente, r.email_cliente
         FROM dml_fichas f
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
-        WHERE f.estado_reparacion LIKE '%ENTREGAD%' OR f.is_closed = 1
+        WHERE f.estado_reparacion LIKE '%ENTREGAD%' OR f.is_closed = TRUE
         ORDER BY f.fecha_entrega_cliente DESC, f.updated_at DESC
     """).fetchall()
 
@@ -53,13 +53,13 @@ def dml_new(raypac_id):
     user = get_current_user()
     db = get_db()
 
-    raypac = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (raypac_id,)).fetchone()
+    raypac = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (raypac_id,)).fetchone()
     if not raypac:
         flash("Ingreso RAYPAC no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
     # Buscar si existe un ticket asociado a este RAYPAC (nuevo flujo)
-    ticket = db.execute("SELECT * FROM tickets WHERE raypac_id = ? AND ficha_id IS NULL", (raypac_id,)).fetchone()
+    ticket = db.execute("SELECT * FROM tickets WHERE raypac_id = %s AND ficha_id IS NULL", (raypac_id,)).fetchone()
 
     if request.method == "POST":
         try:
@@ -85,33 +85,35 @@ def dml_new(raypac_id):
 
             # Si existe ticket, asociar la ficha con él
             if ticket:
-                db.execute("""
+                row = db.execute("""
                     INSERT INTO dml_fichas
                     (numero_ficha, raypac_id, ticket_id, numero_ticket, fecha_ingreso, tecnico,
                      observaciones, n_ciclos, tecnico_resp,
                      estado_reparacion)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
                 """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso, tecnico,
-                      observaciones, n_ciclos, tecnico_resp, 'REVISION_INICIAL'))
+                      observaciones, n_ciclos, tecnico_resp, 'REVISION_INICIAL')).fetchone()
 
-                ficha_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
+                ficha_id = row['id']
 
                 # Actualizar ticket con el ficha_id
-                db.execute("UPDATE tickets SET ficha_id = ? WHERE id = ?", (ficha_id, ticket['id']))
+                db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
 
                 numero_ticket = ticket['numero_ticket']
             else:
                 # Flujo antiguo: crear ficha sin ticket previo
-                db.execute("""
+                row = db.execute("""
                     INSERT INTO dml_fichas
                     (numero_ficha, raypac_id, fecha_ingreso, tecnico,
                      observaciones, n_ciclos, tecnico_resp,
                      estado_reparacion)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
                 """, (numero_ficha, raypac_id, fecha_ingreso, tecnico,
-                      observaciones, n_ciclos, tecnico_resp, 'REVISION_INICIAL'))
+                      observaciones, n_ciclos, tecnico_resp, 'REVISION_INICIAL')).fetchone()
 
-                ficha_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
+                ficha_id = row['id']
 
                 # Crear ticket después (flujo antiguo)
                 numero_ticket = crear_ticket(ficha_id, raypac['numero_serie'])
@@ -152,14 +154,14 @@ def dml_new(raypac_id):
                             break
 
                     db.execute(
-                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (?, ?, ?)",
+                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
                         (ficha_id, parte_nombre, estado)
                     )
             else:
                 # Sin ticket, crear partes con estado por defecto
                 for parte in partes_nombres:
                     db.execute(
-                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (?, ?, ?)",
+                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
                         (ficha_id, parte, "POR INSPECCIONAR")
                     )
 
@@ -184,7 +186,7 @@ def dml_new(raypac_id):
 def dml_view(id, readonly=False):
     user = get_current_user()
     db = get_db()
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
 
     if not ficha:
         flash("Ficha no encontrada.", "error")
@@ -194,17 +196,17 @@ def dml_view(id, readonly=False):
     raypac = None
     if ficha['raypac_id']:
         raypac = db.execute(
-            "SELECT * FROM raypac_entries WHERE id = ?",
+            "SELECT * FROM raypac_entries WHERE id = %s",
             (ficha['raypac_id'],)
         ).fetchone()
 
     partes = db.execute(
-        "SELECT * FROM dml_partes WHERE ficha_id = ? ORDER BY id",
+        "SELECT * FROM dml_partes WHERE ficha_id = %s ORDER BY id",
         (id,)
     ).fetchall()
 
     repuestos = db.execute(
-        "SELECT * FROM dml_repuestos WHERE ficha_id = ? ORDER BY id",
+        "SELECT * FROM dml_repuestos WHERE ficha_id = %s ORDER BY id",
         (id,)
     ).fetchall()
 
@@ -218,7 +220,7 @@ def dml_view(id, readonly=False):
 def dml_edit(id):
     user = get_current_user()
     db = get_db()
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
 
     if not ficha:
         flash("Ficha no encontrada.", "error")
@@ -246,9 +248,17 @@ def dml_edit(id):
             # CAMBIO DAVID: No usar diagnostico_inicial, ya viene de RAYPAC
             diagnostico_rep = request.form.get("diagnostico_reparacion")
             observaciones = request.form.get("observaciones")
-            n_ciclos = request.form.get("n_ciclos")
+            n_ciclos_raw = request.form.get("n_ciclos")
+            try:
+                n_ciclos = int(n_ciclos_raw) if n_ciclos_raw else None
+            except ValueError:
+                n_ciclos = None  # texto no numérico (ej. "NO APLICA")
             mecanizado = request.form.get("mecanizado_adic") or "NO APLICA"
-            horas = request.form.get("horas_adic") or 0
+            horas_raw = request.form.get("horas_adic")
+            try:
+                horas = float(horas_raw) if horas_raw else None
+            except ValueError:
+                horas = None  # texto no numérico (ej. "NO APLICA")
             numero_remito = request.form.get("numero_remito_salida")
             tecnico_resp = request.form.get("tecnico_resp") or ""
 
@@ -276,11 +286,11 @@ def dml_edit(id):
             # Actualizar SOLO los campos que existen en dml_fichas
             db.execute("""
                 UPDATE dml_fichas
-                SET fecha_ingreso=?, fecha_egreso=?,
-                    estado_reparacion=?, diagnostico_reparacion=?, observaciones=?,
-                    n_ciclos=?, mecanizado_adic=?, horas_adic=?, numero_remito_salida=?,
-                    tecnico_resp=?, updated_at=CURRENT_TIMESTAMP
-                WHERE id = ?
+                SET fecha_ingreso=%s, fecha_egreso=%s,
+                    estado_reparacion=%s, diagnostico_reparacion=%s, observaciones=%s,
+                    n_ciclos=%s, mecanizado_adic=%s, horas_adic=%s, numero_remito_salida=%s,
+                    tecnico_resp=%s, updated_at=CURRENT_TIMESTAMP
+                WHERE id = %s
             """, (fecha_ingreso, fecha_egreso,
                   estado, diagnostico_rep, observaciones,
                   n_ciclos, mecanizado, horas, numero_remito,
@@ -288,12 +298,12 @@ def dml_edit(id):
             db.commit()
 
             # Actualizar partes
-            partes = db.execute("SELECT id FROM dml_partes WHERE ficha_id = ? ORDER BY id", (id,)).fetchall()
+            partes = db.execute("SELECT id FROM dml_partes WHERE ficha_id = %s ORDER BY id", (id,)).fetchall()
             for idx, parte in enumerate(partes):
                 estado_parte = request.form.get(f"parte_{idx}")
                 if estado_parte:
                     db.execute(
-                        "UPDATE dml_partes SET estado = ? WHERE id = ?",
+                        "UPDATE dml_partes SET estado = %s WHERE id = %s",
                         (estado_parte, parte['id'])
                     )
             db.commit()
@@ -303,10 +313,11 @@ def dml_edit(id):
             flash("Ficha actualizada correctamente.", "success")
             return redirect(url_for("dml.dml_view", id=id))
         except Exception as e:
+            db.rollback()  # Revertir la transacción en caso de error
             flash(f"Error: {str(e)}", "error")
 
-    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = ?", (id,)).fetchall()
-    repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = ?", (id,)).fetchall()
+    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s", (id,)).fetchall()
+    repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = %s", (id,)).fetchall()
 
     # Convertir Row a dict para serialización JSON
     partes = [dict(p) for p in partes]
@@ -325,13 +336,13 @@ def agregar_repuesto(id):
     user = get_current_user()
     db = get_db()
 
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_edit", id=id))
 
     # Validar cantidad máxima (15 repuestos)
-    count = db.execute("SELECT COUNT(*) as cnt FROM dml_repuestos WHERE ficha_id = ?", (id,)).fetchone()
+    count = db.execute("SELECT COUNT(*) as cnt FROM dml_repuestos WHERE ficha_id = %s", (id,)).fetchone()
     if count['cnt'] >= 15:
         flash("Máximo 15 repuestos por ficha.", "error")
         return redirect(url_for("dml.dml_edit", id=id))
@@ -346,7 +357,7 @@ def agregar_repuesto(id):
 
     # Buscar repuesto en matriz
     repuesto = db.execute(
-        "SELECT * FROM matriz_repuestos WHERE codigo_repuesto = ?",
+        "SELECT * FROM matriz_repuestos WHERE codigo_repuesto = %s",
         (codigo,)
     ).fetchone()
 
@@ -356,7 +367,7 @@ def agregar_repuesto(id):
 
     # Verificar stock AUTOMÁTICAMENTE en ubicación DML
     stock = db.execute(
-        "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = ? AND ubicacion = 'DML'",
+        "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = 'DML'",
         (codigo,)
     ).fetchone()
 
@@ -376,7 +387,7 @@ def agregar_repuesto(id):
     db.execute("""
         INSERT INTO dml_repuestos
         (ficha_id, codigo_repuesto, descripcion, cantidad, cantidad_utilizada, estado_repuesto, en_stock, en_falta)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, (id, codigo, repuesto['item'], cantidad_utilizada, cantidad_utilizada, estado_repuesto, en_stock, en_falta))
     db.commit()
 
@@ -405,7 +416,7 @@ def marcar_repuesto_falta(id, repuesto_id):
     db = get_db()
 
     repuesto = db.execute(
-        "SELECT * FROM dml_repuestos WHERE id = ? AND ficha_id = ?",
+        "SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s",
         (repuesto_id, id)
     ).fetchone()
 
@@ -413,7 +424,7 @@ def marcar_repuesto_falta(id, repuesto_id):
         return jsonify({"error": "Repuesto no encontrado"}), 404
 
     db.execute(
-        "UPDATE dml_repuestos SET en_falta = 1, en_stock = 0 WHERE id = ?",
+        "UPDATE dml_repuestos SET en_falta = 1, en_stock = 0 WHERE id = %s",
         (repuesto_id,)
     )
     db.commit()
@@ -429,7 +440,7 @@ def marcar_repuesto_llegada(id, repuesto_id):
     user = get_current_user()
 
     repuesto = db.execute(
-        "SELECT * FROM dml_repuestos WHERE id = ? AND ficha_id = ?",
+        "SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s",
         (repuesto_id, id)
     ).fetchone()
 
@@ -438,7 +449,7 @@ def marcar_repuesto_llegada(id, repuesto_id):
 
     # Cambiar estado
     db.execute(
-        "UPDATE dml_repuestos SET en_falta = 0, en_stock = 1, estado_repuesto = 'EN STOCK' WHERE id = ?",
+        "UPDATE dml_repuestos SET en_falta = 0, en_stock = 1, estado_repuesto = 'EN STOCK' WHERE id = %s",
         (repuesto_id,)
     )
 
@@ -475,7 +486,7 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
         SELECT dr.*, m.item as descripcion
         FROM dml_repuestos dr
         LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = dr.codigo_repuesto
-        WHERE dr.id = ? AND dr.ficha_id = ?
+        WHERE dr.id = %s AND dr.ficha_id = %s
     """, (repuesto_id, ficha_id)).fetchone()
 
     if not repuesto:
@@ -485,7 +496,7 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     # Verificar stock actual
     stock = db.execute("""
         SELECT cantidad FROM stock_ubicaciones
-        WHERE codigo_repuesto = ? AND ubicacion = 'DML'
+        WHERE codigo_repuesto = %s AND ubicacion = 'DML'
     """, (repuesto['codigo_repuesto'],)).fetchone()
 
     if not stock or stock['cantidad'] < repuesto['cantidad_utilizada']:
@@ -496,21 +507,21 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     db.execute("""
         UPDATE dml_repuestos
         SET en_stock = 1, en_falta = 0, estado_repuesto = 'COLOCADO'
-        WHERE id = ?
+        WHERE id = %s
     """, (repuesto_id,))
 
     # Descontar del stock
     db.execute("""
         UPDATE stock_ubicaciones
-        SET cantidad = cantidad - ?, updated_at = CURRENT_TIMESTAMP
-        WHERE codigo_repuesto = ? AND ubicacion = 'DML'
+        SET cantidad = cantidad - %s, updated_at = CURRENT_TIMESTAMP
+        WHERE codigo_repuesto = %s AND ubicacion = 'DML'
     """, (repuesto['cantidad_utilizada'], repuesto['codigo_repuesto']))
 
     # Actualizar matriz_repuestos
     db.execute("""
         UPDATE matriz_repuestos
-        SET cantidad_actual = cantidad_actual - ?
-        WHERE codigo_repuesto = ?
+        SET cantidad_actual = cantidad_actual - %s
+        WHERE codigo_repuesto = %s
     """, (repuesto['cantidad_utilizada'], repuesto['codigo_repuesto']))
 
     db.commit()
@@ -529,7 +540,7 @@ def eliminar_repuesto(ficha_id, repuesto_id):
     user = get_current_user()
     db = get_db()
 
-    repuesto = db.execute("SELECT * FROM dml_repuestos WHERE id = ? AND ficha_id = ?", (repuesto_id, ficha_id)).fetchone()
+    repuesto = db.execute("SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s", (repuesto_id, ficha_id)).fetchone()
     if not repuesto:
         flash("Repuesto no encontrado.", "error")
         return redirect(url_for("dml.dml_view", id=ficha_id))
@@ -541,12 +552,12 @@ def eliminar_repuesto(ficha_id, repuesto_id):
         # Restar de estadísticas (reversar el uso)
         db.execute("""
             UPDATE estadisticas_repuestos
-            SET total_usos = total_usos - ?, ultima_actualizacion = CURRENT_TIMESTAMP
-            WHERE codigo_repuesto = ?
+            SET total_usos = total_usos - %s, ultima_actualizacion = CURRENT_TIMESTAMP
+            WHERE codigo_repuesto = %s
         """, (repuesto['cantidad_utilizada'], repuesto['codigo_repuesto']))
 
     # Eliminar repuesto
-    db.execute("DELETE FROM dml_repuestos WHERE id = ?", (repuesto_id,))
+    db.execute("DELETE FROM dml_repuestos WHERE id = %s", (repuesto_id,))
     db.commit()
 
     log_action(user['id'], "DELETE", "dml_repuestos", repuesto_id, None,
@@ -566,7 +577,7 @@ def crear_ticket_endpoint(id):
     user = get_current_user()
     db = get_db()
 
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_list"))
@@ -579,7 +590,7 @@ def crear_ticket_endpoint(id):
     try:
         # Obtener número de serie desde RAYPAC
         raypac = db.execute(
-            "SELECT numero_serie, mail_comercial FROM raypac_entries WHERE id = ?",
+            "SELECT numero_serie, mail_comercial FROM raypac_entries WHERE id = %s",
             (ficha['raypac_id'],)
         ).fetchone()
 
@@ -636,7 +647,7 @@ def dml_close(id):
     user = get_current_user()
     db = get_db()
 
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_list"))
@@ -661,9 +672,9 @@ def dml_close(id):
         errores.append("Técnico responsable")
 
     # 4. Validar que tenga al menos un repuesto registrado o partes inspeccionadas
-    repuestos_count = db.execute("SELECT COUNT(*) as cnt FROM dml_repuestos WHERE ficha_id = ?", (id,)).fetchone()['cnt']
+    repuestos_count = db.execute("SELECT COUNT(*) as cnt FROM dml_repuestos WHERE ficha_id = %s", (id,)).fetchone()['cnt']
     partes_inspeccionadas = db.execute(
-        "SELECT COUNT(*) as cnt FROM dml_partes WHERE ficha_id = ? AND estado != 'POR INSPECCIONAR'",
+        "SELECT COUNT(*) as cnt FROM dml_partes WHERE ficha_id = %s AND estado != 'POR INSPECCIONAR'",
         (id,)
     ).fetchone()['cnt']
 
@@ -681,23 +692,23 @@ def dml_close(id):
         fecha_egreso = datetime.now().strftime("%Y-%m-%d")
         db.execute("""
             UPDATE dml_fichas
-            SET is_closed = 1, fecha_egreso = ?, estado_reparacion = 'ENTREGADA'
-            WHERE id = ?
+            SET is_closed = TRUE, fecha_egreso = %s, estado_reparacion = 'ENTREGADA'
+            WHERE id = %s
         """, (fecha_egreso, id))
 
         # Cerrar el ticket asociado (ya cumplió su función de seguimiento)
         if ficha['numero_ticket']:
             db.execute("""
                 UPDATE tickets
-                SET estado = 'CERRADO', fecha_cierre = ?
-                WHERE numero_ticket = ?
+                SET estado = 'CERRADO', fecha_cierre = %s
+                WHERE numero_ticket = %s
             """, (fecha_egreso, ficha['numero_ticket']))
 
         db.commit()
 
         # Obtener info para email
         raypac = db.execute(
-            "SELECT numero_serie, cliente, comercial, mail_comercial FROM raypac_entries WHERE id = ?",
+            "SELECT numero_serie, cliente, comercial, mail_comercial FROM raypac_entries WHERE id = %s",
             (ficha['raypac_id'],)
         ).fetchone()
 
@@ -767,7 +778,7 @@ def dml_registrar_acuse(id):
     user = get_current_user()
     db = get_db()
 
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_entregadas"))
@@ -788,14 +799,14 @@ def dml_registrar_acuse(id):
         # Actualizar acuse de recibo
         db.execute("""
             UPDATE dml_fichas
-            SET fecha_entrega_cliente = ?, recibido_por = ?,
+            SET fecha_entrega_cliente = %s, recibido_por = %s,
                 observaciones = CASE
                     WHEN observaciones IS NOT NULL AND observaciones != ''
-                    THEN observaciones || ' | ENTREGA: ' || ?
-                    ELSE 'ENTREGA: ' || ?
+                    THEN observaciones || ' | ENTREGA: ' || %s
+                    ELSE 'ENTREGA: ' || %s
                 END,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
+            WHERE id = %s
         """, (fecha_entrega, recibido_por, observaciones, observaciones, id))
 
         db.commit()
@@ -824,7 +835,7 @@ def generar_ficha(id):
     user = get_current_user()
     db = get_db()
 
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_list"))
@@ -840,7 +851,7 @@ def generar_ficha(id):
 
         # Guardar en BD
         db.execute(
-            "UPDATE dml_fichas SET ficha_generada = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE dml_fichas SET ficha_generada = 1, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
             (id,)
         )
         db.commit()
@@ -848,7 +859,7 @@ def generar_ficha(id):
         # Intentar enviar correo al comercial (no bloquear si falla)
         try:
             raypac = db.execute(
-                "SELECT mail_comercial FROM raypac_entries WHERE id = ?",
+                "SELECT mail_comercial FROM raypac_entries WHERE id = %s",
                 (ficha['raypac_id'],)
             ).fetchone()
 
@@ -868,7 +879,7 @@ def generar_ficha(id):
                          html_body)
 
                 db.execute(
-                    "UPDATE dml_fichas SET ticket_enviado = 1 WHERE id = ?",
+                    "UPDATE dml_fichas SET ticket_enviado = 1 WHERE id = %s",
                     (id,)
                 )
                 db.commit()
@@ -894,7 +905,7 @@ def descargar_ficha_pdf(id):
     user = get_current_user()
     db = get_db()
 
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (id,)).fetchone()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_list"))

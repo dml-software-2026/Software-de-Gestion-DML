@@ -5,9 +5,9 @@ import sys
 from flask import Blueprint, request, render_template, redirect, url_for, flash
 from werkzeug.security import generate_password_hash
 
-from config import BASE_DIR
-from extensions import get_db
-from decorators import login_required, role_required, get_current_user, log_action
+from CODIGO_FUENTE.config import BASE_DIR
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.decorators import login_required, role_required, get_current_user, log_action
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -83,28 +83,28 @@ def cargar_stock_desde_web():
                         continue
 
                     # 1. Insertar o actualizar en matriz_repuestos
-                    cursor = db.execute("SELECT id FROM matriz_repuestos WHERE codigo_repuesto = ?", (codigo,))
+                    cursor = db.execute("SELECT id FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,))
                     existe_matriz = cursor.fetchone()
 
                     if not existe_matriz:
                         numero_correlativo = idx
                         db.execute("""
                             INSERT INTO matriz_repuestos (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
-                            VALUES (?, ?, ?, ?, ?, 'DML')
+                            VALUES (%s, %s, %s, %s, %s, 'DML')
                         """, (numero_correlativo, codigo, item, cantidad, cantidad))
                         repuestos_cargados += 1
                     else:
                         db.execute("""
                             UPDATE matriz_repuestos
-                            SET item = ?, cantidad_actual = ?
-                            WHERE codigo_repuesto = ?
+                            SET item = %s, cantidad_actual = %s
+                            WHERE codigo_repuesto = %s
                         """, (item, cantidad, codigo))
                         repuestos_actualizados += 1
 
                     # 2. Insertar o actualizar en stock_ubicaciones (DML)
                     cursor = db.execute("""
                         SELECT id FROM stock_ubicaciones
-                        WHERE codigo_repuesto = ? AND ubicacion = 'DML'
+                        WHERE codigo_repuesto = %s AND ubicacion = 'DML'
                     """, (codigo,))
 
                     existe_stock = cursor.fetchone()
@@ -112,13 +112,13 @@ def cargar_stock_desde_web():
                     if not existe_stock:
                         db.execute("""
                             INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
-                            VALUES (?, 'DML', ?, ?)
+                            VALUES (%s, 'DML', %s, %s)
                         """, (codigo, cantidad, codigo_ubicacion))
                     else:
                         db.execute("""
                             UPDATE stock_ubicaciones
-                            SET cantidad = ?, codigo_ubicacion_fisica = ?, updated_at = CURRENT_TIMESTAMP
-                            WHERE codigo_repuesto = ? AND ubicacion = 'DML'
+                            SET cantidad = %s, codigo_ubicacion_fisica = %s, updated_at = CURRENT_TIMESTAMP
+                            WHERE codigo_repuesto = %s AND ubicacion = 'DML'
                         """, (cantidad, codigo_ubicacion, codigo))
 
                 except Exception as e:
@@ -172,7 +172,7 @@ def usuario_new():
                 flash("Completa los campos obligatorios.", "error")
                 return render_template("usuario_form.html", roles=roles)
 
-            existe = db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+            existe = db.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone()
             if existe:
                 flash("Este email ya existe.", "error")
                 return render_template("usuario_form.html", roles=roles)
@@ -180,7 +180,7 @@ def usuario_new():
             hash_pwd = generate_password_hash(password)
             db.execute("""
                 INSERT INTO users (email, password_hash, nombre, role, is_active)
-                VALUES (?, ?, ?, ?, 1)
+                VALUES (%s, %s, %s, %s, TRUE)
             """, (email, hash_pwd, nombre, role))
             db.commit()
 
@@ -201,7 +201,7 @@ def usuario_new():
 def usuario_edit(id):
     user = get_current_user()
     db = get_db()
-    usuario = db.execute("SELECT * FROM users WHERE id = ?", (id,)).fetchone()
+    usuario = db.execute("SELECT * FROM users WHERE id = %s", (id,)).fetchone()
 
     if not usuario:
         flash("Usuario no encontrado.", "error")
@@ -219,12 +219,12 @@ def usuario_edit(id):
             if new_password:
                 hash_pwd = generate_password_hash(new_password)
                 db.execute(
-                    "UPDATE users SET role = ?, password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    "UPDATE users SET role = %s, password_hash = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                     (role, hash_pwd, id)
                 )
             else:
                 db.execute(
-                    "UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    "UPDATE users SET role = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                     (role, id)
                 )
             db.commit()
@@ -249,14 +249,16 @@ def usuario_edit(id):
 def usuario_toggle(id):
     user = get_current_user()
     db = get_db()
-    usuario = db.execute("SELECT * FROM users WHERE id = ?", (id,)).fetchone()
+    usuario = db.execute("SELECT * FROM users WHERE id = %s", (id,)).fetchone()
 
     if not usuario:
         flash("Usuario no encontrado.", "error")
         return redirect(url_for("admin.usuarios_list"))
 
-    nuevo_estado = 1 - usuario['is_active']
-    db.execute("UPDATE users SET is_active = ? WHERE id = ?", (nuevo_estado, id))
+    # is_active ahora es BOOLEAN en Postgres (antes era INTEGER 0/1 en
+    # SQLite), por eso el toggle pasó de "1 - valor" a un "not" simple.
+    nuevo_estado = not usuario['is_active']
+    db.execute("UPDATE users SET is_active = %s WHERE id = %s", (nuevo_estado, id))
     db.commit()
 
     log_action(user['id'], "TOGGLE", "users", id, str(usuario['is_active']), str(nuevo_estado))

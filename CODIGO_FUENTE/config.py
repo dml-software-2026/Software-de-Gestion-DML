@@ -12,6 +12,7 @@ else:
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
     DATABASE = os.path.join(BASE_DIR, "dml.db")
+    DATABASE_URL = os.getenv("DATABASE_URL")
     MAIL_SERVER = os.getenv("MAIL_SERVER", "localhost")
     MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
     MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", True)

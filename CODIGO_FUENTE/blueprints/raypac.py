@@ -3,8 +3,8 @@ from datetime import datetime
 
 from flask import Blueprint, request, render_template, redirect, url_for, flash
 
-from extensions import get_db
-from decorators import login_required, role_required, permission_required, get_current_user, log_action
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
 
@@ -28,6 +28,7 @@ def raypac_list(readonly=False):
             ORDER BY r.created_at DESC
         """).fetchall()
     except Exception as e:
+        db.rollback()  # En caso de error, revertir la transacción
         # Si hay error en la query, mostrar mensaje y retornar lista vacía
         flash(f"Error al cargar ingresos RAYPAC: {str(e)}", "error")
         entries = []
@@ -74,7 +75,7 @@ def raypac_new():
                 return render_template("raypac_form.html")
 
             # Verificar que el número de serie es único
-            existe = db.execute("SELECT id FROM raypac_entries WHERE numero_serie = ?", (numero_serie,)).fetchone()
+            existe = db.execute("SELECT id FROM raypac_entries WHERE numero_serie = %s", (numero_serie,)).fetchone()
             if existe:
                 flash("Este número de serie ya existe en el sistema.", "error")
                 return render_template("raypac_form.html")
@@ -82,22 +83,28 @@ def raypac_new():
             # Número correlativo interno
             correlativo = db.execute("SELECT COALESCE(MAX(numero_correlativo), 0) + 1 AS next FROM raypac_entries").fetchone()['next']
 
-            db.execute("""
+            # NOTA: SQLite no devuelve el id insertado en el mismo INSERT (por
+            # eso el código original hacía un segundo SELECT con
+            # last_insert_rowid(), que no existe en Postgres). Postgres sí
+            # permite pedirlo directo con RETURNING id, en una sola query.
+            row = db.execute("""
                 INSERT INTO raypac_entries
                 (numero_correlativo, fecha_recepcion, tipo_solicitud, cliente, numero_serie, modelo_maquina, tipo_maquina,
                  numero_bateria, numero_cargador, diagnostico_ingreso, comercial, mail_comercial, contacto_cliente, email_cliente)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
             """, (correlativo, fecha, tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina,
-                  numero_bateria, numero_cargador, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente))
+                  numero_bateria, numero_cargador, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente)).fetchone()
             db.commit()
 
-            raypac_id = db.execute("SELECT last_insert_rowid() as id").fetchone()['id']
+            raypac_id = row['id']
             log_action(user['id'], "CREATE", "raypac_entries", raypac_id, None,
                       f"Ingreso RAYPAC: {cliente} - {numero_serie}")
 
             flash("Ingreso RAYPAC registrado correctamente.", "success")
             return redirect(url_for("raypac.raypac_view", id=raypac_id))
         except Exception as e:
+            db.rollback()  # Revertir la transacción en caso de error
             flash(f"Error al guardar: {str(e)}", "error")
             return render_template("raypac_form.html")
 
@@ -110,14 +117,14 @@ def raypac_new():
 def raypac_view(id, readonly=False):
     user = get_current_user()
     db = get_db()
-    entry = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (id,)).fetchone()
+    entry = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (id,)).fetchone()
 
     if not entry:
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
     # Verificar si existe un ticket asociado
-    ticket = db.execute("SELECT numero_ticket FROM tickets WHERE raypac_id = ?", (id,)).fetchone()
+    ticket = db.execute("SELECT numero_ticket FROM tickets WHERE raypac_id = %s", (id,)).fetchone()
 
     return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly, ticket=ticket)
 
@@ -128,7 +135,7 @@ def raypac_view(id, readonly=False):
 def raypac_edit(id):
     user = get_current_user()
     db = get_db()
-    entry = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (id,)).fetchone()
+    entry = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (id,)).fetchone()
 
     if not entry:
         flash("Registro no encontrado.", "error")
@@ -160,9 +167,9 @@ def raypac_edit(id):
 
             db.execute("""
                 UPDATE raypac_entries
-                SET fecha_recepcion=?, tipo_solicitud=?, cliente=?, numero_serie=?,
-                    diagnostico_ingreso=?, comercial=?, mail_comercial=?, contacto_cliente=?, email_cliente=?, updated_at=CURRENT_TIMESTAMP
-                WHERE id = ?
+                SET fecha_recepcion=%s, tipo_solicitud=%s, cliente=%s, numero_serie=%s,
+                    diagnostico_ingreso=%s, comercial=%s, mail_comercial=%s, contacto_cliente=%s, email_cliente=%s, updated_at=CURRENT_TIMESTAMP
+                WHERE id = %s
             """, (fecha, tipo_solicitud, cliente, numero_serie, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente, id))
             db.commit()
 
@@ -172,6 +179,7 @@ def raypac_edit(id):
             flash("Ingreso RAYPAC actualizado.", "success")
             return redirect(url_for("raypac.raypac_view", id=id))
         except Exception as e:
+            db.rollback()
             flash(f"Error: {str(e)}", "error")
 
     return render_template("raypac_form.html", entry=entry, edit=True)
@@ -183,7 +191,7 @@ def raypac_edit(id):
 def raypac_freeze(id):
     user = get_current_user()
     db = get_db()
-    entry = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (id,)).fetchone()
+    entry = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (id,)).fetchone()
 
     if not entry:
         flash("Registro no encontrado.", "error")
@@ -207,22 +215,22 @@ def raypac_freeze(id):
         return redirect(url_for("raypac.raypac_view", id=id))
 
     # Verificar que no exista ya en raypac_entries
-    existe = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = ?", (numero_remito,)).fetchone()
+    existe = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = %s", (numero_remito,)).fetchone()
     if existe and existe['id'] != id:
         flash("El número de remito ya existe en otro equipo.", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     # Verificar que no exista en envios_repuestos
-    existe_envio = db.execute("SELECT id FROM envios_repuestos WHERE numero_remito = ?", (numero_remito,)).fetchone()
+    existe_envio = db.execute("SELECT id FROM envios_repuestos WHERE numero_remito = %s", (numero_remito,)).fetchone()
     if existe_envio:
         flash("El número de remito ya existe en un envío de repuestos. Usa un remito diferente.", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     db.execute("""
         UPDATE raypac_entries
-        SET is_frozen = 1, frozen_at = CURRENT_TIMESTAMP, numero_remito = ?,
+        SET is_frozen = TRUE, frozen_at = CURRENT_TIMESTAMP, numero_remito = %s,
             estado_envio_equipos = 'ENVIADO', fecha_envio_equipos = CURRENT_TIMESTAMP
-        WHERE id = ?
+        WHERE id = %s
     """, (numero_remito, id))
     db.commit()
 
@@ -240,7 +248,7 @@ def raypac_unfreeze(id):
     """Descongelar un ingreso RAYPAC con código (solo ADMIN)"""
     user = get_current_user()
     db = get_db()
-    entry = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (id,)).fetchone()
+    entry = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (id,)).fetchone()
 
     if not entry:
         flash("Registro no encontrado.", "error")
@@ -265,8 +273,8 @@ def raypac_unfreeze(id):
 
     db.execute("""
         UPDATE raypac_entries
-        SET is_frozen = 0, frozen_at = NULL
-        WHERE id = ?
+        SET is_frozen = FALSE, frozen_at = NULL
+        WHERE id = %s
     """, (id,))
     db.commit()
 
@@ -283,7 +291,7 @@ def raypac_recepcionar_dml(id):
     """DML recepciona el equipo y actualiza estado a RECIBIDO"""
     user = get_current_user()
     db = get_db()
-    entry = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (id,)).fetchone()
+    entry = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (id,)).fetchone()
 
     if not entry:
         flash("Registro no encontrado.", "error")
@@ -300,7 +308,7 @@ def raypac_recepcionar_dml(id):
     db.execute("""
         UPDATE raypac_entries
         SET estado_envio_equipos = 'RECIBIDO', updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
+        WHERE id = %s
     """, (id,))
     db.commit()
 

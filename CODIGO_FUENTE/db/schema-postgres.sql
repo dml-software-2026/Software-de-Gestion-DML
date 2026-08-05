@@ -1,16 +1,33 @@
-DROP TABLE IF EXISTS mail_log;
-DROP TABLE IF EXISTS audit_log;
-DROP TABLE IF EXISTS envios_repuestos_detalles;
-DROP TABLE IF EXISTS envios_repuestos;
-DROP TABLE IF EXISTS repuestos_faltantes;
-DROP TABLE IF EXISTS dml_repuestos;
-DROP TABLE IF EXISTS dml_partes;
-DROP TABLE IF EXISTS dml_fichas;
-DROP TABLE IF EXISTS stock_ubicaciones;
-DROP TABLE IF EXISTS stock_dml;
-DROP TABLE IF EXISTS matriz_repuestos;
-DROP TABLE IF EXISTS raypac_entries;
-DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS mail_log CASCADE;
+DROP TABLE IF EXISTS logs_auditoria CASCADE;
+DROP TABLE IF EXISTS envios_repuestos_detalles CASCADE;
+DROP TABLE IF EXISTS envios_repuestos CASCADE;
+DROP TABLE IF EXISTS repuestos_faltantes CASCADE;
+DROP TABLE IF EXISTS dml_repuestos CASCADE;
+DROP TABLE IF EXISTS dml_partes CASCADE;
+DROP TABLE IF EXISTS estado_general CASCADE;
+DROP TABLE IF EXISTS ticket_historial CASCADE;
+DROP TABLE IF EXISTS tickets CASCADE;
+DROP TABLE IF EXISTS dml_fichas CASCADE;
+DROP TABLE IF EXISTS stock_ubicaciones CASCADE;
+DROP TABLE IF EXISTS stock_dml CASCADE;
+DROP TABLE IF EXISTS matriz_repuestos CASCADE;
+DROP TABLE IF EXISTS raypac_entries CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS stock_alertas CASCADE;
+DROP TABLE IF EXISTS estadisticas_repuestos CASCADE;
+DROP TABLE IF EXISTS freezing_log CASCADE;
+DROP TYPE IF EXISTS estado_equipo_enum CASCADE;
+DROP TYPE IF EXISTS estado_carcaza_enum CASCADE;
+DROP TYPE IF EXISTS estado_cubre_feedwheel_enum CASCADE;
+DROP TYPE IF EXISTS estado_mango_enum CASCADE;
+DROP TYPE IF EXISTS estado_botones_enum CASCADE;
+DROP TYPE IF EXISTS estado_motor_arrastre_enum CASCADE;
+DROP TYPE IF EXISTS estado_motor_sellado_enum CASCADE;
+DROP TYPE IF EXISTS estado_cuchilla_enum CASCADE;
+DROP TYPE IF EXISTS estado_servo_enum CASCADE;
+DROP TYPE IF EXISTS estado_rueda_arrastre_enum CASCADE;
+DROP TYPE IF EXISTS estado_resorte_manija_enum CASCADE;
 
 -- Tabla de Usuarios
 CREATE TABLE users (
@@ -26,12 +43,11 @@ CREATE TABLE users (
 
 -- Tabla RAYPAC - Ingreso inicial
 CREATE TABLE raypac_entries (
-    id SERIAL PRIMARY KEY,
-    numero_correlativo INTEGER,
+    id SERIAL PRIMARY KEY,  
     fecha_recepcion DATE NOT NULL,
     tipo_solicitud TEXT NOT NULL,
     cliente TEXT NOT NULL,
-    numero_serie TEXT NOT NULL UNIQUE,
+    numero_serie TEXT NOT NULL,
     modelo_maquina TEXT NOT NULL,
     tipo_maquina TEXT NOT NULL,
     numero_bateria TEXT,
@@ -40,7 +56,7 @@ CREATE TABLE raypac_entries (
     comercial TEXT NOT NULL,
     mail_comercial TEXT NOT NULL,
     numero_remito TEXT,
-    is_frozen BOOLEAN NOT NULL DEFAULT FALSE,
+    is_frozen BOOLEAN DEFAULT FALSE,
     frozen_at DATE,
     unfrozen_by TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -90,12 +106,12 @@ CREATE TABLE dml_fichas (
     id SERIAL PRIMARY KEY,
     numero_ficha INTEGER UNIQUE NOT NULL,
     raypac_id INTEGER NOT NULL,
-    fecha_ingreso DATE NOT NULL,
+    fecha_ingreso DATE,
     tecnico TEXT NOT NULL,
     numero_ticket TEXT UNIQUE,
+    observaciones TEXT,
     diagnostico_inicial TEXT,
     diagnostico_reparacion TEXT,
-    observaciones TEXT,
     estado_reparacion TEXT DEFAULT 'A LA ESPERA DE REVISIÓN',
     n_ciclos INTEGER,
     mecanizado_adic TEXT,
@@ -112,6 +128,39 @@ CREATE TABLE dml_fichas (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(raypac_id) REFERENCES raypac_entries(id) ON DELETE CASCADE
+);
+
+CREATE TYPE estado_equipo_enum AS ENUM ('NO APLICA', 'BUENO', 'EXCELENTE', 'MALO', 'OK', 'REGULAR', 'HISTORICO');
+CREATE TYPE estado_carcaza_enum AS ENUM ('NO APLICA', 'BUENO', 'CON TORNILLOS FALTANTES', 'EXCELENTE', 'MALO', 'OK', 'RAJADA', 'REGULAR', 'ROTA', 'HISTORICO');
+CREATE TYPE estado_cubre_feedwheel_enum AS ENUM ('NO APLICA', 'CON TORNILLOS FALTANTES', 'FALTANTE', 'GOLPEADO', 'OK', 'RAJADO', 'ROTO', 'HISTORICO');
+CREATE TYPE estado_mango_enum AS ENUM ('NO APLICA', 'CON TORNILLOS FALTANTES', 'GOLPEADO', 'OK', 'RAJADO', 'ROTO',  'HISTORICO');
+CREATE TYPE estado_botones_enum AS ENUM ('NO APLICA', 'OK', 'ROTO', 'SIN FUNCIONAR', 'HISTORICO');
+CREATE TYPE estado_motor_arrastre_enum AS ENUM ('NO APLICA', 'A PROBAR', 'FUNCIONAMIENTO OK', 'NO FUNCIONA', 'HISTORICO');
+CREATE TYPE estado_motor_sellado_enum AS ENUM ('NO APLICA', 'A PROBAR', 'FUNCIONAMIENTO OK', 'NO FUNCIONA', 'HISTORICO');
+CREATE TYPE estado_cuchilla_enum AS ENUM ('NO APLICA', 'CON DIENTES FALTANTES', 'DESGASTADA', 'FALTANTE', 'OK', 'ROTA', 'SIN FILO', 'HISTORICO');
+CREATE TYPE estado_servo_enum AS ENUM ('NO APLICA', 'A PROBAR', 'FALTANTE', 'OK', 'ROTO', 'TRABADO', 'HISTORICO');
+CREATE TYPE estado_rueda_arrastre_enum AS ENUM ('NO APLICA', 'DESGASTADO', 'FALTANTE', 'OK', 'HISTORICO');
+CREATE TYPE estado_resorte_manija_enum AS ENUM ('NO APLICA', 'DESGASTADO', 'FALTANTE', 'OK', 'ROTO', 'HISTORICO');
+
+--Tabla DML Campo de ingreso "Estado general"
+CREATE TABLE estado_general (
+    id SERIAL PRIMARY KEY,
+    ficha_id INTEGER NOT NULL UNIQUE,
+    estado_equipo estado_equipo_enum,
+    carcaza estado_carcaza_enum,
+    cubre_feedwheel estado_cubre_feedwheel_enum,
+    mango estado_mango_enum,
+    botones estado_botones_enum,
+    motor_arrastre estado_motor_arrastre_enum,
+    motor_sellado estado_motor_sellado_enum,
+    cuchilla estado_cuchilla_enum,
+    servo estado_servo_enum,
+    rueda_arrastre estado_rueda_arrastre_enum,
+    resorte_manija estado_resorte_manija_enum,
+    otros TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(ficha_id) REFERENCES dml_fichas(id) ON DELETE CASCADE
 );
 
 -- Partes del Equipo (12 partes estándar)

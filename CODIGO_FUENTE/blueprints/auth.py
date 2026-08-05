@@ -1,8 +1,8 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash, session
 from werkzeug.security import check_password_hash
 
-from extensions import get_db
-from decorators import login_required, get_current_user
+from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.decorators import login_required, get_current_user
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -20,7 +20,7 @@ def login():
             return render_template("login.html")
 
         db = get_db()
-        user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        user = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
 
         print(f"[LOGIN] Usuario encontrado: {user is not None}")
 
@@ -91,7 +91,7 @@ def index():
             equipos_pendientes = db.execute("""
                 SELECT COUNT(*) AS total
                 FROM raypac_entries r
-                WHERE r.is_frozen = 1
+                WHERE r.is_frozen = TRUE
                 AND r.numero_remito IS NOT NULL
                 AND NOT EXISTS (SELECT 1 FROM dml_fichas f WHERE f.raypac_id = r.id)
             """).fetchone()['total']
@@ -117,7 +117,7 @@ def index():
                 JOIN dml_fichas f ON f.id = dr.ficha_id
                 JOIN stock_ubicaciones su ON su.codigo_repuesto = dr.codigo_repuesto AND su.ubicacion = 'DML'
                 WHERE dr.en_falta = 1
-                AND f.is_closed = 0
+                AND f.is_closed = FALSE
                 AND su.cantidad >= dr.cantidad_utilizada
             """).fetchone()['total']
         except:
@@ -126,14 +126,17 @@ def index():
         # Envíos de repuestos pendientes de recibir desde RAYPAC
         # Verificar si existen las columnas nuevas primero
         try:
-            columns = db.execute("PRAGMA table_info(envios_repuestos)").fetchall()
-            column_names = [col['name'] for col in columns]
+            columns = db.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = %s
+            """, ("envios_repuestos",)).fetchall()
+            column_names = [col['column_name'] for col in columns]
 
             if 'estado_envio' in column_names and 'is_frozen' in column_names and 'fecha_recepcion_dml' in column_names:
                 envios_repuestos_pendientes = db.execute("""
                     SELECT COUNT(*) AS total
                     FROM envios_repuestos
-                    WHERE estado_envio = 'ENVIADO' AND is_frozen = 1 AND fecha_recepcion_dml IS NULL
+                    WHERE estado_envio = 'ENVIADO' AND is_frozen = TRUE AND fecha_recepcion_dml IS NULL
                 """).fetchone()['total']
             else:
                 # Fallback para esquema antiguo
@@ -147,10 +150,10 @@ def index():
 
         stats = {
             "tickets_revision_inicial": tickets_revision_inicial,
-            "fichas_revision_inicial": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'A LA ESPERA DE REVISI_N' AND is_closed = 0"),
-            "fichas_en_reparacion": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'EN REPARACI_N' AND is_closed = 0"),
-            "fichas_espera_repuestos": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion = 'A LA ESPERA DE REPUESTOS' AND is_closed = 0"),
-            "fichas_listas": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'M_QUINA LISTA PARA RETIRAR' AND is_closed = 0"),
+            "fichas_revision_inicial": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'A LA ESPERA DE REVISI_N' AND is_closed = FALSE"),
+            "fichas_en_reparacion": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'EN REPARACI_N' AND is_closed = FALSE"),
+            "fichas_espera_repuestos": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion = 'A LA ESPERA DE REPUESTOS' AND is_closed = FALSE"),
+            "fichas_listas": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE estado_reparacion LIKE 'M_QUINA LISTA PARA RETIRAR' AND is_closed = FALSE"),
             "equipos_raypac_pendientes": equipos_pendientes,
             "envios_repuestos_pendientes": envios_repuestos_pendientes,
             "tickets_activos": count("SELECT COUNT(*) AS total FROM tickets WHERE estado != 'CERRADO'"),
@@ -159,7 +162,7 @@ def index():
     else:  # ADMIN
         stats = {
             "equipos_raypac": count("SELECT COUNT(*) AS total FROM raypac_entries"),
-            "fichas_abiertas": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE is_closed = 0"),
+            "fichas_abiertas": count("SELECT COUNT(*) AS total FROM dml_fichas WHERE is_closed = FALSE"),
             "envios_pendientes": count("SELECT COUNT(*) AS total FROM envios_repuestos WHERE estado = 'PENDIENTE'"),
             "stock_bajo_total": count("SELECT COUNT(*) AS total FROM stock_ubicaciones WHERE cantidad <= 2")
         }

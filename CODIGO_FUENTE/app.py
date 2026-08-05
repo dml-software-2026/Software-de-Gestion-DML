@@ -4,19 +4,19 @@ import sys
 from dotenv import load_dotenv
 from flask import Flask
 
-from config import Config, BASE_DIR
-from extensions import close_db, init_db, migrate_db
-from decorators import get_current_user_jinja
+from CODIGO_FUENTE.config import Config, BASE_DIR
+from CODIGO_FUENTE.extensions import close_db, init_db, migrate_db
+from CODIGO_FUENTE.decorators import get_current_user_jinja
 
-from blueprints.auth import auth_bp
-from blueprints.raypac import raypac_bp
-from blueprints.dml import dml_bp
-from blueprints.tickets import tickets_bp
-from blueprints.envios import envios_bp
-from blueprints.stock import stock_bp
-from blueprints.admin import admin_bp
-from blueprints.estadisticas import estadisticas_bp
-from blueprints.api import api_bp
+from CODIGO_FUENTE.blueprints.auth import auth_bp
+from CODIGO_FUENTE.blueprints.raypac import raypac_bp
+from CODIGO_FUENTE.blueprints.dml import dml_bp
+from CODIGO_FUENTE.blueprints.tickets import tickets_bp
+from CODIGO_FUENTE.blueprints.envios import envios_bp
+from CODIGO_FUENTE.blueprints.stock import stock_bp
+from CODIGO_FUENTE.blueprints.admin import admin_bp
+from CODIGO_FUENTE.blueprints.estadisticas import estadisticas_bp
+from CODIGO_FUENTE.blueprints.api import api_bp
 
 load_dotenv()
 
@@ -59,6 +59,12 @@ def apply_migrations():
             else:
                 # Si existe, aplicar migraciones
                 migrate_db()
+
+            # Verificar/crear usuarios siempre, exista o no la base
+            from CODIGO_FUENTE.extensions import get_db
+            from CODIGO_FUENTE.services.seed import load_seed_data
+            load_seed_data(get_db())
+
         except Exception as e:
             print(f"Error en migraciones: {e}")
             import traceback
