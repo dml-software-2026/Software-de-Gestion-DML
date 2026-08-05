@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, date
 
 from flask import Blueprint, request, render_template, redirect, url_for, flash
 
@@ -53,8 +53,21 @@ def envios_list():
     # Combinar ambos tipos de envíos
     todos_envios = list(envios_repuestos) + list(envios_maquinas)
     # Ordenar por fecha de creación descendente
-    todos_envios.sort(key=lambda x: x['created_at'] if x['created_at'] else '', reverse=True)
+    def _sort_key(x):
+        # Normaliza: envios_repuestos.created_at es TIMESTAMPTZ (datetime),
+        # pero raypac_entries.frozen_at (usado como created_at para
+        # envíos de máquina) es DATE - Python no puede comparar ambos
+        # tipos directamente al ordenar, por eso se homogeneizan acá.
+        val = x['created_at']
+        if val is None:
+            return datetime.min
+        if isinstance(val, datetime):
+            return val
+        if isinstance(val, date):
+            return datetime.combine(val, datetime.min.time())
+        return datetime.min
 
+    todos_envios.sort(key=_sort_key, reverse=True)
     return render_template("envios_list.html", envios=todos_envios)
 
 
