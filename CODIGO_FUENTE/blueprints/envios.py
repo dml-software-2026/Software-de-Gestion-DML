@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 from flask import Blueprint, request, render_template, redirect, url_for, flash
 
@@ -54,21 +54,21 @@ def envios_list():
     todos_envios = list(envios_repuestos) + list(envios_maquinas)
     # Ordenar por fecha de creación descendente
     def _sort_key(x):
-        # Normaliza: envios_repuestos.created_at es TIMESTAMPTZ (datetime),
-        # pero raypac_entries.frozen_at (usado como created_at para
-        # envíos de máquina) es DATE - Python no puede comparar ambos
-        # tipos directamente al ordenar, por eso se homogeneizan acá.
+        # Normaliza: envios_repuestos.created_at es TIMESTAMPTZ (datetime
+        # CON zona horaria), pero raypac_entries.frozen_at (usado como
+        # created_at para envíos de máquina) es DATE (sin hora ni zona).
+        # Python no permite comparar un datetime "aware" con uno "naive",
+        # así que todo se homogeneiza acá a datetime con tz UTC.
         val = x['created_at']
         if val is None:
-            return datetime.min
+            return datetime.min.replace(tzinfo=timezone.utc)
         if isinstance(val, datetime):
-            return val
+            if val.tzinfo is not None:
+                return val
+            return val.replace(tzinfo=timezone.utc)
         if isinstance(val, date):
-            return datetime.combine(val, datetime.min.time())
-        return datetime.min
-
-    todos_envios.sort(key=_sort_key, reverse=True)
-    return render_template("envios_list.html", envios=todos_envios)
+            return datetime.combine(val, datetime.min.time(), tzinfo=timezone.utc)
+        return datetime.min.replace(tzinfo=timezone.utc)
 
 
 @envios_bp.route("/new", methods=["GET", "POST"])
