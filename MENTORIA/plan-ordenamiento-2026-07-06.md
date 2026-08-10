@@ -6,12 +6,12 @@
 ## Objetivo
 
 Al cierre del sprint:
-- [ ] `dev` nivelada con `main`
-- [ ] Refactor #75 mergeado a `main`
-- [ ] Proyecto Supabase creado con schema PostgreSQL corriendo
-- [ ] `DATABASE_URL` configurada en Render
-- [ ] Issues #64 y #65 cerrados
-- [ ] Kanban ordenado (sin duplicados, sin épicas vacías)
+- [x] `dev` nivelada con `main`
+- [x] Refactor #75 mergeado a `main`
+- [x] Proyecto Supabase creado con schema PostgreSQL corriendo
+- [x] `DATABASE_URL` configurada en Render
+- [x] Issues #64 y #65 cerrados
+- [x] Kanban ordenado (sin duplicados, sin épicas vacías)
 
 Restricción: **nadie toca `CODIGO_FUENTE/app.py` excepto Facu.**
 
@@ -138,8 +138,8 @@ Si todo va bien: **~30 minutos** las 5 corridas (~6 min por corrida). Si hay que
 **Puede arrancar hoy en paralelo con Facu.** Fase 1 no toca `app.py`. Facu no toca `schema.sql`.
 
 ### Setup Supabase
-- [ ] Crear proyecto en supabase.com (plan gratuito — el Alcance define 500MB como suficiente)
-- [ ] Guardar credenciales en gestor de passwords (no en el repo): Project URL, DB password, connection string PostgreSQL
+- [x] Crear proyecto en supabase.com (plan gratuito — el Alcance define 500MB como suficiente)
+- [x] Guardar credenciales en gestor de passwords (no en el repo): Project URL, DB password, connection string PostgreSQL
 
 ### Traducir `schema.sql` → `db/schema-postgres.sql`
 
@@ -163,17 +163,17 @@ Renombrar `audit_log` → `logs_auditoria` con:
 
 (Requerido por RNF07 del Acta.)
 
-- [ ] `db/schema-postgres.sql` creado con las 16 tablas convertidas + `logs_auditoria`
-- [ ] Correr el schema en Supabase (SQL Editor) y verificar las 16 tablas
-- [ ] Verificar foreign keys en Table Editor
-- [ ] NO copiar los hashes hardcodeados de usuarios (líneas 280-284 del schema viejo). Los usuarios se crean en Fase 2 vía seed.
+- [x] `db/schema-postgres.sql` creado con las 16 tablas convertidas + `logs_auditoria`
+- [x] Correr el schema en Supabase (SQL Editor) y verificar las 16 tablas
+- [x] Verificar foreign keys en Table Editor
+- [x] NO copiar los hashes hardcodeados de usuarios (líneas 280-284 del schema viejo). Los usuarios se crean en Fase 2 vía seed.
 
 ### Configuración Render
-- [ ] `DATABASE_URL` como env var en Render (formato `postgresql://postgres:PASS@HOST:5432/postgres`)
-- [ ] Probar conexión con `psql "$DATABASE_URL"` desde local
+- [x] `DATABASE_URL` como env var en Render (formato `postgresql://postgres:PASS@HOST:5432/postgres`)
+- [x] Probar conexión con `psql "$DATABASE_URL"` desde local
 
 ### Documentación
-- [ ] Crear `MENTORIA/setup-supabase-render.md` con: cómo se creó el proyecto, dónde viven las credenciales, cómo obtener la connection string, cómo probar la conexión, troubleshooting.
+- [x] Crear `MENTORIA/setup-supabase-render.md` con: cómo se creó el proyecto, dónde viven las credenciales, cómo obtener la connection string, cómo probar la conexión, troubleshooting.
 
 ### Reestructura de scripts DB en la raíz
 
@@ -183,14 +183,14 @@ Crear la carpeta `scripts/` y ordenar los archivos `.py` de la raíz que tocan S
 
 Usar `git mv` para preservar historia:
 
-- [ ] `git mv seed_data.py scripts/`
-- [ ] `git mv seed_data_minimal.py scripts/`
-- [ ] `git mv cargar_stock_nuevo.py scripts/`
-- [ ] `git mv limpiar_bd.py scripts/`
-- [ ] `git mv smoke_test.py scripts/`
-- [ ] `git mv test_login.py scripts/`
-- [ ] `git mv verificar_emails.py scripts/`
-- [ ] `git mv run_migrations.py scripts/` (condicional — su destino final se decide en Fase 2)
+- [x] `git mv seed_data.py scripts/`
+- [x] `git mv seed_data_minimal.py scripts/`
+- [x] `git mv cargar_stock_nuevo.py scripts/`
+- [x] `git mv limpiar_bd.py scripts/`
+- [x] `git mv smoke_test.py scripts/`
+- [x] `git mv test_login.py scripts/`
+- [x] `git mv verificar_emails.py scripts/`
+- [x] `git mv run_migrations.py scripts/` (condicional — su destino final se decide en Fase 2)
 
 **Ajustar el `sys.path.insert(...)` de cada uno.** Los scripts hoy tienen líneas como:
 ```python
@@ -213,14 +213,14 @@ python scripts/smoke_test.py
 
 **Borrar (4 sqlite3 obsoletos):**
 
-- [ ] `git rm check_tables.py` (19 líneas, usa `sqlite_master`, se reescribe si hace falta)
-- [ ] `git rm generar_hashes.py` (los hashes ya no viven en el schema con .env)
-- [ ] `git rm migrate_envios.py` (duplicado exacto de una función en `run_migrations.py`)
-- [ ] `git rm migrate_tickets.py` (idem)
+- [x] `git rm check_tables.py` (19 líneas, usa `sqlite_master`, se reescribe si hace falta)
+- [x] `git rm generar_hashes.py` (los hashes ya no viven en el schema con .env)
+- [x] `git rm migrate_envios.py` (duplicado exacto de una función en `run_migrations.py`)
+- [x] `git rm migrate_tickets.py` (idem)
 
 ### PR
-- [ ] PR contra `dev` con: `schema-postgres.sql` + carpeta `scripts/` con 8 archivos movidos + 4 archivos borrados + `MENTORIA/setup-supabase-render.md`
-- [ ] Merge squash
+- [x] PR contra `dev` con: `schema-postgres.sql` + carpeta `scripts/` con 8 archivos movidos + 4 archivos borrados + `MENTORIA/setup-supabase-render.md`
+- [x] Merge squash
 
 ### No hacer este sprint
 - No tocar `CODIGO_FUENTE/app.py`.
