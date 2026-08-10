@@ -1,7 +1,7 @@
 # Sprint 2026-08-10 → 2026-08-29 (E2)
 
 **Entregable:** Módulo RAYPAC — ingreso y gestión de máquinas · **Demo a David:** viernes 29/08
-**Docs relacionados:** `MENTORIA/descripciones-issues.md` (guías paso a paso) · `MENTORIA/ci-setup.md` · `MENTORIA/flujo-branches.md`
+**Docs relacionados:** `./descripciones-issues.md` (guías paso a paso) · `../ci-setup.md` · `../flujo-branches.md`
 
 ---
 
@@ -57,7 +57,7 @@ Trabajar en `feature/54-ingreso-raypac` desde `dev`. PRs chicos, no uno gigante.
 |---|---|---|---|
 | 1 | #95 | Cerrar Postgres Fase 2 (mergear PR a `dev`) | 2h |
 | 2 | — | **Sync inicial `dev` → `main`** con todo lo acumulado (10 commits: postgres F1+F2, refactor, credentials, .exe borrado). Tag `v1.9-preE2`. Cierra el gap antes de arrancar E2. | 1h |
-| 3 | — | Setup CI (seguir `ci-setup.md`, 9 pasos) — queda activo para todos los PRs futuros | 5-6h |
+| 3 | — | Setup CI (seguir `../ci-setup.md`, 9 pasos) — queda activo para todos los PRs futuros | 5-6h |
 | 4 | #76 | Adecuar script de carga histórico (ver spec en `descripciones-issues.md` — es script Python reejecutable con `INSERT ON CONFLICT DO NOTHING`, valida + reporta errores; NO son INSERTS manuales) | 3-4h |
 | 5 | — | Release manager: coordinar freeze + PR `dev`→`main` final + tag `v2.0-E2` cuando David firme | 1-2h |
 | 6 | — | Grabar video-demo E2 (Anexo B) | 2-3h |
