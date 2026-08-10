@@ -58,7 +58,7 @@ Trabajar en `feature/54-ingreso-raypac` desde `dev`. PRs chicos, no uno gigante.
 | 1 | #95 | Cerrar Postgres Fase 2 (mergear PR a `dev`) | 2h |
 | 2 | — | **Sync inicial `dev` → `main`** con todo lo acumulado (10 commits: postgres F1+F2, refactor, credentials, .exe borrado). Tag `v1.9-preE2`. Cierra el gap antes de arrancar E2. | 1h |
 | 3 | — | Setup CI (seguir `../ci-setup.md`, 9 pasos) — queda activo para todos los PRs futuros | 5-6h |
-| 4 | #76 | Adecuar script de carga histórico (ver spec en `descripciones-issues.md` — es script Python reejecutable con `INSERT ON CONFLICT DO NOTHING`, valida + reporta errores; NO son INSERTS manuales) | 3-4h |
+| 4 | #76 | **Escribir** script de carga histórico según spec (no existe todavía en el repo; el intento manual con INSERTs no cuenta). Ver `./descripciones-issues.md` — es script Python reejecutable con `INSERT ON CONFLICT DO NOTHING`, valida + reporta errores. | 4-6h |
 | 5 | — | Release manager: coordinar freeze + PR `dev`→`main` final + tag `v2.0-E2` cuando David firme | 1-2h |
 | 6 | — | Grabar video-demo E2 (Anexo B) | 2-3h |
 
