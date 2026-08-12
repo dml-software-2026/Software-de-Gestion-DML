@@ -83,7 +83,7 @@ class DMLLauncher:
                 urllib.request.urlopen(self.url, timeout=1)
                 print(f"[OK] Servidor listo en {self.url}")
                 return True
-            except:
+            except Exception:
                 pass
             time.sleep(0.5)
         return False
@@ -271,7 +271,7 @@ class DMLLauncher:
                     self.server_process.terminate()
                 self.server_running = False
                 print("[OK] Servidor detenido")
-            except:
+            except Exception:
                 pass
     
     def run(self):

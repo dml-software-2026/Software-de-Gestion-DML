@@ -80,7 +80,7 @@ def cargar_stock_desde_web():
                     cantidad_str = cantidad_str.replace(',', '')
                     try:
                         cantidad = int(float(cantidad_str))
-                    except:
+                    except Exception:
                         errores += 1
                         continue
 

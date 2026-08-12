@@ -54,7 +54,7 @@ def load_stock():
                 cantidad_str = cantidad.strip().split()[0] if cantidad else '0'
                 try:
                     cantidad = int(cantidad_str)
-                except:
+                except Exception:
                     cantidad = 0
             else:
                 cantidad = int(cantidad)

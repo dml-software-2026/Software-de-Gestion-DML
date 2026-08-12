@@ -289,7 +289,7 @@ def generate_ficha_pdf(ficha_id):
         if os.path.exists(logo_path):
             try:
                 logo_img = Image(logo_path, width=1.5*inch, height=0.6*inch)
-            except:
+            except Exception:
                 pass
 
         header_data = [[

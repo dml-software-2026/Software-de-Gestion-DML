@@ -36,7 +36,7 @@ def seed_minimal():
         for table in tables:
             try:
                 db.execute(f"DELETE FROM {table}")
-            except:
+            except Exception:
                 pass
         db.commit()
         print("✓ Base de datos limpiada")
