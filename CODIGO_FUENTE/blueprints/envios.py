@@ -1,5 +1,5 @@
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
@@ -69,14 +69,14 @@ def envios_list():
         # así que todo se homogeneiza acá a datetime con tz UTC.
         val = x['created_at']
         if val is None:
-            return datetime.min.replace(tzinfo=timezone.utc)
+            return datetime.min.replace(tzinfo=UTC)
         if isinstance(val, datetime):
             if val.tzinfo is not None:
                 return val
-            return val.replace(tzinfo=timezone.utc)
+            return val.replace(tzinfo=UTC)
         if isinstance(val, date):
-            return datetime.combine(val, datetime.min.time(), tzinfo=timezone.utc)
-        return datetime.min.replace(tzinfo=timezone.utc)
+            return datetime.combine(val, datetime.min.time(), tzinfo=UTC)
+        return datetime.min.replace(tzinfo=UTC)
     todos_envios.sort(key=_sort_key, reverse=True)
     return render_template("envios_list.html", envios=todos_envios)
 
