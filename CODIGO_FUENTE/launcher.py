@@ -1,22 +1,20 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 LAUNCHER DML - Sistema de Gestion de Stock y Repuestos
 Version: 2.0 - UI Amigable para No Tecnicos
 """
 
 import os
+import signal
+import socket
+import subprocess
 import sys
 import time
-import webbrowser
-import subprocess
-import socket
-import signal
-from pathlib import Path
-from threading import Thread
 import tkinter as tk
-from tkinter import messagebox
 import urllib.request
+import webbrowser
+from pathlib import Path
+from tkinter import messagebox
 
 # Detectar si es ejecutable compilado o script
 IS_EXECUTABLE = getattr(sys, 'frozen', False)
@@ -137,7 +135,7 @@ class DMLLauncher:
         # Status items
         status_items = [
             ("Servidor", "[OK] Ejecutandose", "#10b981"),
-            ("Puerto", f"5000 (localhost)", "#3b82f6"),
+            ("Puerto", "5000 (localhost)", "#3b82f6"),
             ("URL", "http://127.0.0.1:5000", "#3b82f6"),
             ("Base de Datos", "[OK] Conectada", "#10b981"),
             ("Status", "Listo para usar", "#10b981")

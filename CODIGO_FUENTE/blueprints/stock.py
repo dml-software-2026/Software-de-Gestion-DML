@@ -1,7 +1,13 @@
-from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from CODIGO_FUENTE.decorators import (
+    get_current_user,
+    log_action,
+    login_required,
+    permission_required,
+    role_required,
+)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
 from CODIGO_FUENTE.services.stock import check_stock_alert
 
 stock_bp = Blueprint("stock", __name__, url_prefix="/stock")
@@ -138,7 +144,7 @@ def stock_new():
             flash(f"Repuesto {codigo} agregado al stock de {ubicacion}.", "success")
             return redirect(url_for("stock.stock_list", ubicacion=ubicacion))
         except Exception as e:
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
             return render_template("stock_new.html", ubicacion=ubicacion, user=user)
 
     return render_template("stock_new.html", ubicacion=ubicacion, user=user)
@@ -194,7 +200,7 @@ def stock_edit(codigo):
             flash("Stock actualizado.", "success")
             return redirect(url_for("stock.stock_list", ubicacion=ubicacion))
         except Exception as e:
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
 
     return render_template("stock_edit.html", stock=stock, ubicacion=ubicacion, user=user)
 

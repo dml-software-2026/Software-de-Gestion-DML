@@ -1,10 +1,8 @@
-import os
 import sys
 
 import psycopg2
-from psycopg2.extras import RealDictCursor
-
 from flask import current_app, g
+from psycopg2.extras import RealDictCursor
 
 
 class PgConnection:
@@ -287,7 +285,9 @@ def init_db():
     # Cargar datos iniciales (asumimos BD nueva)
     try:
         print("[SEED] 🌱 Cargando datos iniciales...", file=sys.stderr, flush=True)
-        from CODIGO_FUENTE.services.seed import load_seed_data  # se crea en el siguiente checkpoint
+        from CODIGO_FUENTE.services.seed import (
+            load_seed_data,  # se crea en el siguiente checkpoint
+        )
         db = get_db()
         load_seed_data(db)
         db.commit()

@@ -2,9 +2,10 @@
 """
 Script para cargar stock desde Excel a la base de datos
 """
-import openpyxl
-import sqlite3
 import os
+import sqlite3
+
+import openpyxl
 
 DB_PATH = 'dml.db'
 EXCEL_PATH = 'STOCK 26-05-25.xlsx'
@@ -23,7 +24,7 @@ def load_stock():
     ws = wb["Stock"]
     
     print(f"\nArchivo: {EXCEL_PATH}")
-    print(f"Hoja: Stock")
+    print("Hoja: Stock")
     
     # Connect to DB
     conn = sqlite3.connect(DB_PATH)
@@ -79,7 +80,7 @@ def load_stock():
     result = db.execute("SELECT COUNT(*) FROM stock_dml").fetchone()[0]
     total_stock = result
     
-    print(f"\n\nRESULTADO:")
+    print("\n\nRESULTADO:")
     print(f"  Insertados exitosamente: {inserted}")
     print(f"  Errores: {errors}")
     print(f"  Total en BD: {total_stock}")

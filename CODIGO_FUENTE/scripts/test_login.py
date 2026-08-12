@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Script para verificar credenciales de login"""
 
-from werkzeug.security import check_password_hash, generate_password_hash
 import sqlite3
+
+from werkzeug.security import check_password_hash, generate_password_hash
 
 conn = sqlite3.connect('dml.db')
 cursor = conn.cursor()

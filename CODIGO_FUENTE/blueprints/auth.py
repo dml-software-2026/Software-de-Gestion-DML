@@ -1,8 +1,8 @@
-from flask import Blueprint, request, render_template, redirect, url_for, flash, session
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
+from CODIGO_FUENTE.decorators import get_current_user, login_required
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, get_current_user
 
 auth_bp = Blueprint("auth", __name__)
 
