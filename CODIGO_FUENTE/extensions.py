@@ -132,6 +132,26 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error agregando campos de contacto: {e}")
         db.rollback()
 
+    # Migración: Agregar numero_correlativo a raypac_entries
+    # (raypac_new() en blueprints/raypac.py lee/escribe esta columna para
+    # numerar los ingresos de forma correlativa arrancando en 1, pero nunca
+    # tuvo migración en Postgres — solo existía en el schema.sql viejo de
+    # SQLite. Sin esto, guardar un ingreso nuevo tira excepción.)
+    try:
+        print("[MIGRATION] Verificando campo numero_correlativo...")
+        column_names = _columnas_de(db, "raypac_entries")
+
+        if "numero_correlativo" not in column_names:
+            db.execute("ALTER TABLE raypac_entries ADD COLUMN IF NOT EXISTS numero_correlativo INTEGER")
+            print("[MIGRATION] ✅ Columna numero_correlativo agregada")
+
+        db.commit()
+        print("[MIGRATION] ✅ Campo numero_correlativo verificado")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando numero_correlativo: {e}")
+        db.rollback()
+
     # Migración: Agregar campos de estado a envios_repuestos
     try:
         print("[MIGRATION] Verificando campos de estado en envios_repuestos...")
