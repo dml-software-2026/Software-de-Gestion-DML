@@ -30,8 +30,10 @@
                     <th>Serie</th>
                     <th>Fecha Entrega</th>
                     <th>Recibido Por</th>
+                    {% if user_role in ['ADMIN', 'RAYPAC'] %}
                     <th>Contacto</th>
                     <th>Email</th>
+                    {% endif %}
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -55,8 +57,10 @@
                             <span class="badge badge-secondary">No especificado</span>
                         {% endif %}
                     </td>
+                    {% if user_role in ['ADMIN', 'RAYPAC'] %}
                     <td class="text-dark">{{ ficha.contacto_cliente or '-' }}</td>
                     <td class="text-dark">{{ ficha.email_cliente or '-' }}</td>
+                    {% endif %}
                     <td>
                         <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-sm btn-info" title="Ver Ficha">
                             <i class="fas fa-eye"></i> Ver
