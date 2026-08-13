@@ -8,7 +8,6 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.services.stock import check_stock_alert
 
 stock_bp = Blueprint("stock", __name__, url_prefix="/stock")
 
@@ -16,6 +15,17 @@ stock_bp = Blueprint("stock", __name__, url_prefix="/stock")
 @stock_bp.route("")
 @login_required
 @permission_required(read_roles=["DML_ST"], write_roles=["DML_REPUESTOS", "RAYPAC"])
+
+def calcular_nivel_alerta(cantidad):
+    if cantidad == 0:
+        return "ROJO"
+    elif cantidad == 1:
+        return "AMARILLO"
+    elif cantidad == 2:
+        return "NARANJA"
+    else:
+        return "OK"
+
 def stock_list(readonly=False):
     user = get_current_user()
     db = get_db()
@@ -49,7 +59,7 @@ def stock_list(readonly=False):
     # Agregar información de alerta
     stocks_con_alerta = []
     for stock in stocks:
-        alerta = check_stock_alert(stock['codigo_repuesto'], ubicacion)
+        alerta = calcular_nivel_alerta(stock['cantidad'])
         stocks_con_alerta.append({
             **dict(stock),
             'alerta': alerta,
