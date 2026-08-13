@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Script para mostrar estadísticas finales del sistema."""
 
 import os

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 LAUNCHER DML - Sistema de Gestion de Stock y Repuestos
 Version: 2.0 - UI Amigable para No Tecnicos

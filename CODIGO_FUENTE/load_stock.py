@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Script para cargar stock desde Excel a la base de datos
 """
