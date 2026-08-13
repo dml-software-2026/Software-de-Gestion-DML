@@ -8,7 +8,7 @@
         <div class="col-md-8 offset-md-2">
             <h2 class="mb-4">{% if entry %}Editar{% else %}Nuevo Ingreso{% endif %} RAYPAC</h2>
 
-            <form method="POST" class="needs-validation">
+            <form method="POST" id="raypac-form" class="needs-validation">
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <div class="row mb-3">
@@ -30,8 +30,15 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="cliente" class="form-label">Cliente *</label>
-                                <input type="text" class="form-control" id="cliente" name="cliente" 
+                                <input type="text" class="form-control" id="cliente" name="cliente"
+                                       list="clientes-datalist" autocomplete="off"
                                        value="{{ entry.cliente if entry else '' }}" required>
+                                <datalist id="clientes-datalist">
+                                    {% for c in clientes %}
+                                    <option value="{{ c }}">
+                                    {% endfor %}
+                                </datalist>
+                                <input type="hidden" id="guardar_cliente_nuevo" name="guardar_cliente_nuevo" value="0">
                             </div>
                             <div class="col-md-6">
                                 <label for="numero_serie" class="form-label">N° Serie *</label>
@@ -177,6 +184,28 @@
         
         if (email && !emailInput.value) {
             emailInput.value = email;
+        }
+    });
+
+    // Autoaprendizaje de clientes (RF03): si el cliente escrito no está en
+    // la lista conocida, preguntar si se quiere guardar para futuros
+    // ingresos. El ingreso RAYPAC se guarda igual, esto solo decide si el
+    // nombre queda sugerido la próxima vez.
+    document.getElementById('raypac-form').addEventListener('submit', function() {
+        const clienteInput = document.getElementById('cliente');
+        const guardarInput = document.getElementById('guardar_cliente_nuevo');
+        const valor = clienteInput.value.trim();
+        guardarInput.value = '0';
+
+        if (valor) {
+            const opciones = Array.from(document.querySelectorAll('#clientes-datalist option'))
+                .map(function (o) { return o.value.trim().toLowerCase(); });
+            const esNuevo = !opciones.includes(valor.toLowerCase());
+
+            if (esNuevo) {
+                const guardar = confirm('"' + valor + '" no está en la lista de clientes. ¿Querés guardarlo para futuros ingresos?');
+                guardarInput.value = guardar ? '1' : '0';
+            }
         }
     });
 </script>

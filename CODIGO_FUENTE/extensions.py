@@ -132,6 +132,43 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error agregando campos de contacto: {e}")
         db.rollback()
 
+    # Migración: Tabla clientes (catálogo con autoaprendizaje, RF03 del #54)
+    try:
+        print("[MIGRATION] Verificando tabla clientes...")
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS clientes (
+                id SERIAL PRIMARY KEY,
+                nombre TEXT NOT NULL UNIQUE,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Semilla: clientes existentes al momento de armar el desplegable
+        # (planilla "CAMPOS DE INGRESO DML" compartida por David). Los
+        # nuevos que se carguen desde el form quedan guardados acá mismo
+        # vía autoaprendizaje (ver _registrar_cliente_si_corresponde en
+        # blueprints/raypac.py), ON CONFLICT DO NOTHING los deja
+        # re-ejecutar sin duplicar.
+        clientes_iniciales = [
+            "ABBOTT", "ALUAR", "ANDREANI", "BAYER", "Cartocor", "CASTELLI",
+            "CONARCO", "CYKLOP", "DERIPLOM", "EGGER", "FAMIQ", "FLAMIA",
+            "GEMEZ", "GENERAL PLASTICS", "HENKEL ARG.", "HIDRO ARG",
+            "HILADOS S.A.", "ILVA", "INDUSTRIAS LEAR", "JL", "LA ELENENSE",
+            "LA MORALEJA", "M.DON DAVID", "MABXINCE", "MECALUX", "MESUCAN",
+            "NUTRIN", "ONTEC FORTINOX", "PILKINTON", "PLUDEL", "RAYPAC",
+            "SADEPAN", "SEDAPIC", "SOTIC", "STEL S.A.", "TIGRE ARG.",
+            "TIGRE ARGENTINA", "VIDRIERIA ARG.", "VITOPEL",
+        ]
+        for nombre in clientes_iniciales:
+            db.execute("INSERT INTO clientes (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING", (nombre,))
+
+        db.commit()
+        print("[MIGRATION] ✅ Tabla clientes verificada y semilla cargada")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error creando tabla clientes: {e}")
+        db.rollback()
+
     # Migración: Agregar campos de estado a envios_repuestos
     try:
         print("[MIGRATION] Verificando campos de estado en envios_repuestos...")
