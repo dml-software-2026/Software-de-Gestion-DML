@@ -137,6 +137,54 @@ El monolito original de 4163 líneas ya fue dividido en esto. Ya no hay rutas en
   de dar una tarea por cerrada (un cambio sin commitear se pierde si se formatea
   la máquina o se trabaja desde otra compu).
 
+## Decoradores de auth — firmas exactas (`decorators.py`)
+
+No inventar variantes de estos, usar tal cual:
+
+```python
+@login_required
+def vista(...):
+    ...
+
+@role_required("ADMIN", "DML_ST")   # acepta *roles, cualquiera de estos pasa
+def vista(...):
+    ...
+
+@permission_required(read_roles=["DML_ST"], write_roles=["DML_REPUESTOS"])
+# ADMIN siempre tiene acceso completo (hardcodeado en el decorador).
+# write_roles → acceso completo. read_roles → acceso de solo lectura,
+# inyecta kwargs['readonly'] = True a la vista (la vista debe aceptar
+# un parámetro readonly=False).
+def vista(readonly=False, ...):
+    ...
+```
+
+Orden de decoradores siempre: `@blueprint.route(...)` → `@login_required` →
+`@role_required(...)` o `@permission_required(...)` → `def`.
+
+`get_current_user()` (de `decorators.py`) devuelve el usuario logueado desde la
+sesión, o `None`. Ya usado en casi todas las vistas para obtener `user['role']`,
+`user['id']`, etc.
+
+## Discrepancia conocida: DoD del #62 vs. comportamiento real
+
+El issue #62 dice en su definition of done que un rol no autorizado debe recibir
+**HTTP 403**. El comportamiento real de `role_required` y `permission_required` es
+hacer **redirect** (302) a `auth.index` con un mensaje flash, no un 403. No "corregir"
+esto sin consultarlo antes — es el comportamiento de todo el sistema, cambiarlo
+rompería la UX en 40+ rutas. Si hace falta que algún endpoint puntual devuelva 403
+en vez de redirect (por ejemplo si se agrega una API consumida por JS/fetch), evaluarlo
+caso por caso, no tocar los decoradores compartidos.
+
+## CI en desarrollo (puede cambiar el flujo de PRs pronto)
+
+Sebastián está armando CI esta sprint (tarea propia, para que quede activo bloqueando
+merges rotos en todos los PRs futuros). Cuando esté activo, los PRs van a tener checks
+automáticos obligatorios antes de poder mergear. Si un PR queda bloqueado por un check
+en rojo, no es necesariamente un error del cambio en sí — puede ser el CI recién
+configurado con falsos positivos; avisarle a Facu en vez de intentar "arreglar" el
+pipeline de CI sin que lo sepa.
+
 ## Roles del sistema
 
 4 roles: `ADMIN`, `RAYPAC`, `DML_ST`, `DML_REPUESTOS`. (Confirmado como definitivo
@@ -218,6 +266,11 @@ aparezca del lado DML como "pendiente de recepción".
 - Botón "Generar Ficha" nunca conectado al frontend (la ruta existe, ningún template la llama)
 - Botón "Acuse" en `/dml/entregadas` usa sintaxis Bootstrap 4 en proyecto Bootstrap 5
   (`data-toggle` → debería ser `data-bs-toggle`)
+- `raypac_new()` en `blueprints/raypac.py` inserta y lee la columna `numero_correlativo`
+  de `raypac_entries`, pero esa columna no existe en `schema-postgres.sql` ni tiene
+  migración en `extensions.py` (a diferencia de `contacto_cliente`/`email_cliente`, que
+  sí la tienen). Si corre tal cual contra Supabase, el guardado de un ingreso nuevo se
+  rompe — hallazgo encontrado trabajando el #54, pendiente de confirmar y arreglar.
 
 **No urgente:**
 - Dos generadores de PDF sin unificar (`generar_ficha_pdf` y `generate_ficha_pdf`) más
