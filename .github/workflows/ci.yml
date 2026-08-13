@@ -53,8 +53,8 @@ jobs:
       # PASO 6 — verificar que la app importa sin errores
       # Este es el chequeo más valioso: si Claude alucinó un import o rompió
       # un blueprint, la app no arranca y este comando explota acá, no en producción.
-      # Nota: se corre desde CODIGO_FUENTE/ porque los blueprints hacen imports relativos.
+      # Nota: se corre desde la raíz del repo (igual que gunicorn CODIGO_FUENTE.app:app en Render),
+      # ya que desde la migración a Postgres todos los imports son absolutos.
       - name: Import check — la app bootea?
         run: |
-          cd CODIGO_FUENTE
-          python -c "from app import app; print('OK: app importa correctamente')"
+          python -c "from CODIGO_FUENTE.app import app; print('OK: app importa correctamente')"
