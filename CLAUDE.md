@@ -267,29 +267,54 @@ esto no los reemplaza ni los toca.
 4. 5 flujos consecutivos sin HTTP 500 ni bloqueos
 5. Un usuario DML no ve los campos de contacto/mail cliente
 
-### Checklist manual de pruebas (rama de integración local, 2026-08-13)
+### Checklist manual de pruebas — estado al cierre de la sesión del 2026-08-13
+
+Probado en la rama de integración local `test/54-integracion-local` (no pusheada,
+ver más arriba). Facu la retoma en la próxima sesión: falta el punto 6, y un par de
+sub-chequeos del resto quedaron sin confirmar explícitamente (marcados abajo).
 
 Usuarios: `raypac@dml.local`/`raypac` · `tecnico@dml.local`/`tecnico` (DML_ST) ·
 `admin@dml.local`/`admin`
 
-1. **Alta de ingreso (PR #110):** login `raypac` → `/raypac/new` → completar y
-   guardar → debe redirigir a la vista del ingreso sin error 500 (antes del fix
+1. ✅ **Alta de ingreso (PR #110):** confirmado, guarda sin error 500 (antes del fix
    tiraba "no existe la columna numero_correlativo").
-2. **Desplegable de clientes:** escribir un cliente existente → aparece sugerido
-   en un desplegable blanco debajo del campo (no el `<datalist>` nativo negro,
-   eso se corrigió tras feedback de prueba). Escribir uno nuevo → al guardar sale
-   `confirm()` preguntando si guardarlo; si se acepta, en un ingreso siguiente
-   aparece sugerido; si se cancela, no.
-3. **Contacto/mail (PR #109):** visibles en el form y en `/raypac/<id>` para
-   `raypac`/`admin`; ocultos para `tecnico` (DML_ST) en `/raypac/<id>`.
-4. **Freeze:** ingresar solo 4 dígitos de remito → autocompleta a `00001-04222`.
-   Editar freezado sin código como `raypac` → bloqueado. Con `admin` +
-   `ADMIN2024` → permitido.
-5. **Lado DML:** `tecnico` ve el ingreso freezado como pendiente de recepción,
-   puede recepcionarlo.
-6. **`/dml/entregadas` oculta contacto/mail a DML_ST:** pendiente de probar,
-   requiere un registro en estado "entregado" (recorrido largo: ficha → cierre de
-   reparación → acuse). No probado todavía al momento de escribir esto.
+2. ✅ **Desplegable de clientes — funcional:** confirmado (sugiere existentes,
+   `confirm()` al escribir uno nuevo, autoaprendizaje guarda/no guarda según la
+   respuesta). ⚠️ **Falta reconfirmar el estilo:** el desplegable nativo
+   (`<datalist>`) salía negro y distinto al resto — se reemplazó por uno con
+   clases de Bootstrap (`dropdown-menu`/`dropdown-item`) pusheado a
+   `feature/54-desplegable-clientes`, pero Facu no llegó a volver a mirarlo
+   después del fix. Retomar: refrescar `/raypac/new`, escribir en Cliente y
+   confirmar que ahora es blanco y aparece debajo del campo.
+3. ⚠️ **Contacto/mail (PR #109) — parcial:** confirmado que los campos se ven
+   (con el texto "Visible solo para RAYPAC y ADMIN") logueado como `raypac`.
+   **Falta confirmar el lado que realmente importa del fix:** loguearse como
+   `tecnico` (DML_ST) y abrir `/raypac/<id>` de un ingreso freezado → esos dos
+   campos NO deberían aparecer.
+4. ⚠️ **Freeze — parcial:** confirmado que freeza y guarda remito. **Falta
+   probar el sub-caso de edición bloqueada:** como `raypac` intentar editar un
+   ingreso freezado sin código → debe bloquear. Como `admin` con `ADMIN2024` →
+   debe permitir.
+5. ✅ **Lado DML — recepcionar:** confirmado, el botón "Dar de Alta en DML" está
+   en la sección "Estado de Envío del Equipo" de `/raypac/<id>` (no confundir
+   con la tarjeta separada más abajo "Crear Ficha de Servicio Técnico", que es
+   un flujo posterior y no forma parte de este checklist).
+6. ❌ **`/dml/entregadas` oculta contacto/mail a DML_ST — sin probar todavía.**
+   Requiere un registro en estado "entregado". Facu decidió recorrer el flujo
+   completo por la UI en vez de que se lo prepare directo en la base. Pasos
+   para retomar (logueado como `admin`, cubre todos los roles necesarios):
+   1. `/raypac` → sobre el ingreso recepcionado → **"Crear Ticket"** (pide
+      Técnico Responsable, obligatorio; el resto opcional).
+   2. Desde `/raypac/<id>` (ahora con ticket) → **"Crear Ficha DML"** → completar
+      y guardar → te deja en la edición de la ficha.
+   3. En la edición: completar **Técnico Responsable**, **Diagnóstico**
+      (mín. 10 caracteres), **N° Remito de Salida** — son obligatorios para
+      poder cerrarla. El grid de "Estado del Equipo" se puede dejar con los
+      valores por defecto. Guardar.
+   4. En `/dml/<id>` → **"🔒 Cerrar Ficha"** (confirmar popup) → queda
+      ENTREGADA. Si falta algo, el sistema lista exactamente qué campo falta.
+   5. `/dml/entregadas`: como `admin`/`raypac` deben verse Contacto/Email; como
+      `tecnico` no.
 
 ## Hallazgos pendientes (no resueltos, documentados en HALLAZGOS_REFACTOR.md)
 
@@ -313,6 +338,14 @@ Usuarios: `raypac@dml.local`/`raypac` · `tecnico@dml.local`/`tecnico` (DML_ST) 
   sí la tienen). Reproducido en la práctica contra Postgres real (tira
   `no existe la columna «numero_correlativo»` al guardar un ingreso nuevo) — **fix en
   PR #110** (`fix/54-numero-correlativo-postgres`), pendiente de mergear a `dev`.
+- `raypac_unfreeze()` no revierte `estado_envio_equipos` a `PENDIENTE` al desfreezar
+  — un registro desfreezado puede quedar con `is_frozen=FALSE` pero
+  `estado_envio_equipos='ENVIADO'`, mostrando el badge "Enviado desde RAYPAC" (y el
+  botón "Dar de Alta en DML") como si siguiera en tránsito aunque ya no esté
+  freezado. Encontrado probando el #54 (registro de prueba "Santi" en la base
+  local), no confirmado todavía si pasa igual en producción ni si alguien lo
+  reportó. Sin PR abierto, pendiente de decidir si se arregla en este sprint o
+  se documenta como hallazgo para después.
 
 **No urgente:**
 - Dos generadores de PDF sin unificar (`generar_ficha_pdf` y `generate_ficha_pdf`) más
