@@ -28,16 +28,13 @@
                         </div>
 
                         <div class="row mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-6 position-relative">
                                 <label for="cliente" class="form-label">Cliente *</label>
                                 <input type="text" class="form-control" id="cliente" name="cliente"
-                                       list="clientes-datalist" autocomplete="off"
+                                       autocomplete="off"
                                        value="{{ entry.cliente if entry else '' }}" required>
-                                <datalist id="clientes-datalist">
-                                    {% for c in clientes %}
-                                    <option value="{{ c }}">
-                                    {% endfor %}
-                                </datalist>
+                                <ul class="dropdown-menu w-100 shadow-sm" id="clientes-sugerencias"
+                                    style="max-height: 220px; overflow-y: auto; top: 100%; left: 0;"></ul>
                                 <input type="hidden" id="guardar_cliente_nuevo" name="guardar_cliente_nuevo" value="0">
                             </div>
                             <div class="col-md-6">
@@ -187,24 +184,75 @@
         }
     });
 
-    // Autoaprendizaje de clientes (RF03): si el cliente escrito no está en
-    // la lista conocida, preguntar si se quiere guardar para futuros
-    // ingresos. El ingreso RAYPAC se guarda igual, esto solo decide si el
-    // nombre queda sugerido la próxima vez.
+    // Desplegable de clientes con autoaprendizaje (RF03).
+    // Se arma a mano con clases de Bootstrap (dropdown-menu/dropdown-item)
+    // en vez de <datalist>, que usa el picker nativo del navegador/SO y no
+    // se puede stylear para que coincida con el resto de los desplegables
+    // de la app.
+    const CLIENTES_CONOCIDOS = {{ clientes | tojson }};
+    const clienteInput = document.getElementById('cliente');
+    const clienteSugerencias = document.getElementById('clientes-sugerencias');
+    const guardarClienteInput = document.getElementById('guardar_cliente_nuevo');
+
+    function mostrarSugerenciasCliente() {
+        const texto = clienteInput.value.trim().toLowerCase();
+        clienteSugerencias.innerHTML = '';
+
+        if (!texto) {
+            clienteSugerencias.classList.remove('show');
+            return;
+        }
+
+        const coincidencias = CLIENTES_CONOCIDOS
+            .filter(function (c) { return c.toLowerCase().includes(texto); })
+            .slice(0, 15);
+
+        if (coincidencias.length === 0) {
+            clienteSugerencias.classList.remove('show');
+            return;
+        }
+
+        coincidencias.forEach(function (nombre) {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = '#';
+            a.className = 'dropdown-item';
+            a.textContent = nombre;
+            // mousedown (no click) para que dispare antes del blur del input
+            a.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                clienteInput.value = nombre;
+                clienteSugerencias.classList.remove('show');
+            });
+            li.appendChild(a);
+            clienteSugerencias.appendChild(li);
+        });
+
+        clienteSugerencias.classList.add('show');
+    }
+
+    clienteInput.addEventListener('input', mostrarSugerenciasCliente);
+    clienteInput.addEventListener('focus', mostrarSugerenciasCliente);
+    clienteInput.addEventListener('blur', function () {
+        clienteSugerencias.classList.remove('show');
+    });
+
+    // Autoaprendizaje: si el cliente escrito no está en la lista conocida,
+    // preguntar si se quiere guardar para futuros ingresos. El ingreso
+    // RAYPAC se guarda igual, esto solo decide si el nombre queda
+    // sugerido la próxima vez.
     document.getElementById('raypac-form').addEventListener('submit', function() {
-        const clienteInput = document.getElementById('cliente');
-        const guardarInput = document.getElementById('guardar_cliente_nuevo');
         const valor = clienteInput.value.trim();
-        guardarInput.value = '0';
+        guardarClienteInput.value = '0';
 
         if (valor) {
-            const opciones = Array.from(document.querySelectorAll('#clientes-datalist option'))
-                .map(function (o) { return o.value.trim().toLowerCase(); });
-            const esNuevo = !opciones.includes(valor.toLowerCase());
+            const esNuevo = !CLIENTES_CONOCIDOS.some(function (c) {
+                return c.toLowerCase() === valor.toLowerCase();
+            });
 
             if (esNuevo) {
                 const guardar = confirm('"' + valor + '" no está en la lista de clientes. ¿Querés guardarlo para futuros ingresos?');
-                guardarInput.value = guardar ? '1' : '0';
+                guardarClienteInput.value = guardar ? '1' : '0';
             }
         }
     });
