@@ -216,32 +216,49 @@ aparezca del lado DML como "pendiente de recepción".
   puede estar en `INTERFAZ/templates/`)
 - `CODIGO_FUENTE/db/schema-postgres.sql`
 
-**Checklist (8 ítems, 2 ya resueltos):**
-- [ ] Campo "Contacto del cliente" (visible solo RAYPAC y ADMIN)
-- [ ] Campo "Mail del cliente" (visible solo RAYPAC y ADMIN)
-- [ ] Desplegable de clientes con lista completa + autoaprendizaje (si escriben un
-      cliente nuevo, preguntar si guardarlo)
-- [ ] Desplegable de modelos de máquina (13 modelos: 7 ITA + 3 CT + 3 CTT)
-- [ ] Desplegable de tipo de máquina (A batería, manual, neumática, otro)
-- [ ] Desplegable de comercial responsable con mail autocompletado (5 comerciales:
-      Leonardo Bastagel, Luciana, Ezequiel Pacheco, Daniela Sofio, + 1 a confirmar
-      con David)
-- [x] Validar que no se pueda freezar sin número de remito — **ya implementado**
-      en `raypac_freeze()`
+**Checklist (8 ítems) — estado al 2026-08-13, todos cubiertos por código:**
+- [x] Campo "Contacto del cliente" (visible solo RAYPAC y ADMIN) — PR #109
+- [x] Campo "Mail del cliente" (visible solo RAYPAC y ADMIN) — PR #109
+- [x] Desplegable de clientes con lista completa + autoaprendizaje (si escriben un
+      cliente nuevo, preguntar si guardarlo) — rama `feature/54-desplegable-clientes`
+      (pusheada, PR todavía sin abrir)
+- [x] Desplegable de modelos de máquina (13 modelos: 7 ITA + 3 CT + 3 CTT) — ya estaba
+      hecho de antes del refactor, confirmado exacto contra el Excel de David
+- [x] Desplegable de tipo de máquina (A batería, manual, neumática, otro) — ídem, ya
+      estaba hecho
+- [x] Desplegable de comercial responsable con mail autocompletado — ya estaba hecho.
+      **Ojo:** el issue original decía "5 comerciales, Leonardo Bastagel + 1 a
+      confirmar con David" — eso estaba desactualizado. El Excel "CAMPOS DE INGRESO
+      DML" que compartió David confirma que son **9 comerciales** y coinciden
+      exactos (nombre y mail) con lo que ya había en el código: Ezequiel Pacheco,
+      Leonardo Gastager, Luciana Gregorio, Luciana Paradiso, Daniela Sofio, Hernán
+      Rivero, Matias Chaubell, Paola Isanelli (mail `paola.isabelli@`, sic), Romina
+      Gamarra. No hace falta tocar nada acá.
+- [x] Validar que no se pueda freezar sin número de remito — ya implementado en
+      `raypac_freeze()`
 - [x] Permitir ingresar solo los últimos 4 dígitos del remito con autocompletado de
-      formato `00001-00004222` — **ya implementado** en `raypac_freeze()`
+      formato `00001-04222` — ya implementado en `raypac_freeze()`
 
-**Plan de PRs chicos acordado** (uno por sub-ítem, no un PR gigante):
-0. Research: revisar `schema-postgres.sql` para ver si `raypac_entries` ya tiene
-   `contacto_cliente` y `email_cliente` (el backend en `raypac.py` ya los maneja
-   en las queries, puede que solo falte el HTML)
-1. `feature/54-campos-contacto-mail-cliente` — los dos campos con visibilidad por rol
-2. `feature/54-desplegable-tipo-maquina` — el más simple, 4 opciones estáticas
-3. `feature/54-desplegable-modelos` — 13 opciones estáticas
-4. `feature/54-desplegable-comercial` — mapping nombre→mail, dejar para el final
-   porque falta confirmar el 5° comercial
-5. `feature/54-desplegable-clientes` — el más complejo, necesita persistencia
-   (autoaprendizaje de clientes nuevos)
+**PRs abiertos contra `dev`** (todos `Refs #54`, ninguno cierra el issue solo):
+- **#108** `docs/agregar-claude-md` — este archivo
+- **#109** `feature/54-campos-contacto-mail-cliente` — oculta contacto/mail para
+  roles DML en `dml_entregadas.html` + documenta las columnas en `schema-postgres.sql`
+- **#110** `fix/54-numero-correlativo-postgres` — bug encontrado en el camino (ver
+  Hallazgos abajo), no estaba en el plan original
+- **`feature/54-desplegable-clientes`** (pusheada, PR sin abrir todavía) — tabla
+  `clientes` con autoaprendizaje, sembrada con los 39 clientes del Excel de David
+
+**Conflicto de merge esperable:** #110 y `feature/54-desplegable-clientes` agregan
+cada uno un bloque de migración en el mismo punto de `migrate_db()` (`extensions.py`).
+El que se mergee segundo va a pedir resolver un conflicto chico a mano — solo hay que
+dejar los dos bloques `try/except`, ninguno pisa al otro.
+
+**Técnica usada para probar los 3 juntos sin romper el esquema de PRs chicos:**
+rama local `test/54-integracion-local` (cortada de `dev`, con los 3 branches
+mergeados adentro) **nunca pusheada a GitHub** — sirve solo para levantar un único
+server local y probar el flujo completo de una sentada. Se borra al terminar de
+probar. Los PRs reales en GitHub siguen intactos y se revisan/mergean por separado,
+esto no los reemplaza ni los toca.
 
 **Definition of done del issue:**
 1. Login RAYPAC → `/raypac/new` → completar form → guardar → remito 4 dígitos → freezar
@@ -249,6 +266,30 @@ aparezca del lado DML como "pendiente de recepción".
 3. RAYPAC no puede editar después de freezar (solo ADMIN con código de desbloqueo)
 4. 5 flujos consecutivos sin HTTP 500 ni bloqueos
 5. Un usuario DML no ve los campos de contacto/mail cliente
+
+### Checklist manual de pruebas (rama de integración local, 2026-08-13)
+
+Usuarios: `raypac@dml.local`/`raypac` · `tecnico@dml.local`/`tecnico` (DML_ST) ·
+`admin@dml.local`/`admin`
+
+1. **Alta de ingreso (PR #110):** login `raypac` → `/raypac/new` → completar y
+   guardar → debe redirigir a la vista del ingreso sin error 500 (antes del fix
+   tiraba "no existe la columna numero_correlativo").
+2. **Desplegable de clientes:** escribir un cliente existente → aparece sugerido
+   en un desplegable blanco debajo del campo (no el `<datalist>` nativo negro,
+   eso se corrigió tras feedback de prueba). Escribir uno nuevo → al guardar sale
+   `confirm()` preguntando si guardarlo; si se acepta, en un ingreso siguiente
+   aparece sugerido; si se cancela, no.
+3. **Contacto/mail (PR #109):** visibles en el form y en `/raypac/<id>` para
+   `raypac`/`admin`; ocultos para `tecnico` (DML_ST) en `/raypac/<id>`.
+4. **Freeze:** ingresar solo 4 dígitos de remito → autocompleta a `00001-04222`.
+   Editar freezado sin código como `raypac` → bloqueado. Con `admin` +
+   `ADMIN2024` → permitido.
+5. **Lado DML:** `tecnico` ve el ingreso freezado como pendiente de recepción,
+   puede recepcionarlo.
+6. **`/dml/entregadas` oculta contacto/mail a DML_ST:** pendiente de probar,
+   requiere un registro en estado "entregado" (recorrido largo: ficha → cierre de
+   reparación → acuse). No probado todavía al momento de escribir esto.
 
 ## Hallazgos pendientes (no resueltos, documentados en HALLAZGOS_REFACTOR.md)
 
@@ -267,10 +308,11 @@ aparezca del lado DML como "pendiente de recepción".
 - Botón "Acuse" en `/dml/entregadas` usa sintaxis Bootstrap 4 en proyecto Bootstrap 5
   (`data-toggle` → debería ser `data-bs-toggle`)
 - `raypac_new()` en `blueprints/raypac.py` inserta y lee la columna `numero_correlativo`
-  de `raypac_entries`, pero esa columna no existe en `schema-postgres.sql` ni tiene
+  de `raypac_entries`, pero esa columna no existe en `schema-postgres.sql` ni tenía
   migración en `extensions.py` (a diferencia de `contacto_cliente`/`email_cliente`, que
-  sí la tienen). Si corre tal cual contra Supabase, el guardado de un ingreso nuevo se
-  rompe — hallazgo encontrado trabajando el #54, pendiente de confirmar y arreglar.
+  sí la tienen). Reproducido en la práctica contra Postgres real (tira
+  `no existe la columna «numero_correlativo»` al guardar un ingreso nuevo) — **fix en
+  PR #110** (`fix/54-numero-correlativo-postgres`), pendiente de mergear a `dev`.
 
 **No urgente:**
 - Dos generadores de PDF sin unificar (`generar_ficha_pdf` y `generate_ficha_pdf`) más
