@@ -11,11 +11,6 @@ from CODIGO_FUENTE.extensions import get_db
 
 stock_bp = Blueprint("stock", __name__, url_prefix="/stock")
 
-
-@stock_bp.route("")
-@login_required
-@permission_required(read_roles=["DML_ST"], write_roles=["DML_REPUESTOS", "RAYPAC"])
-
 def calcular_nivel_alerta(cantidad):
     if cantidad == 0:
         return "ROJO"
@@ -25,6 +20,10 @@ def calcular_nivel_alerta(cantidad):
         return "NARANJA"
     else:
         return "OK"
+
+@stock_bp.route("")
+@login_required
+@permission_required(read_roles=["DML_ST"], write_roles=["DML_REPUESTOS", "RAYPAC"])
 
 def stock_list(readonly=False):
     user = get_current_user()
