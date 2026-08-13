@@ -22,6 +22,16 @@ y probado (o listo para revisar), Claude Code se encarga de:
   partido en varios PRs chicos)
 - `git push` de la rama correspondiente
 
+**Probar localmente con Facu antes de pushear, siempre que sea viable.** Levantar
+el server local, avisar explícitamente "listo para probar" y decir qué probar y
+cómo (pasos concretos, no solo "fijate que funcione"). Recién después de que Facu
+confirma que anduvo, pushear. Si un PR ya está pusheado y aparece un problema al
+probarlo, el fix va como commit nuevo en la misma rama (no hace falta rama nueva).
+
+**Un PR abierto en GitHub no se mergea solo.** Mergear es una acción manual que
+hace Facu desde GitHub — dejar PRs abiertos mientras se sigue probando no tiene
+ningún riesgo, no hace falta cancelarlos ni cerrarlos "por las dudas".
+
 **Los Pull Requests los abre Facu manualmente desde GitHub** (no desde la terminal).
 Cuando un cambio esté commiteado y pusheado y listo para convertirse en PR, Claude
 Code tiene que **avisarle explícitamente a Facu** — algo como: "Ya pusheé la rama
