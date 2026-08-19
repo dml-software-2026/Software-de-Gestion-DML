@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 
 # Agregar CODIGO_FUENTE al path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'CODIGO_FUENTE'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'CODIGO_FUENTE'))
 
 from app import app, get_db, generate_ticket_number
 
@@ -24,7 +24,7 @@ def seed_database():
         
         # Limpiar datos existentes (respetando foreign keys)
         db.execute("DELETE FROM ticket_historial")
-        db.execute("DELETE FROM audit_log")
+        db.execute("DELETE FROM logs_auditoria")
         db.execute("DELETE FROM freezing_log")
         db.execute("DELETE FROM tickets")
         db.execute("DELETE FROM dml_repuestos")

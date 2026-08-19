@@ -87,7 +87,7 @@
     <h2>Editar Ficha DML #{{ ficha.numero_ficha }}</h2>
     
     <!-- FORM PRINCIPAL: DATOS DE LA FICHA -->
-    <form method="POST" action="{{ url_for('dml_edit', id=ficha.id) }}">
+    <form method="POST" action="{{ url_for('dml.dml_edit', id=ficha.id) }}">
         <!-- SECCIÓN 1: DATOS BÁSICOS -->
         <div class="section-title">DATOS BÁSICOS</div>
         
@@ -191,7 +191,7 @@
             <button type="submit" class="btn btn-primary btn-lg" style="margin-right: 10px;">
                 💾 Guardar Cambios
             </button>
-            <a href="{{ url_for('dml_view', id=ficha.id) }}" class="btn btn-secondary btn-lg" style="margin-right: 10px;">
+            <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-secondary btn-lg" style="margin-right: 10px;">
                 ❌ Cancelar
             </a>
         </div>
@@ -220,7 +220,7 @@
                 </div>
                 <div style="margin-left: 10px; display: flex; gap: 5px;">
                     {% if repuesto.en_falta %}
-                    <form method="POST" action="{{ url_for('mover_repuesto_a_stock', ficha_id=ficha.id, repuesto_id=repuesto.id) }}" 
+                    <form method="POST" action="{{ url_for('dml.mover_repuesto_a_stock', ficha_id=ficha.id, repuesto_id=repuesto.id) }}" 
                           style="display: inline;">
                         <button type="submit" class="btn btn-warning btn-sm" 
                                 onclick="return confirm('¿Confirmar que el repuesto {{ repuesto.codigo_repuesto }} ya está disponible?')" 
@@ -229,7 +229,7 @@
                         </button>
                     </form>
                     {% endif %}
-                    <form method="POST" action="{{ url_for('eliminar_repuesto', ficha_id=ficha.id, repuesto_id=repuesto.id) }}" 
+                    <form method="POST" action="{{ url_for('dml.eliminar_repuesto', ficha_id=ficha.id, repuesto_id=repuesto.id) }}" 
                           style="display: inline;">
                         <button type="submit" class="btn btn-danger btn-sm" 
                                 onclick="return confirm('¿Eliminar repuesto {{ repuesto.codigo_repuesto }}?')">
@@ -250,7 +250,7 @@
             <p style="margin: 0 0 12px 0; font-size: 0.85em; color: #555;">
                 <strong>🔗 Conectado al stock:</strong> El sistema verifica automáticamente la disponibilidad y descuenta del inventario.
             </p>
-            <form method="POST" action="{{ url_for('agregar_repuesto', id=ficha.id) }}" id="form_agregar_repuesto">
+            <form method="POST" action="{{ url_for('dml.agregar_repuesto', id=ficha.id) }}" id="form_agregar_repuesto">
                 <div style="display: grid; grid-template-columns: 2fr 1fr 100px; gap: 10px; align-items: end;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label><strong>Código del Repuesto:</strong></label>

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
-sys.path.insert(0, 'CODIGO_FUENTE')
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'CODIGO_FUENTE'))
 
 from app import app, get_db
 from datetime import datetime

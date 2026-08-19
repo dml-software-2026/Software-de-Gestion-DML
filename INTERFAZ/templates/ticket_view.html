@@ -34,10 +34,10 @@
         <div class="col-md-12">
             <!-- BOTONES DE ACCIÓN (NO IMPRIMIR) -->
             <div class="no-print" style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <a href="{{ url_for('dml_list') }}" class="btn btn-secondary">
+                <a href="{{ url_for('dml.dml_list') }}" class="btn btn-secondary">
                     ⬅️ Volver a Fichas
                 </a>
-                <a href="{{ url_for('ticket_print', numero_ticket=ticket.numero_ticket) }}" class="btn btn-info" target="_blank">
+                <a href="{{ url_for('tickets.ticket_print', numero_ticket=ticket.numero_ticket) }}" class="btn btn-info" target="_blank">
                     🖨️ Imprimir Solapa/Etiqueta
                 </a>
             </div>
@@ -165,16 +165,14 @@
             <!-- BOTONES DE ACCIÓN (NO IMPRIMIR) -->
             <div class="no-print mt-4 mb-4">
                 {% if ticket.numero_ficha %}
-                <a href="{{ url_for('dml_view', id=ticket.ficha_id) }}" class="btn btn-primary">
+                <a href="{{ url_for('dml.dml_view', id=ticket.ficha_id) }}" class="btn btn-primary">
                     📄 Ver Ficha Completa
                 </a>
                 {% endif %}
-                <a href="{{ url_for('tickets_list') }}" class="btn btn-secondary">
+                <a href="{{ url_for('tickets.tickets_list') }}" class="btn btn-secondary">
                     🔙 Volver a Tickets
                 </a>
-                <button onclick="window.print()" class="btn btn-info">
-                    🖨️ Imprimir Vista Completa
-                </button>
+                
             </div>
 
             <!-- NOTA DE PIE (NO IMPRIMIR) -->

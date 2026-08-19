@@ -56,7 +56,7 @@
                     <td>{{ ticket.numero_serie }}</td>
                     <td>
                         {% if ticket.numero_ficha %}
-                        <a href="{{ url_for('dml_view', id=ticket.ficha_id) }}">
+                        <a href="{{ url_for('dml.dml_view', id=ticket.ficha_id) }}">
                             #{{ '%07d' % ticket.numero_ficha }}
                         </a>
                         {% else %}
@@ -70,7 +70,7 @@
                         <span class="text-muted">Sin ficha</span>
                         {% endif %}
                     </td>
-                    <td>{{ ticket.fecha_creacion[:10] }}</td>
+                    <td>{{ ticket.fecha_creacion.strftime('%Y-%m-%d') if ticket.fecha_creacion else '' }}</td>
                     <td>
                         {% if ticket.estado == 'ACTIVO' %}
                         <span class="badge bg-success">ACTIVO</span>
@@ -79,7 +79,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <a href="{{ url_for('ticket_view', numero_ticket=ticket.numero_ticket) }}" 
+                        <a href="{{ url_for('tickets.ticket_view', numero_ticket=ticket.numero_ticket) }}" 
                            class="btn btn-sm btn-info">
                             👁️ Ver
                         </a>
@@ -96,7 +96,7 @@
     {% endif %}
 
     <div class="mt-4">
-        <a href="{{ url_for('dml_list') }}" class="btn btn-secondary">⬅️ Volver</a>
+        <a href="{{ url_for('dml.dml_list') }}" class="btn btn-secondary">⬅️ Volver</a>
     </div>
     
     <div class="text-muted text-center mt-3 small">

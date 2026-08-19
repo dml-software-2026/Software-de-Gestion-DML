@@ -17,10 +17,10 @@
         </div>
         <div class="col-md-6 text-right">
             {% if session.get('user_id') and not readonly and user_role in ['ADMIN', 'RAYPAC'] %}
-            <a class="btn btn-success" href="{{ url_for('raypac_new') }}">
+            <a class="btn btn-success" href="{{ url_for('raypac.raypac_new') }}">
                 <i class="fas fa-plus"></i> Nuevo Ingreso
             </a>
-            <a href="{{ url_for('export_raypac_csv') }}" class="btn btn-info btn-sm" title="Exportar a CSV">
+            <a href="{{ url_for('estadisticas.export_raypac_csv') }}" class="btn btn-info btn-sm" title="Exportar a CSV">
                 <i class="bi bi-file-earmark-spreadsheet"></i> CSV
             </a>
             {% elif readonly %}
@@ -71,7 +71,7 @@
                         {% if entry.fichas_count and entry.fichas_count > 0 %}
                             {# Ya tiene ficha creada #}
                             {% if entry.ficha_id %}
-                                <a href="{{ url_for('dml_view', id=entry.ficha_id) }}" class="badge" style="background-color: #28a745; color: white; font-size: 12px; text-decoration: none;">Ficha Creada</a>
+                                <a href="{{ url_for('dml.dml_view', id=entry.ficha_id) }}" class="badge" style="background-color: #28a745; color: white; font-size: 12px; text-decoration: none;">Ficha Creada</a>
                                 {% if entry.estado_ficha and entry.estado_ficha in estado_config %}
                                     <br><span class="badge mt-1" style="background-color: {{ estado_config[entry.estado_ficha]['color'] }}; color: white; font-size: 11px;">{{ estado_config[entry.estado_ficha]['texto'] }}</span>
                                 {% endif %}
@@ -80,11 +80,11 @@
                             {% endif %}
                         {% elif entry.ticket_id and entry.is_frozen %}
                             {# Tiene ticket pero no ficha → puede crear ficha #}
-                            <a href="{{ url_for('ticket_view', numero_ticket=entry.ticket_numero) }}" class="badge" style="background-color: #17a2b8; color: white; font-size: 12px; text-decoration: none; margin-bottom: 3px;">{{ entry.ticket_numero }}</a>
-                            <br><a href="{{ url_for('dml_new', raypac_id=entry.id) }}" class="btn btn-sm btn-success">Crear Ficha</a>
+                            <a href="{{ url_for('tickets.ticket_view', numero_ticket=entry.ticket_numero) }}" class="badge" style="background-color: #17a2b8; color: white; font-size: 12px; text-decoration: none; margin-bottom: 3px;">{{ entry.ticket_numero }}</a>
+                            <br><a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-sm btn-success">Crear Ficha</a>
                         {% elif entry.is_frozen and not entry.ticket_id %}
                             {# Freezado pero sin ticket → crear ticket primero #}
-                            <form method="POST" action="{{ url_for('ticket_nuevo', raypac_id=entry.id) }}" style="display: inline;">
+                            <form method="POST" action="{{ url_for('tickets.ticket_nuevo', raypac_id=entry.id) }}" style="display: inline;">
                                 <button type="submit" class="btn btn-sm btn-primary">Crear Ticket</button>
                             </form>
                         {% else %}
@@ -94,7 +94,7 @@
                     </td>
                     {% endif %}
                     <td>
-                        <a href="{{ url_for('raypac_view', id=entry.id) }}" class="btn btn-sm btn-info">Ver</a>
+                        <a href="{{ url_for('raypac.raypac_view', id=entry.id) }}" class="btn btn-sm btn-info">Ver</a>
                     </td>
                 </tr>
                 {% endfor %}

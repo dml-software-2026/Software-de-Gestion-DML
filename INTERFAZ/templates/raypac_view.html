@@ -71,7 +71,7 @@
                     {% endif %}
                     {% if user_role in ['ADMIN', 'DML_ST'] and entry.is_frozen %}
                     <br><br>
-                    <form method="POST" action="{{ url_for('raypac_recepcionar_dml', id=entry.id) }}" class="d-inline">
+                    <form method="POST" action="{{ url_for('raypac.raypac_recepcionar_dml', id=entry.id) }}" class="d-inline">
                         <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('¿Confirmar recepción del equipo en DML?')">
                             <i class="bi bi-check-circle"></i> Dar de Alta en DML
                         </button>
@@ -88,7 +88,7 @@
                 <strong>✓ Freezado:</strong> {{ entry.frozen_at }}<br>
                 <strong>Remito de Envío:</strong> {{ entry.numero_remito }}<br><br>
                 {% if user_role == 'ADMIN' %}
-                <form method="POST" action="{{ url_for('raypac_unfreeze', id=entry.id) }}" class="d-inline">
+                <form method="POST" action="{{ url_for('raypac.raypac_unfreeze', id=entry.id) }}" class="d-inline">
                     <input type="text" name="unfreeze_code" class="form-control d-inline-block" style="width: auto;" placeholder="Últimos 4 dígitos del remito" maxlength="4" pattern="\d{4}" required>
                     <button type="submit" class="btn btn-warning btn-sm">🔓 Desfreezar Definitivamente</button>
                     <small class="text-muted d-block mt-1">⚠️ Solo para cambios importantes (requiere validación)</small>
@@ -110,11 +110,11 @@
             
             {% if not entry.is_frozen %}
             <!-- Modo editable: botón editar normal y opción de freezar -->
-            <a href="{{ url_for('raypac_edit', id=entry.id) }}" class="btn btn-primary">
+            <a href="{{ url_for('raypac.raypac_edit', id=entry.id) }}" class="btn btn-primary">
                 <i class="fas fa-edit"></i> Editar
             </a>
             
-            <form method="POST" action="{{ url_for('raypac_freeze', id=entry.id) }}" class="d-inline">
+            <form method="POST" action="{{ url_for('raypac.raypac_freeze', id=entry.id) }}" class="d-inline">
                 <input type="text" name="numero_remito" class="form-control d-inline-block" style="width: auto;" placeholder="Ej: 4222" pattern="[0-9]{1,5}" maxlength="5" required title="Ingresa solo los últimos 4 dígitos (Ej: 4222). El sistema lo convertirá a formato 00001-04222">
                 <button type="submit" class="btn btn-success">Freezar y Enviar a ST</button>
                 <small class="text-muted d-block mt-1">💡 Ingresa solo los últimos 4 dígitos del remito (Ej: 4222 → se guarda como 00001-04222)</small>
@@ -124,7 +124,7 @@
             <span class="badge badge-info" style="font-size: 16px;">Modo Solo Lectura</span>
             {% endif %}
             
-            <a href="{{ url_for('raypac_list') }}" class="btn btn-secondary">Volver</a>
+            <a href="{{ url_for('raypac.raypac_list') }}" class="btn btn-secondary">Volver</a>
         </div>
     </div>
 
@@ -137,14 +137,14 @@
         <div class="card-body">
             {% if ticket %}
             <p>La máquina ya fue enviada a ST y tiene ticket asociado: <strong>{{ ticket.numero_ticket }}</strong></p>
-            <a href="{{ url_for('dml_new', raypac_id=entry.id) }}" class="btn btn-lg btn-success">
+            <a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-lg btn-success">
                 Crear Ficha DML
             </a>
             {% else %}
             <div class="alert alert-warning">
                 <i class="bi bi-exclamation-triangle"></i> <strong>Debe crear un ticket primero</strong>
                 <p class="mb-2 mt-2">Antes de crear la ficha, es necesario generar un ticket de seguimiento para el cliente.</p>
-                <a href="{{ url_for('raypac_list') }}" class="btn btn-primary">
+                <a href="{{ url_for('raypac.raypac_list') }}" class="btn btn-primary">
                     <i class="bi bi-ticket"></i> Ir a crear ticket
                 </a>
             </div>

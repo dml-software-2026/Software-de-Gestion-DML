@@ -6,12 +6,12 @@
 ## Objetivo
 
 Al cierre del sprint:
-- [ ] `dev` nivelada con `main`
-- [ ] Refactor #75 mergeado a `main`
-- [ ] Proyecto Supabase creado con schema PostgreSQL corriendo
-- [ ] `DATABASE_URL` configurada en Render
-- [ ] Issues #64 y #65 cerrados
-- [ ] Kanban ordenado (sin duplicados, sin épicas vacías)
+- [x] `dev` nivelada con `main`
+- [x] Refactor #75 mergeado a `main`
+- [x] Proyecto Supabase creado con schema PostgreSQL corriendo
+- [x] `DATABASE_URL` configurada en Render
+- [x] Issues #64 y #65 cerrados
+- [x] Kanban ordenado (sin duplicados, sin épicas vacías)
 
 Restricción: **nadie toca `CODIGO_FUENTE/app.py` excepto Facu.**
 
@@ -22,19 +22,19 @@ Restricción: **nadie toca `CODIGO_FUENTE/app.py` excepto Facu.**
 ### Blueprints faltantes
 Un blueprint es un módulo de Flask que agrupa rutas por dominio (ver `blueprints/auth.py` y `blueprints/raypac.py` como referencia).
 
-- [ ] `blueprints/dml.py` — `/dml/*` (fichas, partes, repuestos)
-- [ ] `blueprints/tickets.py` — `/tickets`, `/ticket/*`
-- [ ] `blueprints/envios.py` — `/envios/*`
-- [ ] `blueprints/stock.py` — `/stock/*`
-- [ ] `blueprints/admin.py` — `/admin` (ABM usuarios, carga stock)
-- [ ] `blueprints/estadisticas.py` — dashboard + exports
-- [ ] `blueprints/api.py` — `/api/*`
+- [x] `blueprints/dml.py` — `/dml/*` (fichas, partes, repuestos)
+- [x] `blueprints/tickets.py` — `/tickets`, `/ticket/*`
+- [x] `blueprints/envios.py` — `/envios/*`
+- [x] `blueprints/stock.py` — `/stock/*`
+- [x] `blueprints/admin.py` — `/admin` (ABM usuarios, carga stock)
+- [x] `blueprints/estadisticas.py` — dashboard + exports
+- [x] `blueprints/api.py` — `/api/*`
 
 ### Cierre del refactor
-- [ ] `app.py` nuevo chico: crea Flask app, registra los 9 blueprints, hook `apply_migrations`
-- [ ] Reemplazar el monolito por el nuevo `app.py`
-- [ ] Tag `pre-refactor-monolito` antes del PR (red de seguridad)
-- [ ] PR contra `main` + merge con squash
+- [x] `app.py` nuevo chico: crea Flask app, registra los 9 blueprints, hook `apply_migrations`
+- [x] Reemplazar el monolito por el nuevo `app.py`
+- [x] Tag `pre-refactor-monolito` antes del PR (red de seguridad)
+- [x] PR contra `main` + merge con squash
 
 ### Flujo integral a probar (5 veces seguidas sin HTTP 500)
 
@@ -138,8 +138,8 @@ Si todo va bien: **~30 minutos** las 5 corridas (~6 min por corrida). Si hay que
 **Puede arrancar hoy en paralelo con Facu.** Fase 1 no toca `app.py`. Facu no toca `schema.sql`.
 
 ### Setup Supabase
-- [ ] Crear proyecto en supabase.com (plan gratuito — el Alcance define 500MB como suficiente)
-- [ ] Guardar credenciales en gestor de passwords (no en el repo): Project URL, DB password, connection string PostgreSQL
+- [x] Crear proyecto en supabase.com (plan gratuito — el Alcance define 500MB como suficiente)
+- [x] Guardar credenciales en gestor de passwords (no en el repo): Project URL, DB password, connection string PostgreSQL
 
 ### Traducir `schema.sql` → `db/schema-postgres.sql`
 
@@ -163,17 +163,17 @@ Renombrar `audit_log` → `logs_auditoria` con:
 
 (Requerido por RNF07 del Acta.)
 
-- [ ] `db/schema-postgres.sql` creado con las 16 tablas convertidas + `logs_auditoria`
-- [ ] Correr el schema en Supabase (SQL Editor) y verificar las 16 tablas
-- [ ] Verificar foreign keys en Table Editor
-- [ ] NO copiar los hashes hardcodeados de usuarios (líneas 280-284 del schema viejo). Los usuarios se crean en Fase 2 vía seed.
+- [x] `db/schema-postgres.sql` creado con las 16 tablas convertidas + `logs_auditoria`
+- [x] Correr el schema en Supabase (SQL Editor) y verificar las 16 tablas
+- [x] Verificar foreign keys en Table Editor
+- [x] NO copiar los hashes hardcodeados de usuarios (líneas 280-284 del schema viejo). Los usuarios se crean en Fase 2 vía seed.
 
 ### Configuración Render
-- [ ] `DATABASE_URL` como env var en Render (formato `postgresql://postgres:PASS@HOST:5432/postgres`)
-- [ ] Probar conexión con `psql "$DATABASE_URL"` desde local
+- [x] `DATABASE_URL` como env var en Render (formato `postgresql://postgres:PASS@HOST:5432/postgres`)
+- [x] Probar conexión con `psql "$DATABASE_URL"` desde local
 
 ### Documentación
-- [ ] Crear `MENTORIA/setup-supabase-render.md` con: cómo se creó el proyecto, dónde viven las credenciales, cómo obtener la connection string, cómo probar la conexión, troubleshooting.
+- [x] Crear `MENTORIA/setup-supabase-render.md` con: cómo se creó el proyecto, dónde viven las credenciales, cómo obtener la connection string, cómo probar la conexión, troubleshooting.
 
 ### Reestructura de scripts DB en la raíz
 
@@ -183,14 +183,14 @@ Crear la carpeta `scripts/` y ordenar los archivos `.py` de la raíz que tocan S
 
 Usar `git mv` para preservar historia:
 
-- [ ] `git mv seed_data.py scripts/`
-- [ ] `git mv seed_data_minimal.py scripts/`
-- [ ] `git mv cargar_stock_nuevo.py scripts/`
-- [ ] `git mv limpiar_bd.py scripts/`
-- [ ] `git mv smoke_test.py scripts/`
-- [ ] `git mv test_login.py scripts/`
-- [ ] `git mv verificar_emails.py scripts/`
-- [ ] `git mv run_migrations.py scripts/` (condicional — su destino final se decide en Fase 2)
+- [x] `git mv seed_data.py scripts/`
+- [x] `git mv seed_data_minimal.py scripts/`
+- [x] `git mv cargar_stock_nuevo.py scripts/`
+- [x] `git mv limpiar_bd.py scripts/`
+- [x] `git mv smoke_test.py scripts/`
+- [x] `git mv test_login.py scripts/`
+- [x] `git mv verificar_emails.py scripts/`
+- [x] `git mv run_migrations.py scripts/` (condicional — su destino final se decide en Fase 2)
 
 **Ajustar el `sys.path.insert(...)` de cada uno.** Los scripts hoy tienen líneas como:
 ```python
@@ -213,14 +213,14 @@ python scripts/smoke_test.py
 
 **Borrar (4 sqlite3 obsoletos):**
 
-- [ ] `git rm check_tables.py` (19 líneas, usa `sqlite_master`, se reescribe si hace falta)
-- [ ] `git rm generar_hashes.py` (los hashes ya no viven en el schema con .env)
-- [ ] `git rm migrate_envios.py` (duplicado exacto de una función en `run_migrations.py`)
-- [ ] `git rm migrate_tickets.py` (idem)
+- [x] `git rm check_tables.py` (19 líneas, usa `sqlite_master`, se reescribe si hace falta)
+- [x] `git rm generar_hashes.py` (los hashes ya no viven en el schema con .env)
+- [x] `git rm migrate_envios.py` (duplicado exacto de una función en `run_migrations.py`)
+- [x] `git rm migrate_tickets.py` (idem)
 
 ### PR
-- [ ] PR contra `dev` con: `schema-postgres.sql` + carpeta `scripts/` con 8 archivos movidos + 4 archivos borrados + `MENTORIA/setup-supabase-render.md`
-- [ ] Merge squash
+- [x] PR contra `dev` con: `schema-postgres.sql` + carpeta `scripts/` con 8 archivos movidos + 4 archivos borrados + `MENTORIA/setup-supabase-render.md`
+- [x] Merge squash
 
 ### No hacer este sprint
 - No tocar `CODIGO_FUENTE/app.py`.
@@ -235,20 +235,24 @@ python scripts/smoke_test.py
 ### 1. Higiene de git (bloqueante — primero de todo)
 **Por qué primero:** hasta que dev esté nivelada con main, cualquier branch nueva arrastra basura en el diff.
 
-- [ ] Aprobar y mergear PR #82 (squash). Verificar después:
+- [x] Aprobar y mergear PR #82 (squash). Verificar después:
+
   ```
   git fetch origin
   git ls-tree origin/dev | grep app_backup  # NO debe devolver nada
   ```
-- [ ] Borrar branch `chore/eliminar-app-backup-obsoleto` (ya mergeada como #81):
+
+- [x] Borrar branch `chore/eliminar-app-backup-obsoleto` (ya mergeada como #81):
+
   ```
   git push origin --delete chore/eliminar-app-backup-obsoleto
   ```
 
 ### 2. Higiene de kanban (XS cada uno)
-- [ ] Cerrar #60 con comentario "Duplicado de #61" (reason: not planned)
-- [ ] Cerrar #33 con comentario "Obsoleto post-#74, RNF01 del Acta excluye .exe" (reason: not planned)
-- [ ] Cerrar #22, #23, #24, #26 con comentario "Es categoría, no tarea. Ya está el field Épica en el Project"
+
+- [x] Cerrar #60 con comentario "Duplicado de #61" (reason: not planned)
+- [x] Cerrar #33 con comentario "Obsoleto post-#74, RNF01 del Acta excluye .exe" (reason: not planned)
+- [x] Cerrar #22, #23, #24, #26 con comentario "Es categoría, no tarea. Ya está el field Épica en el Project"
 
 ### 3. Crear 3 issues nuevos para el sprint siguiente (backlog, sin asignar)
 
@@ -265,7 +269,7 @@ python scripts/smoke_test.py
 
 **Por qué rebase y no branch nueva:** ya tenés 4 commits reales en `fix/remove-hardcoded-credentials`. Rebranchar es tirarlos. Rebase los reaplica sobre el `dev` actualizado y el diff queda limpio (sin las 4221 líneas ajenas que hundieron el PR #72).
 
-- [ ] Rebase:
+- [x] Rebase:
   ```
   git fetch origin
   git checkout fix/remove-hardcoded-credentials
@@ -276,23 +280,23 @@ python scripts/smoke_test.py
   git log origin/dev..HEAD --oneline
   # Debe listar SOLO tus 4 commits.
   ```
-- [ ] Eliminar el bloque `CORRECT_HASHES` de `CODIGO_FUENTE/app.py` líneas 449-465 aprox (es lo que se te había pasado — causa raíz de #65)
-- [ ] Verificar:
+- [x] Eliminar el bloque `CORRECT_HASHES` de `CODIGO_FUENTE/app.py` líneas 449-465 aprox (es lo que se te había pasado — causa raíz de #65)
+- [x] Verificar:
   ```
   git diff origin/dev --stat
   # Debe mostrar SOLO tus cambios: .env.example, app.py con hardcodes reemplazados + CORRECT_HASHES eliminado.
   ```
-- [ ] Push forzado (obligatorio tras rebase):
+- [x] Push forzado (obligatorio tras rebase):
   ```
   git push --force-with-lease origin fix/remove-hardcoded-credentials
   # --force-with-lease es seguro: falla si alguien pusheó mientras rebaseabas.
   ```
-- [ ] PR contra `dev`:
+- [x] PR contra `dev`:
   ```
   gh pr create --base dev \
     --title "fix: mover credenciales a .env + eliminar CORRECT_HASHES (cierra #64 y #65)"
   ```
-- [ ] Merge squash → #64 y #65 se auto-cierran.
+- [x] Merge squash → #64 y #65 se auto-cierran.
 
 ### 5. Reestructura no-DB de la raíz
 
@@ -300,23 +304,23 @@ Ordenar los archivos de la raíz que no usan `import sqlite3` (los sqlite3 los m
 
 **Mover a `scripts/` (Seba crea la carpeta en su PR, vos aprovechás):**
 
-- [ ] `git mv test_email.py scripts/` (test SMTP puro, sin BD)
+- [x] `git mv test_email.py scripts/` (test SMTP puro, sin BD)
 
 **Borrar (obsoletos de la era del ejecutable y huérfanos):**
 
-- [ ] `git rm launcher.py` (raíz — wrapper del ex-.exe, RNF01 del Acta excluye ejecutable local)
-- [ ] `git rm reset_db.html` (endpoint eliminado en #77, quedó huérfano el HTML)
+- [x] `git rm launcher.py` (raíz — wrapper del ex-.exe, RNF01 del Acta excluye ejecutable local)
+- [x] `git rm reset_db.html` (endpoint eliminado en #77, quedó huérfano el HTML)
 
 **Actualizar (sin mover):**
 
-- [ ] `.env.production`: eliminar la línea `DATABASE_URL=sqlite:////var/data/dml.db`. Es residuo de la era SQLite y confunde. La var se define recién en Fase 2.
+- [x] `.env.production`: eliminar la línea `DATABASE_URL=sqlite:////var/data/dml.db`. Es residuo de la era SQLite y confunde. La var se define recién en Fase 2.
 
 **Ordenamiento del PR:** hacer estos cambios en tu misma rama del rebase de #64 (o sea, el PR del rebase incluye también esta reestructura no-DB). Si preferís separar en dos PRs porque temés que se choquen, dale.
 
-- [ ] Ivo: `test_email.py` movido a `scripts/`
-- [ ] Ivo: `launcher.py` (raíz) borrado
-- [ ] Ivo: `reset_db.html` borrado
-- [ ] Ivo: `.env.production` actualizado
+- [x] Ivo: `test_email.py` movido a `scripts/`
+- [x] Ivo: `launcher.py` (raíz) borrado
+- [x] Ivo: `reset_db.html` borrado
+- [x] Ivo: `.env.production` actualizado
 
 ---
 

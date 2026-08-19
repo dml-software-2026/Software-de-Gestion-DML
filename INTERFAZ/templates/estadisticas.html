@@ -128,8 +128,8 @@
 
 <div class="stats-container">
     <div class="d-flex gap-2 mb-3">
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">⬅️ Inicio</a>
-        <a href="{{ url_for('stock_list', ubicacion=ubicacion) }}" class="btn btn-primary">📦 Ver Stock {{ ubicacion }}</a>
+        <a href="{{ url_for('auth.index') }}" class="btn btn-secondary">⬅️ Inicio</a>
+        <a href="{{ url_for('stock.stock_list', ubicacion=ubicacion) }}" class="btn btn-primary">📦 Ver Stock {{ ubicacion }}</a>
     </div>
     
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -137,7 +137,7 @@
         {% if ubicaciones_disponibles %}
         <div class="btn-group" role="group">
             {% for ubi in ubicaciones_disponibles %}
-            <a href="{{ url_for('estadisticas', ubicacion=ubi) }}" 
+            <a href="{{ url_for('estadisticas.estadisticas', ubicacion=ubi) }}" 
                class="btn btn-{{ 'primary' if ubi == ubicacion else 'outline-primary' }}">
                 {{ ubi }}
             </a>

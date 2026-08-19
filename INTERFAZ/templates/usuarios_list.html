@@ -5,7 +5,7 @@
     <div class="row">
         <div class="col-md-12">
             <h2>Gestión de Usuarios</h2>
-            <a href="{{ url_for('usuario_new') }}" class="btn btn-primary mb-3">Nuevo Usuario</a>
+            <a href="{{ url_for('admin.usuario_new') }}" class="btn btn-primary mb-3">Nuevo Usuario</a>
             
             {% if usuarios %}
             <table class="table table-striped">
@@ -33,11 +33,11 @@
                                 {{ "Activo" if u.is_active else "Inactivo" }}
                             </span>
                         </td>
-                        <td>{{ u.created_at[:10] if u.created_at else "N/A" }}</td>
+                        <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else "N/A" }}</td>
                         <td>
-                            <a href="{{ url_for('usuario_edit', id=u.id) }}" class="btn btn-sm btn-info">Editar</a>
+                            <a href="{{ url_for('admin.usuario_edit', id=u.id) }}" class="btn btn-sm btn-info">Editar</a>
                             {% if u.id != user.id %}
-                            <form method="POST" action="{{ url_for('usuario_toggle', id=u.id) }}" style="display:inline;">
+                            <form method="POST" action="{{ url_for('admin.usuario_toggle', id=u.id) }}" style="display:inline;">
                                 <button type="submit" class="btn btn-sm btn-warning" 
                                     onclick="return confirm('¿Estás seguro?')">
                                     {{ "Desactivar" if u.is_active else "Activar" }}
