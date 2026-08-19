@@ -28,25 +28,22 @@ asumir contexto de nada más.
   `test/54-integracion-local` en `http://127.0.0.1:5000`). Detalle de los 3 bugs
   de setup encontrados y sus workarounds: sección "Setup de entorno local" más
   abajo.
-- **Checklist manual del #54 — retomado y en curso (ver detalle completo en la
-  sección "Issue #54" más abajo):**
-  - ✅ Punto 2 (desplegable de clientes) reprobado y con un fix nuevo ya aplicado
-    (mostrar la lista completa al hacer foco, no solo al escribir) — commit en
-    `feature/54-desplegable-clientes`, mergeado a la rama de integración local.
-  - Puntos 3, 4 y 6 del checklist: **todavía sin probar en esta sesión**, quedan
-    para la próxima.
-  - **Hallazgo nuevo (no bloqueante, documentado, no se ataca este sprint):**
-    inconsistencia visual entre el desplegable de Cliente (armado a mano) y los
-    ~24 `<select>` nativos del resto de la app, en 8 templates. Detalle completo
-    en `HALLAZGOS_REFACTOR.md` #9. Decisión de Facu: no tocar en este sprint por
-    riesgo de corte de alcance del #54, queda como issue propio para después.
-- **Próximo paso concreto:** seguir el checklist manual desde el punto 3 (ver
-  pasos concretos en la sección "Issue #54"), con el server ya levantado en la
-  rama `test/54-integracion-local` (recrearla si se perdió: cortar de `dev`
-  actualizada y mergear `feature/54-campos-contacto-mail-cliente`,
-  `fix/54-numero-correlativo-postgres` y `feature/54-desplegable-clientes` -
-  ojo con el conflicto esperable en `extensions.py`, resolver dejando los dos
-  bloques `try/except` de migración sin que ninguno pise al otro).
+- **Checklist manual del #54 — ✅ COMPLETO, los 6 puntos confirmados.** Detalle
+  punto por punto en la sección "Issue #54" más abajo, incluye 2 hallazgos
+  nuevos no bloqueantes (código muerto del unfreeze con `ADMIN2024` en
+  `raypac_edit()`, y la inconsistencia visual de desplegables ya documentada
+  en `HALLAZGOS_REFACTOR.md` #8 y #9).
+  - Fix aplicado y pusheado durante el testing: desplegable de clientes ahora
+    muestra la lista completa al hacer foco, no solo al escribir (commit
+    `f7f2325` en `feature/54-desplegable-clientes`, ya en origin).
+- **Próximo paso concreto:** Facu todavía no mergeó ninguno de los 3 PRs del
+  #54 (#109, #110, `feature/54-desplegable-clientes` — esta última sigue sin
+  PR abierto en GitHub, solo pusheada). Falta que Facu revise una vez más y
+  mergee cuando esté conforme. Después de mergear los 3, falta resolver a
+  mano el conflicto esperable en `extensions.py` (dos bloques de migración
+  try/except, no se pisan entre sí, ya resuelto una vez en
+  `test/54-integracion-local` como referencia). El checklist en sí ya no
+  bloquea nada.
 - **Bloqueos:** ninguno.
 
 ## Instrucciones de flujo de trabajo para Claude Code
@@ -368,54 +365,66 @@ esto no los reemplaza ni los toca.
 4. 5 flujos consecutivos sin HTTP 500 ni bloqueos
 5. Un usuario DML no ve los campos de contacto/mail cliente
 
-### Checklist manual de pruebas — estado al cierre de la sesión del 2026-08-13
+### Checklist manual de pruebas — ✅ COMPLETO (cerrado 2026-08-19)
 
 Probado en la rama de integración local `test/54-integracion-local` (no pusheada,
-ver más arriba). Facu la retoma en la próxima sesión: falta el punto 6, y un par de
-sub-chequeos del resto quedaron sin confirmar explícitamente (marcados abajo).
+ver más arriba), en dos sesiones (2026-08-13 y 2026-08-19, esta última desde una
+máquina distinta). Los 6 puntos quedaron confirmados. Facu todavía no mergeó los
+PRs — decisión suya, quiere revisar una vez más antes de apretar el botón.
 
 Usuarios: `raypac@dml.local`/`raypac` · `tecnico@dml.local`/`tecnico` (DML_ST) ·
 `admin@dml.local`/`admin`
 
 1. ✅ **Alta de ingreso (PR #110):** confirmado, guarda sin error 500 (antes del fix
    tiraba "no existe la columna numero_correlativo").
-2. ✅ **Desplegable de clientes — funcional:** confirmado (sugiere existentes,
-   `confirm()` al escribir uno nuevo, autoaprendizaje guarda/no guarda según la
-   respuesta). ⚠️ **Falta reconfirmar el estilo:** el desplegable nativo
-   (`<datalist>`) salía negro y distinto al resto — se reemplazó por uno con
-   clases de Bootstrap (`dropdown-menu`/`dropdown-item`) pusheado a
-   `feature/54-desplegable-clientes`, pero Facu no llegó a volver a mirarlo
-   después del fix. Retomar: refrescar `/raypac/new`, escribir en Cliente y
-   confirmar que ahora es blanco y aparece debajo del campo.
-3. ⚠️ **Contacto/mail (PR #109) — parcial:** confirmado que los campos se ven
-   (con el texto "Visible solo para RAYPAC y ADMIN") logueado como `raypac`.
-   **Falta confirmar el lado que realmente importa del fix:** loguearse como
-   `tecnico` (DML_ST) y abrir `/raypac/<id>` de un ingreso freezado → esos dos
-   campos NO deberían aparecer.
-4. ⚠️ **Freeze — parcial:** confirmado que freeza y guarda remito. **Falta
-   probar el sub-caso de edición bloqueada:** como `raypac` intentar editar un
-   ingreso freezado sin código → debe bloquear. Como `admin` con `ADMIN2024` →
-   debe permitir.
+2. ✅ **Desplegable de clientes:** confirmado funcional (sugiere existentes,
+   `confirm()` al escribir uno nuevo, autoaprendizaje). El estilo original tenía un
+   problema real de consistencia: al hacer foco/click con el campo vacío no
+   mostraba nada (solo al escribir) — inconsistente con el resto de los `<select>`
+   de la app, que muestran todas las opciones al clickear. **Fix aplicado y
+   confirmado** (commit `f7f2325` en `feature/54-desplegable-clientes`, ya
+   pusheado): ahora al hacer foco sin texto muestra la lista completa (scrollea,
+   ya tenía `max-height`), escribiendo sigue filtrando igual que antes.
+   - **Hallazgo aparte, no resuelto este sprint** (ver `HALLAZGOS_REFACTOR.md` #8):
+     por más parecido que quede, un desplegable armado a mano nunca va a ser
+     pixel-idéntico a un `<select>` nativo (el navegador dibuja el popup abierto,
+     no Bootstrap). Facu pidió unificar TODOS los `<select>` de la app al mismo
+     patrón para consistencia total - alcance grande (~24 selects en 8 templates),
+     decidido posponer para no arriesgar el timeline del #54. Queda como issue
+     propio para después del sprint.
+3. ✅ **Contacto/mail (PR #109):** confirmado en ambos sentidos - se ven como
+   `raypac` (con el texto "Visible solo para RAYPAC y ADMIN"), y NO se ven como
+   `tecnico` (DML_ST) abriendo `/raypac/<id>` de un ingreso freezado.
+4. ✅ **Freeze / edición bloqueada — confirmado, con una corrección importante al
+   flujo que se pensaba probar:** el botón Editar está oculto en
+   `raypac_view.html` para TODOS los roles (incluido ADMIN) mientras
+   `entry.is_frozen` sea true - no hay forma de editar "in place" con un código
+   sin desfreezar antes. El código real para volver a habilitar edición es
+   **"Desfreezar Definitivamente"** (solo ADMIN), que pide los **últimos 4
+   dígitos del número de remito** de ese registro (no un código fijo) - una vez
+   desfreezado, tanto ADMIN como RAYPAC pueden editar de nuevo normalmente.
+   Confirmado con testing real: bloquea sin desfreezar, desfreezar con los 4
+   dígitos correctos funciona, y editar después funciona con los dos roles.
+   - **Hallazgo aparte, no resuelto:** `raypac_edit()` (backend) todavía tiene
+     una segunda lógica de desbloqueo con el código hardcodeado `"ADMIN2024"`
+     (con un TODO de seguridad al lado, ver hallazgo #2 de seguridad) que es
+     **inalcanzable desde la UI real** - mismo patrón que el hallazgo #5
+     ("Generar Ficha" nunca conectado al frontend), código muerto que nadie
+     dispara. No confundir este código con el flujo real que sí funciona
+     (últimos 4 dígitos del remito).
 5. ✅ **Lado DML — recepcionar:** confirmado, el botón "Dar de Alta en DML" está
    en la sección "Estado de Envío del Equipo" de `/raypac/<id>` (no confundir
    con la tarjeta separada más abajo "Crear Ficha de Servicio Técnico", que es
    un flujo posterior y no forma parte de este checklist).
-6. ❌ **`/dml/entregadas` oculta contacto/mail a DML_ST — sin probar todavía.**
-   Requiere un registro en estado "entregado". Facu decidió recorrer el flujo
-   completo por la UI en vez de que se lo prepare directo en la base. Pasos
-   para retomar (logueado como `admin`, cubre todos los roles necesarios):
-   1. `/raypac` → sobre el ingreso recepcionado → **"Crear Ticket"** (pide
-      Técnico Responsable, obligatorio; el resto opcional).
-   2. Desde `/raypac/<id>` (ahora con ticket) → **"Crear Ficha DML"** → completar
-      y guardar → te deja en la edición de la ficha.
-   3. En la edición: completar **Técnico Responsable**, **Diagnóstico**
-      (mín. 10 caracteres), **N° Remito de Salida** — son obligatorios para
-      poder cerrarla. El grid de "Estado del Equipo" se puede dejar con los
-      valores por defecto. Guardar.
-   4. En `/dml/<id>` → **"🔒 Cerrar Ficha"** (confirmar popup) → queda
-      ENTREGADA. Si falta algo, el sistema lista exactamente qué campo falta.
-   5. `/dml/entregadas`: como `admin`/`raypac` deben verse Contacto/Email; como
-      `tecnico` no.
+6. ✅ **`/dml/entregadas` oculta contacto/mail a DML_ST:** confirmado con el
+   flujo completo por UI (crear ticket → crear ficha → completar Técnico
+   Responsable/Diagnóstico mín. 10 caracteres/N° Remito de Salida → cerrar
+   ficha → ENTREGADA). Como `admin`/`raypac` se ven Contacto/Email en
+   `/dml/entregadas`; como `tecnico`, no.
+   - **Nota de flujo:** el botón "Crear Ticket" en `/raypac` (lista) solo
+     aparece si el registro está freezado y sin ticket todavía (`raypac_list.html`,
+     condición `entry.is_frozen and not entry.ticket_id`) - si lo desfreezaste
+     para probar el punto 4, hay que volver a freezarlo antes de este paso.
 
 ## Hallazgos pendientes (no resueltos, documentados en HALLAZGOS_REFACTOR.md)
 

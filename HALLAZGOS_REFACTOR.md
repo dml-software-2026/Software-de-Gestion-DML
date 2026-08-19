@@ -92,7 +92,7 @@ individuales.
      en vez de mostrar algo vacío o un texto genérico tipo "Sin
      diagnóstico". Parece un dato de prueba olvidado.
 
-9. **Desplegables inconsistentes entre sí (nativo `<select>` vs. custom armado
+8. **Desplegables inconsistentes entre sí (nativo `<select>` vs. custom armado
    a mano).** Encontrado probando el checklist manual del #54: el campo
    Cliente en `raypac_form.html` es un `<input>` de texto libre con una lista
    de sugerencias armada a mano (`<ul class="dropdown-menu">` + JS), necesario
@@ -117,14 +117,30 @@ individuales.
      teclado/lector de pantalla al reimplementar - un `<select>` nativo la
      tiene gratis, un dropdown armado a mano no.
 
+9. **`raypac_edit()` tiene un segundo mecanismo de desbloqueo con el código
+   hardcodeado `"ADMIN2024"` que es inalcanzable desde la UI real.** Mismo
+   patrón que el hallazgo #5 (código de backend que existe pero nadie lo
+   dispara). Encontrado probando el punto 4 del checklist del #54:
+   `raypac_view.html` oculta el botón "Editar" para TODOS los roles (incluido
+   ADMIN) mientras `entry.is_frozen` sea true, sin excepción - por lo tanto
+   nunca se llega al formulario que aceptaría el `unfreeze_code == "ADMIN2024"`
+   de `raypac_edit()`. El flujo real que sí funciona por UI es distinto:
+   "Desfreezar Definitivamente" (solo ADMIN, en `raypac_view.html`) pide los
+   **últimos 4 dígitos del número de remito** de ese registro específico (no
+   un código fijo), y desfreeza el registro por completo en vez de habilitar
+   una edición puntual. No corrompe nada ni bloquea el flujo (el DoD del #54
+   igual se cumple con el mecanismo real), pero el código de `ADMIN2024` en
+   `raypac_edit()` queda muerto - candidato a eliminar junto con la limpieza
+   de hallazgo #2 (mismo código hardcodeado, contexto de seguridad).
+
 ## Archivos viejos / de backup dando vueltas (candidatos a borrar)
 
-8. `CODIGO_FUENTE/app_backup.py` (ya en proceso de eliminación, branch
-   `chore/eliminar-app-backup-obsoleto`).
+10. `CODIGO_FUENTE/app_backup.py` (ya en proceso de eliminación, branch
+    `chore/eliminar-app-backup-obsoleto`).
 
-9. En `INTERFAZ/templates/`: `dml_view_OLD.html`, `dml_edit_FIXED.html`,
-   `dml_edit_BACKUP.html` - no referenciados por ningún `render_template()`
-   del código actual, probablemente de la cohorte anterior.
+11. En `INTERFAZ/templates/`: `dml_view_OLD.html`, `dml_edit_FIXED.html`,
+    `dml_edit_BACKUP.html` - no referenciados por ningún `render_template()`
+    del código actual, probablemente de la cohorte anterior.
 
 ---
 
