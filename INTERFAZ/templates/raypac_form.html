@@ -198,14 +198,12 @@
         const texto = clienteInput.value.trim().toLowerCase();
         clienteSugerencias.innerHTML = '';
 
-        if (!texto) {
-            clienteSugerencias.classList.remove('show');
-            return;
-        }
-
-        const coincidencias = CLIENTES_CONOCIDOS
-            .filter(function (c) { return c.toLowerCase().includes(texto); })
-            .slice(0, 15);
+        // Sin texto (recién enfocado/clickeado): mostrar la lista completa,
+        // igual que un <select> común — que se pueda ver todo sin tener que
+        // escribir primero. Escribiendo, se filtra como antes.
+        const coincidencias = texto
+            ? CLIENTES_CONOCIDOS.filter(function (c) { return c.toLowerCase().includes(texto); }).slice(0, 15)
+            : CLIENTES_CONOCIDOS;
 
         if (coincidencias.length === 0) {
             clienteSugerencias.classList.remove('show');
