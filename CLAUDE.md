@@ -3,6 +3,49 @@
 Este documento es para que Claude Code tenga contexto completo del proyecto sin que
 haya que reexplicarlo. Actualizarlo cuando cambie algo importante.
 
+## 🔖 Checkpoint (leer primero, mantener actualizado)
+
+**Por qué existe:** Facu trabaja desde dos máquinas distintas, y la memoria local de
+Claude Code (`~/.claude/.../memory/`) vive en el home de cada máquina — no viaja de
+una a otra. Lo único que sí viaja es lo que está versionado en este repo. Esta
+sección es la fuente de verdad de "qué estábamos haciendo y por dónde quedamos": se
+actualiza al cierre de cada sesión (o al cambiar de tarea en curso) y sigue el mismo
+flujo que cualquier otro cambio — rama chica `docs/checkpoint-...`, commit, push, y
+avisarle a Facu para que abra y mergee el PR contra `dev`. Hasta que ese PR no esté
+mergeado, el checkpoint actualizado vive solo en esa rama, no en `dev` — no dar la
+tarea de "guardar contexto" por terminada hasta la confirmación del merge.
+
+**Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
+asumir contexto de nada más.
+
+- **Última actualización:** 2026-08-19 (misma sesión, retomada en máquina nueva)
+- **En curso:** Issue #54 (ingreso RAYPAC) — fase de pruebas manuales locales, antes
+  de que Facu mergee los PRs #109, #110 y la rama `feature/54-desplegable-clientes`
+  (sin PR abierto todavía).
+- **Ambiente local de esta máquina:** ya armado de punta a punta (Postgres 17 +
+  pgAdmin 4 + Python 3.11 instalados, venv recreado, `.env` con `DATABASE_URL`
+  apuntando a una base local `dml_dev`, schema aplicado, server corriendo con
+  `test/54-integracion-local` en `http://127.0.0.1:5000`). Detalle de los 3 bugs
+  de setup encontrados y sus workarounds: sección "Setup de entorno local" más
+  abajo.
+- **Checklist manual del #54 — ✅ COMPLETO, los 6 puntos confirmados.** Detalle
+  punto por punto en la sección "Issue #54" más abajo, incluye 2 hallazgos
+  nuevos no bloqueantes (código muerto del unfreeze con `ADMIN2024` en
+  `raypac_edit()`, y la inconsistencia visual de desplegables ya documentada
+  en `HALLAZGOS_REFACTOR.md` #8 y #9).
+  - Fix aplicado y pusheado durante el testing: desplegable de clientes ahora
+    muestra la lista completa al hacer foco, no solo al escribir (commit
+    `f7f2325` en `feature/54-desplegable-clientes`, ya en origin).
+- **Próximo paso concreto:** Facu todavía no mergeó ninguno de los 3 PRs del
+  #54 (#109, #110, `feature/54-desplegable-clientes` — esta última sigue sin
+  PR abierto en GitHub, solo pusheada). Falta que Facu revise una vez más y
+  mergee cuando esté conforme. Después de mergear los 3, falta resolver a
+  mano el conflicto esperable en `extensions.py` (dos bloques de migración
+  try/except, no se pisan entre sí, ya resuelto una vez en
+  `test/54-integracion-local` como referencia). El checklist en sí ya no
+  bloquea nada.
+- **Bloqueos:** ninguno.
+
 ## Instrucciones de flujo de trabajo para Claude Code
 
 **PRs chicos, siempre.** No armar un PR gigante con toda una tarea/issue resuelta de
@@ -49,6 +92,13 @@ sin resolver de por medio.
 **Nombres de rama:** `tipo/descripcion-corta-con-guiones` (ej. `fix/proteger-endpoint`,
 `feature/54-desplegable-tipo-maquina`). El tipo (`fix`, `feature`, `docs`, `chore`)
 según corresponda al cambio.
+
+**Mantener el Checkpoint actualizado.** Al cierre de cada sesión, o cuando cambie
+significativamente el estado de la tarea en curso (se prueba algo, se destraba un
+bloqueo, se decide el próximo paso), actualizar la sección "🔖 Checkpoint" al
+principio de este archivo con el estado real y el próximo paso concreto. Sigue el
+mismo flujo que cualquier cambio: rama chica (`docs/checkpoint-...`), commit, push,
+avisarle a Facu para que abra y mergee el PR contra `dev`.
 
 ## Proyecto
 
@@ -127,7 +177,45 @@ El monolito original de 4163 líneas ya fue dividido en esto. Ya no hay rutas en
   DATABASE_URL=postgresql://postgres:TU_PASSWORD@localhost:5432/NOMBRE_BASE
   ```
 - **Requiere PostgreSQL + pgAdmin 4 instalados localmente** desde postgresql.org
-  (el instalador de EDB trae ambos juntos).
+  (el instalador de EDB trae ambos juntos). En Windows con `winget` se puede
+  instalar todo en silencioso, sin el instalador gráfico interactivo:
+  ```powershell
+  winget install --id PostgreSQL.PostgreSQL.17 --silent --accept-package-agreements --accept-source-agreements --override "--mode unattended --unattendedmodeui minimal --superpassword TU_PASSWORD --serverport 5432"
+  winget install --id PostgreSQL.pgAdmin --silent --accept-package-agreements --accept-source-agreements
+  winget install --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
+  ```
+- **Base Postgres local nueva (vacía): correr el schema a mano antes de
+  arrancar la app.** `init_db()` (`extensions.py`) NO crea tablas, solo
+  hace `ALTER TABLE` sobre tablas que asume que ya existen (porque en
+  Supabase el schema se cargó una sola vez a mano por el SQL Editor, ver
+  `MENTORIA/Migracion PostgreSQL/carga-inicial-supabase.md`). En una base
+  local nueva, arrancar la app sin este paso tira `UndefinedTable` en
+  cadena. Correr primero:
+  ```powershell
+  psql -U postgres -h localhost -p 5432 -d NOMBRE_BASE -f CODIGO_FUENTE/db/schema-postgres.sql
+  ```
+  (el script empieza con `DROP TABLE IF EXISTS ...`, seguro en una base
+  nueva/de prueba, destructivo si se corre sobre una base con datos reales
+  - no correrlo nunca contra `dev`/prod de Supabase).
+- **Bug conocido: archivo `dml.db` viejo puede tapar el init de Postgres.**
+  `config.py` decide si "la base ya existe" chequeando si existe un archivo
+  `dml.db` en la raíz (leftover de la era SQLite, en `.gitignore`, no
+  versionado). Si ese archivo está presente en la máquina, la app se salta
+  `init_db()` y va directo a `migrate_db()` sobre una Postgres vacía, mismo
+  error en cadena que el punto anterior. Si aparece ese archivo por algún
+  motivo, renombrarlo/borrarlo antes de levantar el server.
+- **Bug conocido en Windows: prints con emoji rompen la consola.** Varios
+  `print()` de `extensions.py`/`app.py` llevan emoji (✅⚠️📁🌱). En una
+  consola Windows con codepage `cp1252` (no UTF-8) esto tira
+  `UnicodeEncodeError` **dentro del propio `except` que loggea el error
+  real**, tapándolo con un traceback distinto. Workaround: forzar UTF-8 en
+  el proceso antes de correr la app:
+  ```powershell
+  $env:PYTHONIOENCODING = "utf-8"
+  ```
+  (Nota: reportar al equipo - la solución de fondo es sacar los emoji de
+  los `print()` o configurar `sys.stdout.reconfigure(encoding="utf-8")` en
+  `app.py`.)
 - **Bug conocido de orden de imports en `app.py`:** `load_dotenv()` se llama DESPUÉS
   de `from config import Config, BASE_DIR`, así que `config.py` lee `DATABASE_URL`
   antes de que el `.env` esté cargado — queda en `None` aunque el `.env` esté bien
@@ -277,54 +365,66 @@ esto no los reemplaza ni los toca.
 4. 5 flujos consecutivos sin HTTP 500 ni bloqueos
 5. Un usuario DML no ve los campos de contacto/mail cliente
 
-### Checklist manual de pruebas — estado al cierre de la sesión del 2026-08-13
+### Checklist manual de pruebas — ✅ COMPLETO (cerrado 2026-08-19)
 
 Probado en la rama de integración local `test/54-integracion-local` (no pusheada,
-ver más arriba). Facu la retoma en la próxima sesión: falta el punto 6, y un par de
-sub-chequeos del resto quedaron sin confirmar explícitamente (marcados abajo).
+ver más arriba), en dos sesiones (2026-08-13 y 2026-08-19, esta última desde una
+máquina distinta). Los 6 puntos quedaron confirmados. Facu todavía no mergeó los
+PRs — decisión suya, quiere revisar una vez más antes de apretar el botón.
 
 Usuarios: `raypac@dml.local`/`raypac` · `tecnico@dml.local`/`tecnico` (DML_ST) ·
 `admin@dml.local`/`admin`
 
 1. ✅ **Alta de ingreso (PR #110):** confirmado, guarda sin error 500 (antes del fix
    tiraba "no existe la columna numero_correlativo").
-2. ✅ **Desplegable de clientes — funcional:** confirmado (sugiere existentes,
-   `confirm()` al escribir uno nuevo, autoaprendizaje guarda/no guarda según la
-   respuesta). ⚠️ **Falta reconfirmar el estilo:** el desplegable nativo
-   (`<datalist>`) salía negro y distinto al resto — se reemplazó por uno con
-   clases de Bootstrap (`dropdown-menu`/`dropdown-item`) pusheado a
-   `feature/54-desplegable-clientes`, pero Facu no llegó a volver a mirarlo
-   después del fix. Retomar: refrescar `/raypac/new`, escribir en Cliente y
-   confirmar que ahora es blanco y aparece debajo del campo.
-3. ⚠️ **Contacto/mail (PR #109) — parcial:** confirmado que los campos se ven
-   (con el texto "Visible solo para RAYPAC y ADMIN") logueado como `raypac`.
-   **Falta confirmar el lado que realmente importa del fix:** loguearse como
-   `tecnico` (DML_ST) y abrir `/raypac/<id>` de un ingreso freezado → esos dos
-   campos NO deberían aparecer.
-4. ⚠️ **Freeze — parcial:** confirmado que freeza y guarda remito. **Falta
-   probar el sub-caso de edición bloqueada:** como `raypac` intentar editar un
-   ingreso freezado sin código → debe bloquear. Como `admin` con `ADMIN2024` →
-   debe permitir.
+2. ✅ **Desplegable de clientes:** confirmado funcional (sugiere existentes,
+   `confirm()` al escribir uno nuevo, autoaprendizaje). El estilo original tenía un
+   problema real de consistencia: al hacer foco/click con el campo vacío no
+   mostraba nada (solo al escribir) — inconsistente con el resto de los `<select>`
+   de la app, que muestran todas las opciones al clickear. **Fix aplicado y
+   confirmado** (commit `f7f2325` en `feature/54-desplegable-clientes`, ya
+   pusheado): ahora al hacer foco sin texto muestra la lista completa (scrollea,
+   ya tenía `max-height`), escribiendo sigue filtrando igual que antes.
+   - **Hallazgo aparte, no resuelto este sprint** (ver `HALLAZGOS_REFACTOR.md` #8):
+     por más parecido que quede, un desplegable armado a mano nunca va a ser
+     pixel-idéntico a un `<select>` nativo (el navegador dibuja el popup abierto,
+     no Bootstrap). Facu pidió unificar TODOS los `<select>` de la app al mismo
+     patrón para consistencia total - alcance grande (~24 selects en 8 templates),
+     decidido posponer para no arriesgar el timeline del #54. Queda como issue
+     propio para después del sprint.
+3. ✅ **Contacto/mail (PR #109):** confirmado en ambos sentidos - se ven como
+   `raypac` (con el texto "Visible solo para RAYPAC y ADMIN"), y NO se ven como
+   `tecnico` (DML_ST) abriendo `/raypac/<id>` de un ingreso freezado.
+4. ✅ **Freeze / edición bloqueada — confirmado, con una corrección importante al
+   flujo que se pensaba probar:** el botón Editar está oculto en
+   `raypac_view.html` para TODOS los roles (incluido ADMIN) mientras
+   `entry.is_frozen` sea true - no hay forma de editar "in place" con un código
+   sin desfreezar antes. El código real para volver a habilitar edición es
+   **"Desfreezar Definitivamente"** (solo ADMIN), que pide los **últimos 4
+   dígitos del número de remito** de ese registro (no un código fijo) - una vez
+   desfreezado, tanto ADMIN como RAYPAC pueden editar de nuevo normalmente.
+   Confirmado con testing real: bloquea sin desfreezar, desfreezar con los 4
+   dígitos correctos funciona, y editar después funciona con los dos roles.
+   - **Hallazgo aparte, no resuelto:** `raypac_edit()` (backend) todavía tiene
+     una segunda lógica de desbloqueo con el código hardcodeado `"ADMIN2024"`
+     (con un TODO de seguridad al lado, ver hallazgo #2 de seguridad) que es
+     **inalcanzable desde la UI real** - mismo patrón que el hallazgo #5
+     ("Generar Ficha" nunca conectado al frontend), código muerto que nadie
+     dispara. No confundir este código con el flujo real que sí funciona
+     (últimos 4 dígitos del remito).
 5. ✅ **Lado DML — recepcionar:** confirmado, el botón "Dar de Alta en DML" está
    en la sección "Estado de Envío del Equipo" de `/raypac/<id>` (no confundir
    con la tarjeta separada más abajo "Crear Ficha de Servicio Técnico", que es
    un flujo posterior y no forma parte de este checklist).
-6. ❌ **`/dml/entregadas` oculta contacto/mail a DML_ST — sin probar todavía.**
-   Requiere un registro en estado "entregado". Facu decidió recorrer el flujo
-   completo por la UI en vez de que se lo prepare directo en la base. Pasos
-   para retomar (logueado como `admin`, cubre todos los roles necesarios):
-   1. `/raypac` → sobre el ingreso recepcionado → **"Crear Ticket"** (pide
-      Técnico Responsable, obligatorio; el resto opcional).
-   2. Desde `/raypac/<id>` (ahora con ticket) → **"Crear Ficha DML"** → completar
-      y guardar → te deja en la edición de la ficha.
-   3. En la edición: completar **Técnico Responsable**, **Diagnóstico**
-      (mín. 10 caracteres), **N° Remito de Salida** — son obligatorios para
-      poder cerrarla. El grid de "Estado del Equipo" se puede dejar con los
-      valores por defecto. Guardar.
-   4. En `/dml/<id>` → **"🔒 Cerrar Ficha"** (confirmar popup) → queda
-      ENTREGADA. Si falta algo, el sistema lista exactamente qué campo falta.
-   5. `/dml/entregadas`: como `admin`/`raypac` deben verse Contacto/Email; como
-      `tecnico` no.
+6. ✅ **`/dml/entregadas` oculta contacto/mail a DML_ST:** confirmado con el
+   flujo completo por UI (crear ticket → crear ficha → completar Técnico
+   Responsable/Diagnóstico mín. 10 caracteres/N° Remito de Salida → cerrar
+   ficha → ENTREGADA). Como `admin`/`raypac` se ven Contacto/Email en
+   `/dml/entregadas`; como `tecnico`, no.
+   - **Nota de flujo:** el botón "Crear Ticket" en `/raypac` (lista) solo
+     aparece si el registro está freezado y sin ticket todavía (`raypac_list.html`,
+     condición `entry.is_frozen and not entry.ticket_id`) - si lo desfreezaste
+     para probar el punto 4, hay que volver a freezarlo antes de este paso.
 
 ## Hallazgos pendientes (no resueltos, documentados en HALLAZGOS_REFACTOR.md)
 
