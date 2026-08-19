@@ -15,6 +15,23 @@ from CODIGO_FUENTE.extensions import get_db
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
 
 
+def _obtener_clientes(db):
+    """Lista de clientes para el desplegable con autoaprendizaje (RF03)."""
+    rows = db.execute("SELECT nombre FROM clientes ORDER BY nombre").fetchall()
+    return [r["nombre"] for r in rows]
+
+
+def _registrar_cliente_si_corresponde(db, cliente, guardar_nuevo):
+    """Si el usuario escribió un cliente que no estaba en la lista y confirmó
+    guardarlo (checkbox/confirm del form), lo agrega al catálogo para que
+    aparezca sugerido en los próximos ingresos."""
+    if not guardar_nuevo or not cliente:
+        return
+    existe = db.execute("SELECT id FROM clientes WHERE LOWER(nombre) = LOWER(%s)", (cliente,)).fetchone()
+    if not existe:
+        db.execute("INSERT INTO clientes (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING", (cliente,))
+
+
 @raypac_bp.route("")
 @login_required
 @permission_required(read_roles=["DML_ST"], write_roles=["RAYPAC"])
@@ -74,17 +91,18 @@ def raypac_new():
             mail_comercial = request.form.get("mail_comercial")
             contacto_cliente = request.form.get("contacto_cliente")
             email_cliente = request.form.get("email_cliente")
+            guardar_cliente_nuevo = request.form.get("guardar_cliente_nuevo") == "1"
 
             # Validación básica
             if not all([tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina, comercial, mail_comercial]):
                 flash("Por favor completa todos los campos obligatorios.", "error")
-                return render_template("raypac_form.html")
+                return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
             # Verificar que el número de serie es único
             existe = db.execute("SELECT id FROM raypac_entries WHERE numero_serie = %s", (numero_serie,)).fetchone()
             if existe:
                 flash("Este número de serie ya existe en el sistema.", "error")
-                return render_template("raypac_form.html")
+                return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
             # Número correlativo interno
             correlativo = db.execute("SELECT COALESCE(MAX(numero_correlativo), 0) + 1 AS next FROM raypac_entries").fetchone()['next']
@@ -101,6 +119,8 @@ def raypac_new():
                 RETURNING id
             """, (correlativo, fecha, tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina,
                   numero_bateria, numero_cargador, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente)).fetchone()
+
+            _registrar_cliente_si_corresponde(db, cliente, guardar_cliente_nuevo)
             db.commit()
 
             raypac_id = row['id']
@@ -112,9 +132,9 @@ def raypac_new():
         except Exception as e:
             db.rollback()  # Revertir la transacción en caso de error
             flash(f"Error al guardar: {e!s}", "error")
-            return render_template("raypac_form.html")
+            return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
-    return render_template("raypac_form.html")
+    return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
 
 @raypac_bp.route("/<int:id>")
@@ -170,6 +190,7 @@ def raypac_edit(id):
             mail_comercial = request.form.get("mail_comercial")
             contacto_cliente = request.form.get("contacto_cliente")
             email_cliente = request.form.get("email_cliente")
+            guardar_cliente_nuevo = request.form.get("guardar_cliente_nuevo") == "1"
 
             db.execute("""
                 UPDATE raypac_entries
@@ -177,6 +198,8 @@ def raypac_edit(id):
                     diagnostico_ingreso=%s, comercial=%s, mail_comercial=%s, contacto_cliente=%s, email_cliente=%s, updated_at=CURRENT_TIMESTAMP
                 WHERE id = %s
             """, (fecha, tipo_solicitud, cliente, numero_serie, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente, id))
+
+            _registrar_cliente_si_corresponde(db, cliente, guardar_cliente_nuevo)
             db.commit()
 
             log_action(user['id'], "UPDATE", "raypac_entries", id, None,
@@ -188,7 +211,7 @@ def raypac_edit(id):
             db.rollback()
             flash(f"Error: {e!s}", "error")
 
-    return render_template("raypac_form.html", entry=entry, edit=True)
+    return render_template("raypac_form.html", entry=entry, edit=True, clientes=_obtener_clientes(db))
 
 
 @raypac_bp.route("/<int:id>/freeze", methods=["POST"])

@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS dml_fichas CASCADE;
 DROP TABLE IF EXISTS stock_ubicaciones CASCADE;
 DROP TABLE IF EXISTS stock_dml CASCADE;
 DROP TABLE IF EXISTS matriz_repuestos CASCADE;
+DROP TABLE IF EXISTS clientes CASCADE;
 DROP TABLE IF EXISTS raypac_entries CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS stock_alertas CASCADE;
@@ -64,6 +65,13 @@ CREATE TABLE raypac_entries (
     unfrozen_by TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Catálogo de clientes RAYPAC (desplegable con autoaprendizaje, RF03)
+CREATE TABLE clientes (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Matriz de Repuestos (catálogo)
