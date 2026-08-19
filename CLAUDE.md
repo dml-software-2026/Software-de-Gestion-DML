@@ -18,32 +18,40 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-- **Última actualización:** 2026-08-19 (misma sesión, retomada en máquina nueva)
-- **En curso:** Issue #54 (ingreso RAYPAC) — fase de pruebas manuales locales, antes
-  de que Facu mergee los PRs #109, #110 y la rama `feature/54-desplegable-clientes`
-  (sin PR abierto todavía).
-- **Ambiente local de esta máquina:** ya armado de punta a punta (Postgres 17 +
-  pgAdmin 4 + Python 3.11 instalados, venv recreado, `.env` con `DATABASE_URL`
-  apuntando a una base local `dml_dev`, schema aplicado, server corriendo con
-  `test/54-integracion-local` en `http://127.0.0.1:5000`). Detalle de los 3 bugs
-  de setup encontrados y sus workarounds: sección "Setup de entorno local" más
-  abajo.
-- **Checklist manual del #54 — ✅ COMPLETO, los 6 puntos confirmados.** Detalle
-  punto por punto en la sección "Issue #54" más abajo, incluye 2 hallazgos
-  nuevos no bloqueantes (código muerto del unfreeze con `ADMIN2024` en
-  `raypac_edit()`, y la inconsistencia visual de desplegables ya documentada
-  en `HALLAZGOS_REFACTOR.md` #8 y #9).
-  - Fix aplicado y pusheado durante el testing: desplegable de clientes ahora
-    muestra la lista completa al hacer foco, no solo al escribir (commit
-    `f7f2325` en `feature/54-desplegable-clientes`, ya en origin).
-- **Próximo paso concreto:** Facu todavía no mergeó ninguno de los 3 PRs del
-  #54 (#109, #110, `feature/54-desplegable-clientes` — esta última sigue sin
-  PR abierto en GitHub, solo pusheada). Falta que Facu revise una vez más y
-  mergee cuando esté conforme. Después de mergear los 3, falta resolver a
-  mano el conflicto esperable en `extensions.py` (dos bloques de migración
-  try/except, no se pisan entre sí, ya resuelto una vez en
-  `test/54-integracion-local` como referencia). El checklist en sí ya no
-  bloquea nada.
+- **Última actualización:** 2026-08-19, cierre de sesión (arrancada en una
+  máquina nueva de Facu, retomando contexto de la sesión del 2026-08-13).
+- **Issue #54 (ingreso RAYPAC) — ✅ CERRADO.** Los 3 PRs (#109, #110, #115)
+  están mergeados a `dev`. Checklist manual de 6 puntos y los 5 puntos del
+  DoD original confirmados (incluidas 5 altas consecutivas sin error 500).
+  Al mergear #115 apareció un conflicto no anticipado en `raypac.py` y
+  `extensions.py` — no era lógico, era el `ruff --fix` de la CI de Sebastián
+  (#113, mergeada un rato antes) pisando las mismas líneas. Se resolvió
+  combinando ambos cambios (no se descartó ninguno), verificado con
+  `ruff check` + import-check (los mismos 2 checks de la CI) antes de
+  pushear. Detalle completo en la sección "Issue #54" más abajo.
+- **Issue #62 (endpoints sin auth) — ✅ CERRADO.** Traía 2/4 checkpoints
+  de una sesión anterior (el fix puntual de `/admin/cargar-stock-csv` ya
+  mergeado). Los 2 que faltaban se cerraron hoy: auditadas las 26 rutas
+  protegidas de los 9 blueprints (ninguna otra desprotegida, solo quedan
+  públicas a propósito `/login`, `/logout` y las 2 de `/ticket/...`), y
+  probado con un script automatizado que las 26 redirigen a `/login` sin
+  sesión. Único punto sin resolver: el DoD original pide HTTP 403 para rol
+  no autorizado, pero el comportamiento real es redirect (302) - es una
+  discrepancia ya documentada más abajo ("Discrepancia conocida"), no se
+  toca sin decisión de equipo. Facu deja pendiente confirmar el review del
+  PR #106 y, si quiere, repetir 2-3 pruebas a mano (el testing de hoy fue
+  automatizado, no manual como pide el DoD general del sprint).
+- **Ambiente local de esta máquina:** quedó armado de punta a punta
+  (Postgres 17 + pgAdmin 4 + Python 3.11 vía winget, venv, `.env` con
+  `DATABASE_URL` a una base local `dml_dev`, schema aplicado) - queda
+  instalado para la próxima sesión en esta máquina, no hace falta rehacerlo.
+  El server de pruebas se detuvo al cerrar la sesión. Detalle de los 3 bugs
+  de setup encontrados: sección "Setup de entorno local" más abajo.
+- **Próximo paso concreto:** ninguna tarea en curso. Para la próxima sesión,
+  ir al plan del sprint (`MENTORIA/sprint-2026-08-10/sprint.md`) y ver qué
+  sigue en la lista de Facu - con #62 y #54 cerrados, ya no quedan tareas
+  propias asignadas en ese plan para este sprint (E2, cierra el 29/08).
+  Confirmar con Matías/el equipo en el próximo daily si hay algo nuevo.
 - **Bloqueos:** ninguno.
 
 ## Instrucciones de flujo de trabajo para Claude Code
@@ -292,11 +300,14 @@ en `SCOPE_v3.0.md` — un documento viejo, AS IS, proponía 2 roles, descartado.
 
 - **Entregable:** módulo RAYPAC (ingreso y gestión de máquinas). Demo a David viernes 29/08.
 - **Tareas de Facu (~20h):**
-  1. **#62 — Endpoints sin auth** (en curso, casi cerrado): único endpoint desprotegido
-     encontrado fue `/admin/cargar-stock-csv` en `blueprints/admin.py` (le faltaban
-     `@login_required` y `@role_required("ADMIN")`, ya agregados). Issue duplicado #86
-     cerrado en el mismo PR con `Closes #62` + `Closes #86`.
-  2. **#54 — Corregir ingreso RAYPAC** (16h, core de la sprint) — ver detalle abajo.
+  1. **#62 — Endpoints sin auth — ✅ cerrado (2026-08-19).** Único endpoint
+     desprotegido: `/admin/cargar-stock-csv` en `blueprints/admin.py` (le
+     faltaban `@login_required` y `@role_required("ADMIN")`, ya agregados,
+     PR #106). Auditadas las 26 rutas protegidas restantes de los 9
+     blueprints - ninguna otra desprotegida. Issue duplicado #86 cerrado en
+     el mismo PR con `Closes #62` + `Closes #86`.
+  2. **#54 — Corregir ingreso RAYPAC — ✅ cerrado (2026-08-19).** Los 3 PRs
+     (#109, #110, #115) mergeados a `dev`. Ver detalle abajo.
 - **Dailies:** lunes/miércoles/jueves, Matías participa.
 - **Riesgo anotado:** si para el miércoles 20/08 el #54 no lleva 60% de avance, se corta
   el alcance.
@@ -337,26 +348,39 @@ aparezca del lado DML como "pendiente de recepción".
 - [x] Permitir ingresar solo los últimos 4 dígitos del remito con autocompletado de
       formato `00001-04222` — ya implementado en `raypac_freeze()`
 
-**PRs abiertos contra `dev`** (todos `Refs #54`, ninguno cierra el issue solo):
+**PRs mergeados a `dev` (todos ✅, 2026-08-19):**
 - **#108** `docs/agregar-claude-md` — este archivo
 - **#109** `feature/54-campos-contacto-mail-cliente` — oculta contacto/mail para
   roles DML en `dml_entregadas.html` + documenta las columnas en `schema-postgres.sql`
 - **#110** `fix/54-numero-correlativo-postgres` — bug encontrado en el camino (ver
   Hallazgos abajo), no estaba en el plan original
-- **`feature/54-desplegable-clientes`** (pusheada, PR sin abrir todavía) — tabla
-  `clientes` con autoaprendizaje, sembrada con los 39 clientes del Excel de David
+- **#113** `chore/103-continuous-integrations` (de Sebastián, no es del #54 pero
+  se mergeó en el medio) — CI mínimo (ruff + import check) + 27 fixes automáticos
+  de `ruff --fix` en todo `CODIGO_FUENTE/`
+- **#115** `feature/54-desplegable-clientes` — tabla `clientes` con
+  autoaprendizaje, sembrada con los 39 clientes del Excel de David
+- **#116** `docs/checkpoint-sesion` — checkpoint de continuidad + cierre del
+  checklist (esta sección, versión anterior)
 
-**Conflicto de merge esperable:** #110 y `feature/54-desplegable-clientes` agregan
-cada uno un bloque de migración en el mismo punto de `migrate_db()` (`extensions.py`).
-El que se mergee segundo va a pedir resolver un conflicto chico a mano — solo hay que
-dejar los dos bloques `try/except`, ninguno pisa al otro.
+**Conflicto de merge real al mergear #115:** no fue el anticipado (#110 vs.
+`feature/54-desplegable-clientes` en `extensions.py`, que sí estaba previsto y
+no llegó a pasar en la práctica porque `raypac.py` conflictuó primero) - fue
+un conflicto contra el `ruff --fix` de #113, mergeado un rato antes, que
+reordenó imports y algunas líneas de `raypac.py`/`extensions.py` justo donde
+`feature/54-desplegable-clientes` también tocaba. Se resolvió localmente
+(mergear `origin/dev` en la rama, combinar ambos cambios sin descartar
+ninguno, correr `ruff check` + el import-check de la app antes de pushear) y
+se pusheó ya resuelto - lección para la próxima vez que se abra una PR de
+`chore/` tipo lint/formateo masivo: **avisar a quien tenga ramas activas**,
+porque puede generar conflictos "de forma" en cualquier archivo tocado,
+no solo en los que uno espera.
 
 **Técnica usada para probar los 3 juntos sin romper el esquema de PRs chicos:**
 rama local `test/54-integracion-local` (cortada de `dev`, con los 3 branches
-mergeados adentro) **nunca pusheada a GitHub** — sirve solo para levantar un único
-server local y probar el flujo completo de una sentada. Se borra al terminar de
-probar. Los PRs reales en GitHub siguen intactos y se revisan/mergean por separado,
-esto no los reemplaza ni los toca.
+mergeados adentro) **nunca pusheada a GitHub** — sirvió para levantar un único
+server local y probar el flujo completo de una sentada. Se borró al cerrar la
+sesión (2026-08-19). Los PRs reales en GitHub se revisaron/mergearon por
+separado, esto no los reemplazó ni los tocó.
 
 **Definition of done del issue:**
 1. Login RAYPAC → `/raypac/new` → completar form → guardar → remito 4 dígitos → freezar
