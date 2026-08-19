@@ -1,12 +1,20 @@
 import re
-from datetime import datetime, date, timezone
+from datetime import UTC, date, datetime
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from CODIGO_FUENTE.decorators import (
+    get_current_user,
+    log_action,
+    login_required,
+    role_required,
+)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, role_required, get_current_user, log_action
 from CODIGO_FUENTE.services.mail import send_mail
-from CODIGO_FUENTE.services.stock import ajustar_stock_ubicacion, actualizar_estado_alerta_stock
+from CODIGO_FUENTE.services.stock import (
+    actualizar_estado_alerta_stock,
+    ajustar_stock_ubicacion,
+)
 
 envios_bp = Blueprint("envios", __name__, url_prefix="/envios")
 
@@ -61,14 +69,14 @@ def envios_list():
         # así que todo se homogeneiza acá a datetime con tz UTC.
         val = x['created_at']
         if val is None:
-            return datetime.min.replace(tzinfo=timezone.utc)
+            return datetime.min.replace(tzinfo=UTC)
         if isinstance(val, datetime):
             if val.tzinfo is not None:
                 return val
-            return val.replace(tzinfo=timezone.utc)
+            return val.replace(tzinfo=UTC)
         if isinstance(val, date):
-            return datetime.combine(val, datetime.min.time(), tzinfo=timezone.utc)
-        return datetime.min.replace(tzinfo=timezone.utc)
+            return datetime.combine(val, datetime.min.time(), tzinfo=UTC)
+        return datetime.min.replace(tzinfo=UTC)
     todos_envios.sort(key=_sort_key, reverse=True)
     return render_template("envios_list.html", envios=todos_envios)
 
@@ -393,7 +401,7 @@ def envios_unfreeze(id):
         db.commit()
 
         log_action(user['id'], "UNFREEZE", "envios_repuestos", id, None,
-                  f"Envío descongelado por ADMIN")
+                  "Envío descongelado por ADMIN")
 
         flash("🔓 Envío descongelado correctamente.", "success")
         return redirect(url_for("envios.envios_view", id=id))

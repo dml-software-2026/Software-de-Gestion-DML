@@ -1,8 +1,8 @@
-from flask import Blueprint, request, render_template, redirect, url_for, flash, session
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
+from CODIGO_FUENTE.decorators import get_current_user, login_required
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, get_current_user
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -95,7 +95,7 @@ def index():
                 AND r.numero_remito IS NOT NULL
                 AND NOT EXISTS (SELECT 1 FROM dml_fichas f WHERE f.raypac_id = r.id)
             """).fetchone()['total']
-        except:
+        except Exception:
             equipos_pendientes = 0
 
         # Tickets sin ficha (pendientes de revisión inicial)
@@ -106,7 +106,7 @@ def index():
                 WHERE estado = 'ACTIVO'
                 AND ficha_id IS NULL
             """).fetchone()['total']
-        except:
+        except Exception:
             tickets_revision_inicial = 0
 
         # Repuestos que estaban EN FALTA y ahora tienen stock disponible
@@ -120,7 +120,7 @@ def index():
                 AND f.is_closed = FALSE
                 AND su.cantidad >= dr.cantidad_utilizada
             """).fetchone()['total']
-        except:
+        except Exception:
             repuestos_disponibles = 0
 
         # Envíos de repuestos pendientes de recibir desde RAYPAC
@@ -145,7 +145,7 @@ def index():
                     FROM envios_repuestos
                     WHERE estado = 'PENDIENTE'
                 """).fetchone()['total']
-        except:
+        except Exception:
             envios_repuestos_pendientes = 0
 
         stats = {

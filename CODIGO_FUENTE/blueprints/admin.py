@@ -2,12 +2,17 @@ import csv
 import os
 import sys
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from werkzeug.security import generate_password_hash
 
 from CODIGO_FUENTE.config import BASE_DIR
+from CODIGO_FUENTE.decorators import (
+    get_current_user,
+    log_action,
+    login_required,
+    role_required,
+)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, role_required, get_current_user, log_action
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -73,7 +78,7 @@ def cargar_stock_desde_web():
                     cantidad_str = cantidad_str.replace(',', '')
                     try:
                         cantidad = int(float(cantidad_str))
-                    except:
+                    except Exception:
                         errores += 1
                         continue
 
@@ -119,13 +124,13 @@ def cargar_stock_desde_web():
                             WHERE codigo_repuesto = %s AND ubicacion = 'DML'
                         """, (cantidad, codigo_ubicacion, codigo))
 
-                except Exception as e:
+                except Exception:
                     errores += 1
                     continue
 
         db.commit()
 
-        output.append(f"[STOCK] ✅ Carga completada!")
+        output.append("[STOCK] ✅ Carga completada!")
         output.append(f"[STOCK] 📦 Repuestos nuevos: {repuestos_cargados}")
         output.append(f"[STOCK] 🔄 Repuestos actualizados: {repuestos_actualizados}")
         output.append(f"[STOCK] ⚠️ Errores: {errores}")
@@ -187,7 +192,7 @@ def usuario_new():
             flash(f"Usuario {email} creado.", "success")
             return redirect(url_for("admin.usuarios_list"))
         except Exception as e:
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
 
     roles = ["ADMIN", "RAYPAC", "DML_ST", "DML_REPUESTOS"]
     return render_template("usuario_form.html", roles=roles)
@@ -235,7 +240,7 @@ def usuario_edit(id):
                 flash("Usuario actualizado.", "success")
             return redirect(url_for("admin.usuarios_list"))
         except Exception as e:
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
 
     roles = ["ADMIN", "RAYPAC", "DML_ST", "DML_REPUESTOS"]
     return render_template("usuario_edit.html", target_user=usuario, roles=roles)

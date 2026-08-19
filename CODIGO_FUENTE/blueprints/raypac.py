@@ -1,10 +1,16 @@
 import re
 from datetime import datetime
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from CODIGO_FUENTE.decorators import (
+    get_current_user,
+    log_action,
+    login_required,
+    permission_required,
+    role_required,
+)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
 
@@ -30,7 +36,7 @@ def raypac_list(readonly=False):
     except Exception as e:
         db.rollback()  # En caso de error, revertir la transacción
         # Si hay error en la query, mostrar mensaje y retornar lista vacía
-        flash(f"Error al cargar ingresos RAYPAC: {str(e)}", "error")
+        flash(f"Error al cargar ingresos RAYPAC: {e!s}", "error")
         entries = []
 
     # Configuración de badges para estados de fichas DML
@@ -105,7 +111,7 @@ def raypac_new():
             return redirect(url_for("raypac.raypac_view", id=raypac_id))
         except Exception as e:
             db.rollback()  # Revertir la transacción en caso de error
-            flash(f"Error al guardar: {str(e)}", "error")
+            flash(f"Error al guardar: {e!s}", "error")
             return render_template("raypac_form.html")
 
     return render_template("raypac_form.html")
@@ -180,7 +186,7 @@ def raypac_edit(id):
             return redirect(url_for("raypac.raypac_view", id=id))
         except Exception as e:
             db.rollback()
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
 
     return render_template("raypac_form.html", entry=entry, edit=True)
 
