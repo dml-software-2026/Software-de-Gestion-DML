@@ -44,7 +44,8 @@ CREATE TABLE users (
 
 -- Tabla RAYPAC - Ingreso inicial
 CREATE TABLE raypac_entries (
-    id SERIAL PRIMARY KEY,  
+    id SERIAL PRIMARY KEY,
+    numero_correlativo INTEGER,
     fecha_recepcion DATE NOT NULL,
     tipo_solicitud TEXT NOT NULL,
     cliente TEXT NOT NULL,
@@ -56,6 +57,8 @@ CREATE TABLE raypac_entries (
     diagnostico_ingreso TEXT,
     comercial TEXT NOT NULL,
     mail_comercial TEXT NOT NULL,
+    contacto_cliente TEXT,
+    email_cliente TEXT,
     numero_remito TEXT,
     is_frozen BOOLEAN DEFAULT FALSE,
     frozen_at DATE,

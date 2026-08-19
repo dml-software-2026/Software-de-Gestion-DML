@@ -1,13 +1,32 @@
 from datetime import datetime
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify, send_file
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 
+from CODIGO_FUENTE.decorators import (
+    get_current_user,
+    log_action,
+    login_required,
+    permission_required,
+    role_required,
+)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
 from CODIGO_FUENTE.services.mail import send_mail
-from CODIGO_FUENTE.services.numeracion import generate_ficha_number, crear_ticket
-from CODIGO_FUENTE.services.stock import ajustar_stock_ubicacion, actualizar_estadistica_repuesto, verificar_alerta_stock
+from CODIGO_FUENTE.services.numeracion import crear_ticket, generate_ficha_number
 from CODIGO_FUENTE.services.pdf import generar_ficha_pdf, generate_ficha_pdf
+from CODIGO_FUENTE.services.stock import (
+    actualizar_estadistica_repuesto,
+    ajustar_stock_ubicacion,
+    verificar_alerta_stock,
+)
 
 dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
 
@@ -174,7 +193,7 @@ def dml_new(raypac_id):
             flash(f"Ficha #{numero_ficha} creada correctamente. Ticket: {numero_ticket}", "success")
             return redirect(url_for("dml.dml_edit", id=ficha_id))
         except Exception as e:
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
             return render_template("dml_form.html", raypac=raypac, ticket=ticket)
 
     return render_template("dml_form.html", raypac=raypac, ticket=ticket)
@@ -308,13 +327,13 @@ def dml_edit(id):
                     )
             db.commit()
 
-            log_action(user['id'], "UPDATE", "dml_fichas", id, None, f"Actualización ficha")
+            log_action(user['id'], "UPDATE", "dml_fichas", id, None, "Actualización ficha")
 
             flash("Ficha actualizada correctamente.", "success")
             return redirect(url_for("dml.dml_view", id=id))
         except Exception as e:
             db.rollback()  # Revertir la transacción en caso de error
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
 
     partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s", (id,)).fetchall()
     repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = %s", (id,)).fetchall()
@@ -527,7 +546,7 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     db.commit()
 
     log_action(user['id'], "MOVER_REPUESTO_A_STOCK", "dml_repuestos", repuesto_id,
-              f"EN FALTA", f"EN STOCK - {repuesto['codigo_repuesto']}")
+              "EN FALTA", f"EN STOCK - {repuesto['codigo_repuesto']}")
 
     flash(f"✅ Repuesto {repuesto['codigo_repuesto']} movido a EN STOCK y descontado del inventario.", "success")
     return redirect(url_for("dml.dml_edit", id=ficha_id))
@@ -634,7 +653,7 @@ def crear_ticket_endpoint(id):
         flash(f"✅ Ticket creado exitosamente: {numero_ticket}", "success")
 
     except Exception as e:
-        flash(f"Error al crear ticket: {str(e)}", "error")
+        flash(f"Error al crear ticket: {e!s}", "error")
 
     return redirect(url_for("dml.dml_view", id=id))
 
@@ -682,7 +701,7 @@ def dml_close(id):
         errores.append("Debe inspeccionar al menos una parte o agregar repuestos utilizados")
 
     if errores:
-        flash(f"⚠️ No se puede cerrar la ficha. Campos requeridos faltantes:", "error")
+        flash("⚠️ No se puede cerrar la ficha. Campos requeridos faltantes:", "error")
         for error in errores:
             flash(f"• {error}", "error")
         return redirect(url_for("dml.dml_edit", id=id))
@@ -766,7 +785,7 @@ def dml_close(id):
         flash(f"✅ Ficha #{ficha['numero_ficha']} cerrada y marcada como ENTREGADA. Notificación {mail_status}.", "success")
         return redirect(url_for("dml.dml_view", id=id))
     except Exception as e:
-        flash(f"Error al cerrar ficha: {str(e)}", "error")
+        flash(f"Error al cerrar ficha: {e!s}", "error")
         return redirect(url_for("dml.dml_view", id=id))
 
 
@@ -817,7 +836,7 @@ def dml_registrar_acuse(id):
         flash(f"✅ Acuse de recibo registrado correctamente para Ficha #{ficha['numero_ficha']}.", "success")
 
     except Exception as e:
-        flash(f"Error al cerrar ficha: {str(e)}", "error")
+        flash(f"Error al cerrar ficha: {e!s}", "error")
 
     return redirect(url_for("dml.dml_view", id=id))
 
@@ -884,7 +903,7 @@ def generar_ficha(id):
                 )
                 db.commit()
         except Exception as e:
-            print(f"Error al enviar email: {str(e)}")
+            print(f"Error al enviar email: {e!s}")
 
         log_action(user['id'], "GENERATE_FICHA", "dml_fichas", id, None,
                   f"Ficha #{ficha['numero_ficha']}")
@@ -893,7 +912,7 @@ def generar_ficha(id):
         return redirect(url_for("dml.dml_view", id=id))
 
     except Exception as e:
-        flash(f"Error al generar ficha: {str(e)}", "error")
+        flash(f"Error al generar ficha: {e!s}", "error")
         return redirect(url_for("dml.dml_view", id=id))
 
 

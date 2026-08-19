@@ -1,6 +1,6 @@
 from functools import wraps
 
-from flask import session, redirect, url_for, flash
+from flask import flash, redirect, session, url_for
 
 from CODIGO_FUENTE.extensions import get_db
 

@@ -1,10 +1,8 @@
-import os
 import sys
 
 import psycopg2
-from psycopg2.extras import RealDictCursor
-
 from flask import current_app, g
+from psycopg2.extras import RealDictCursor
 
 
 class PgConnection:
@@ -130,6 +128,26 @@ def migrate_db():
 
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error agregando campos de contacto: {e}")
+        db.rollback()
+
+    # Migración: Agregar numero_correlativo a raypac_entries
+    # (raypac_new() en blueprints/raypac.py lee/escribe esta columna para
+    # numerar los ingresos de forma correlativa arrancando en 1, pero nunca
+    # tuvo migración en Postgres — solo existía en el schema.sql viejo de
+    # SQLite. Sin esto, guardar un ingreso nuevo tira excepción.)
+    try:
+        print("[MIGRATION] Verificando campo numero_correlativo...")
+        column_names = _columnas_de(db, "raypac_entries")
+
+        if "numero_correlativo" not in column_names:
+            db.execute("ALTER TABLE raypac_entries ADD COLUMN IF NOT EXISTS numero_correlativo INTEGER")
+            print("[MIGRATION] ✅ Columna numero_correlativo agregada")
+
+        db.commit()
+        print("[MIGRATION] ✅ Campo numero_correlativo verificado")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando numero_correlativo: {e}")
         db.rollback()
 
     # Migración: Tabla clientes (catálogo con autoaprendizaje, RF03 del #54)
@@ -324,7 +342,9 @@ def init_db():
     # Cargar datos iniciales (asumimos BD nueva)
     try:
         print("[SEED] 🌱 Cargando datos iniciales...", file=sys.stderr, flush=True)
-        from CODIGO_FUENTE.services.seed import load_seed_data  # se crea en el siguiente checkpoint
+        from CODIGO_FUENTE.services.seed import (
+            load_seed_data,  # se crea en el siguiente checkpoint
+        )
         db = get_db()
         load_seed_data(db)
         db.commit()
