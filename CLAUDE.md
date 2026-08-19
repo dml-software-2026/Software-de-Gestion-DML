@@ -3,6 +3,31 @@
 Este documento es para que Claude Code tenga contexto completo del proyecto sin que
 haya que reexplicarlo. Actualizarlo cuando cambie algo importante.
 
+## 🔖 Checkpoint (leer primero, mantener actualizado)
+
+**Por qué existe:** Facu trabaja desde dos máquinas distintas, y la memoria local de
+Claude Code (`~/.claude/.../memory/`) vive en el home de cada máquina — no viaja de
+una a otra. Lo único que sí viaja es lo que está versionado en este repo. Esta
+sección es la fuente de verdad de "qué estábamos haciendo y por dónde quedamos": se
+actualiza al cierre de cada sesión (o al cambiar de tarea en curso) y sigue el mismo
+flujo que cualquier otro cambio — rama chica `docs/checkpoint-...`, commit, push, y
+avisarle a Facu para que abra y mergee el PR contra `dev`. Hasta que ese PR no esté
+mergeado, el checkpoint actualizado vive solo en esa rama, no en `dev` — no dar la
+tarea de "guardar contexto" por terminada hasta la confirmación del merge.
+
+**Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
+asumir contexto de nada más.
+
+- **Última actualización:** 2026-08-19
+- **En curso:** Issue #54 (ingreso RAYPAC) — fase de pruebas manuales locales, antes
+  de que Facu mergee los PRs #109, #110 y la rama `feature/54-desplegable-clientes`
+  (sin PR abierto todavía).
+- **Próximo paso concreto:** recrear la rama local `test/54-integracion-local` desde
+  `dev` (ya actualizada a `b715ca5`), mergear ahí los 3 branches, levantar el server,
+  y retomar el checklist manual de pruebas (ver sección "Issue #54" más abajo) desde
+  el punto 6, más reconfirmar los ⚠️ de los puntos 2, 3 y 4.
+- **Bloqueos:** ninguno. Working tree limpio, `dev` local sincronizada con origin.
+
 ## Instrucciones de flujo de trabajo para Claude Code
 
 **PRs chicos, siempre.** No armar un PR gigante con toda una tarea/issue resuelta de
@@ -49,6 +74,13 @@ sin resolver de por medio.
 **Nombres de rama:** `tipo/descripcion-corta-con-guiones` (ej. `fix/proteger-endpoint`,
 `feature/54-desplegable-tipo-maquina`). El tipo (`fix`, `feature`, `docs`, `chore`)
 según corresponda al cambio.
+
+**Mantener el Checkpoint actualizado.** Al cierre de cada sesión, o cuando cambie
+significativamente el estado de la tarea en curso (se prueba algo, se destraba un
+bloqueo, se decide el próximo paso), actualizar la sección "🔖 Checkpoint" al
+principio de este archivo con el estado real y el próximo paso concreto. Sigue el
+mismo flujo que cualquier cambio: rama chica (`docs/checkpoint-...`), commit, push,
+avisarle a Facu para que abra y mergee el PR contra `dev`.
 
 ## Proyecto
 
