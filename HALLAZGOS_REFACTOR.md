@@ -92,6 +92,31 @@ individuales.
      en vez de mostrar algo vacío o un texto genérico tipo "Sin
      diagnóstico". Parece un dato de prueba olvidado.
 
+9. **Desplegables inconsistentes entre sí (nativo `<select>` vs. custom armado
+   a mano).** Encontrado probando el checklist manual del #54: el campo
+   Cliente en `raypac_form.html` es un `<input>` de texto libre con una lista
+   de sugerencias armada a mano (`<ul class="dropdown-menu">` + JS), necesario
+   porque soporta autoaprendizaje (RF03) - un `<select>` no puede. El resto de
+   los campos de selección de la app son `<select class="form-control">`
+   nativos. Un `<select>` nativo no se puede stylear para que su lista
+   desplegada coincida pixel a pixel con un widget armado en HTML/CSS (el
+   navegador/SO dibuja esa lista, no Bootstrap) - por eso conviven dos looks
+   distintos.
+   - **Alcance confirmado (2026-08-19):** 31 `<select>` en 11 templates,
+     de los cuales 3 son archivos backup/muertos ya candidatos a borrar más
+     abajo (`dml_view_OLD.html`, `dml_edit_FIXED.html`,
+     `dml_edit_BACKUP.html`) → quedan **~24 selects reales en 8 templates
+     vivos**: `raypac_form.html` (5), `ticket_nuevo.html` (12),
+     `dml_edit.html` (2), `envios_form.html`, `ficha_view.html`,
+     `tickets_list.html`, `usuario_form.html`, `usuario_edit.html` (1 c/u).
+   - **Decisión de Facu (2026-08-19):** no se ataca en el sprint E2 actual
+     (riesgo de corte de alcance del #54 ya anotado, no forma parte de su
+     DoD). Candidato a issue propio: reemplazar los `<select>` nativos por
+     el mismo patrón de dropdown-menu armado a mano que ya tiene Cliente,
+     de a un template/grupo chico por PR. Ojo con la accesibilidad de
+     teclado/lector de pantalla al reimplementar - un `<select>` nativo la
+     tiene gratis, un dropdown armado a mano no.
+
 ## Archivos viejos / de backup dando vueltas (candidatos a borrar)
 
 8. `CODIGO_FUENTE/app_backup.py` (ya en proceso de eliminación, branch

@@ -18,15 +18,36 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-- **Última actualización:** 2026-08-19
+- **Última actualización:** 2026-08-19 (misma sesión, retomada en máquina nueva)
 - **En curso:** Issue #54 (ingreso RAYPAC) — fase de pruebas manuales locales, antes
   de que Facu mergee los PRs #109, #110 y la rama `feature/54-desplegable-clientes`
   (sin PR abierto todavía).
-- **Próximo paso concreto:** recrear la rama local `test/54-integracion-local` desde
-  `dev` (ya actualizada a `b715ca5`), mergear ahí los 3 branches, levantar el server,
-  y retomar el checklist manual de pruebas (ver sección "Issue #54" más abajo) desde
-  el punto 6, más reconfirmar los ⚠️ de los puntos 2, 3 y 4.
-- **Bloqueos:** ninguno. Working tree limpio, `dev` local sincronizada con origin.
+- **Ambiente local de esta máquina:** ya armado de punta a punta (Postgres 17 +
+  pgAdmin 4 + Python 3.11 instalados, venv recreado, `.env` con `DATABASE_URL`
+  apuntando a una base local `dml_dev`, schema aplicado, server corriendo con
+  `test/54-integracion-local` en `http://127.0.0.1:5000`). Detalle de los 3 bugs
+  de setup encontrados y sus workarounds: sección "Setup de entorno local" más
+  abajo.
+- **Checklist manual del #54 — retomado y en curso (ver detalle completo en la
+  sección "Issue #54" más abajo):**
+  - ✅ Punto 2 (desplegable de clientes) reprobado y con un fix nuevo ya aplicado
+    (mostrar la lista completa al hacer foco, no solo al escribir) — commit en
+    `feature/54-desplegable-clientes`, mergeado a la rama de integración local.
+  - Puntos 3, 4 y 6 del checklist: **todavía sin probar en esta sesión**, quedan
+    para la próxima.
+  - **Hallazgo nuevo (no bloqueante, documentado, no se ataca este sprint):**
+    inconsistencia visual entre el desplegable de Cliente (armado a mano) y los
+    ~24 `<select>` nativos del resto de la app, en 8 templates. Detalle completo
+    en `HALLAZGOS_REFACTOR.md` #9. Decisión de Facu: no tocar en este sprint por
+    riesgo de corte de alcance del #54, queda como issue propio para después.
+- **Próximo paso concreto:** seguir el checklist manual desde el punto 3 (ver
+  pasos concretos en la sección "Issue #54"), con el server ya levantado en la
+  rama `test/54-integracion-local` (recrearla si se perdió: cortar de `dev`
+  actualizada y mergear `feature/54-campos-contacto-mail-cliente`,
+  `fix/54-numero-correlativo-postgres` y `feature/54-desplegable-clientes` -
+  ojo con el conflicto esperable en `extensions.py`, resolver dejando los dos
+  bloques `try/except` de migración sin que ninguno pise al otro).
+- **Bloqueos:** ninguno.
 
 ## Instrucciones de flujo de trabajo para Claude Code
 
@@ -159,7 +180,45 @@ El monolito original de 4163 líneas ya fue dividido en esto. Ya no hay rutas en
   DATABASE_URL=postgresql://postgres:TU_PASSWORD@localhost:5432/NOMBRE_BASE
   ```
 - **Requiere PostgreSQL + pgAdmin 4 instalados localmente** desde postgresql.org
-  (el instalador de EDB trae ambos juntos).
+  (el instalador de EDB trae ambos juntos). En Windows con `winget` se puede
+  instalar todo en silencioso, sin el instalador gráfico interactivo:
+  ```powershell
+  winget install --id PostgreSQL.PostgreSQL.17 --silent --accept-package-agreements --accept-source-agreements --override "--mode unattended --unattendedmodeui minimal --superpassword TU_PASSWORD --serverport 5432"
+  winget install --id PostgreSQL.pgAdmin --silent --accept-package-agreements --accept-source-agreements
+  winget install --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
+  ```
+- **Base Postgres local nueva (vacía): correr el schema a mano antes de
+  arrancar la app.** `init_db()` (`extensions.py`) NO crea tablas, solo
+  hace `ALTER TABLE` sobre tablas que asume que ya existen (porque en
+  Supabase el schema se cargó una sola vez a mano por el SQL Editor, ver
+  `MENTORIA/Migracion PostgreSQL/carga-inicial-supabase.md`). En una base
+  local nueva, arrancar la app sin este paso tira `UndefinedTable` en
+  cadena. Correr primero:
+  ```powershell
+  psql -U postgres -h localhost -p 5432 -d NOMBRE_BASE -f CODIGO_FUENTE/db/schema-postgres.sql
+  ```
+  (el script empieza con `DROP TABLE IF EXISTS ...`, seguro en una base
+  nueva/de prueba, destructivo si se corre sobre una base con datos reales
+  - no correrlo nunca contra `dev`/prod de Supabase).
+- **Bug conocido: archivo `dml.db` viejo puede tapar el init de Postgres.**
+  `config.py` decide si "la base ya existe" chequeando si existe un archivo
+  `dml.db` en la raíz (leftover de la era SQLite, en `.gitignore`, no
+  versionado). Si ese archivo está presente en la máquina, la app se salta
+  `init_db()` y va directo a `migrate_db()` sobre una Postgres vacía, mismo
+  error en cadena que el punto anterior. Si aparece ese archivo por algún
+  motivo, renombrarlo/borrarlo antes de levantar el server.
+- **Bug conocido en Windows: prints con emoji rompen la consola.** Varios
+  `print()` de `extensions.py`/`app.py` llevan emoji (✅⚠️📁🌱). En una
+  consola Windows con codepage `cp1252` (no UTF-8) esto tira
+  `UnicodeEncodeError` **dentro del propio `except` que loggea el error
+  real**, tapándolo con un traceback distinto. Workaround: forzar UTF-8 en
+  el proceso antes de correr la app:
+  ```powershell
+  $env:PYTHONIOENCODING = "utf-8"
+  ```
+  (Nota: reportar al equipo - la solución de fondo es sacar los emoji de
+  los `print()` o configurar `sys.stdout.reconfigure(encoding="utf-8")` en
+  `app.py`.)
 - **Bug conocido de orden de imports en `app.py`:** `load_dotenv()` se llama DESPUÉS
   de `from config import Config, BASE_DIR`, así que `config.py` lee `DATABASE_URL`
   antes de que el `.env` esté cargado — queda en `None` aunque el `.env` esté bien
