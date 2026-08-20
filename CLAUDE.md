@@ -18,8 +18,7 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-- **Última actualización:** 2026-08-19, cierre de sesión (arrancada en una
-  máquina nueva de Facu, retomando contexto de la sesión del 2026-08-13).
+- **Última actualización:** 2026-08-20, cierre de sesión.
 - **Issue #54 (ingreso RAYPAC) — ✅ CERRADO.** Los 3 PRs (#109, #110, #115)
   están mergeados a `dev`. Checklist manual de 6 puntos y los 5 puntos del
   DoD original confirmados (incluidas 5 altas consecutivas sin error 500).
@@ -41,17 +40,40 @@ asumir contexto de nada más.
   toca sin decisión de equipo. Facu deja pendiente confirmar el review del
   PR #106 y, si quiere, repetir 2-3 pruebas a mano (el testing de hoy fue
   automatizado, no manual como pide el DoD general del sprint).
-- **Ambiente local de esta máquina:** quedó armado de punta a punta
-  (Postgres 17 + pgAdmin 4 + Python 3.11 vía winget, venv, `.env` con
-  `DATABASE_URL` a una base local `dml_dev`, schema aplicado) - queda
-  instalado para la próxima sesión en esta máquina, no hace falta rehacerlo.
-  El server de pruebas se detuvo al cerrar la sesión. Detalle de los 3 bugs
-  de setup encontrados: sección "Setup de entorno local" más abajo.
-- **Próximo paso concreto:** ninguna tarea en curso. Para la próxima sesión,
-  ir al plan del sprint (`MENTORIA/sprint-2026-08-10/sprint.md`) y ver qué
-  sigue en la lista de Facu - con #62 y #54 cerrados, ya no quedan tareas
-  propias asignadas en ese plan para este sprint (E2, cierra el 29/08).
-  Confirmar con Matías/el equipo en el próximo daily si hay algo nuevo.
+- **Con #62 y #54 cerrados no quedan tareas propias de Facu asignadas en
+  `MENTORIA/sprint-2026-08-10/sprint.md` para este sprint (E2).** El trabajo
+  de esta sesión (ver abajo) es autopropuesto a partir de hallazgos del
+  testing del #54, no viene del plan de Matías — confirmar en el próximo
+  daily si hay algo nuevo antes de asumir que sigue siendo así.
+- **Hecho hoy — fix del bug de `raypac_unfreeze()`:** encontrado durante el
+  testing del #54 (registro de prueba "Santi"). Al desfreezar un registro,
+  `estado_envio_equipos` quedaba trabado en `'ENVIADO'` en vez de volver a
+  `'PENDIENTE'`, y el badge de `raypac_view.html` seguía mostrando "Enviado
+  desde RAYPAC" aunque el registro ya no estuviera freezado. Fix aplicado
+  y probado localmente (pasos 1-5 del testing manual, confirmado por Facu):
+  rama `fix/raypac-unfreeze-estado-envio`, commit `8b22dc0`, **pusheada,
+  PR todavía sin abrir en GitHub.** El UPDATE revierte a `PENDIENTE` salvo
+  que ya esté en `'RECIBIDO'` (no pisa una recepción ya confirmada por DML).
+- **Próximo paso concreto:** dos cosas.
+  1. Facu abre el PR de `fix/raypac-unfreeze-estado-envio` contra `dev`
+     (`Refs #54` o el número de issue si ya la cargó al kanban — la tarea
+     no tenía issue propia todavía a esta fecha) y lo mergea cuando esté
+     conforme.
+  2. Candidato para la próxima tarea, ya identificado pero sin arrancar:
+     **limpiar el código muerto de `"ADMIN2024"` en `raypac_edit()`**
+     (hallazgo #9 de `HALLAZGOS_REFACTOR.md` — segundo mecanismo de
+     desbloqueo hardcodeado, inalcanzable desde la UI real porque el flujo
+     que funciona de verdad es "Desfreezar Definitivamente" con los
+     últimos 4 dígitos del remito). Mismo patrón que el hallazgo #2 de
+     seguridad (código repetido 5 veces en el proyecto) — este sería un
+     primer paso hacia esa limpieza más grande. Tamaño XS, Épica
+     "Seguridad y deuda técnica" (a diferencia del fix de hoy, que era de
+     "Gestión de reparaciones"). Sin issue creada todavía.
+- **Ambiente local de esta máquina:** sigue armado de punta a punta
+  (Postgres 17 + pgAdmin 4 + Python 3.11, venv, `.env` con `DATABASE_URL`
+  a una base local `dml_dev`, schema aplicado) - no hace falta rehacerlo.
+  El server de pruebas se detuvo al cerrar la sesión. Detalle de los 3
+  bugs de setup conocidos: sección "Setup de entorno local" más abajo.
 - **Bloqueos:** ninguno.
 
 ## Instrucciones de flujo de trabajo para Claude Code
@@ -470,16 +492,15 @@ Usuarios: `raypac@dml.local`/`raypac` · `tecnico@dml.local`/`tecnico` (DML_ST) 
   de `raypac_entries`, pero esa columna no existe en `schema-postgres.sql` ni tenía
   migración en `extensions.py` (a diferencia de `contacto_cliente`/`email_cliente`, que
   sí la tienen). Reproducido en la práctica contra Postgres real (tira
-  `no existe la columna «numero_correlativo»` al guardar un ingreso nuevo) — **fix en
-  PR #110** (`fix/54-numero-correlativo-postgres`), pendiente de mergear a `dev`.
-- `raypac_unfreeze()` no revierte `estado_envio_equipos` a `PENDIENTE` al desfreezar
-  — un registro desfreezado puede quedar con `is_frozen=FALSE` pero
-  `estado_envio_equipos='ENVIADO'`, mostrando el badge "Enviado desde RAYPAC" (y el
-  botón "Dar de Alta en DML") como si siguiera en tránsito aunque ya no esté
-  freezado. Encontrado probando el #54 (registro de prueba "Santi" en la base
-  local), no confirmado todavía si pasa igual en producción ni si alguien lo
-  reportó. Sin PR abierto, pendiente de decidir si se arregla en este sprint o
-  se documenta como hallazgo para después.
+  `no existe la columna «numero_correlativo»` al guardar un ingreso nuevo) — **resuelto,
+  PR #110** (`fix/54-numero-correlativo-postgres`) ya mergeado a `dev`.
+- ~~`raypac_unfreeze()` no revierte `estado_envio_equipos` a `PENDIENTE` al desfreezar~~
+  — **resuelto (2026-08-20).** Encontrado probando el #54 (registro de prueba "Santi"
+  en la base local): un registro desfreezado podía quedar con `is_frozen=FALSE` pero
+  `estado_envio_equipos='ENVIADO'`, mostrando el badge "Enviado desde RAYPAC" como si
+  siguiera en tránsito aunque ya no estuviera freezado. Fix probado localmente,
+  pusheado en `fix/raypac-unfreeze-estado-envio` (commit `8b22dc0`), **PR pendiente
+  de abrir en GitHub.** Detalle en el Checkpoint de arriba.
 
 **No urgente:**
 - Dos generadores de PDF sin unificar (`generar_ficha_pdf` y `generate_ficha_pdf`) más
