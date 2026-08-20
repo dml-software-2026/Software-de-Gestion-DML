@@ -300,9 +300,16 @@ def raypac_unfreeze(id):
         flash(f"⚠️ Código incorrecto. Use los últimos 4 dígitos del remito ({entry['numero_remito']}).", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
+    # Al desfreezar, el envío a DML queda sin confirmar de nuevo (vuelve a
+    # PENDIENTE) — salvo que DML ya haya recepcionado el equipo, en cuyo caso
+    # no se pisa esa confirmación solo porque se reabrió el registro para editar.
     db.execute("""
         UPDATE raypac_entries
-        SET is_frozen = FALSE, frozen_at = NULL
+        SET is_frozen = FALSE, frozen_at = NULL,
+            estado_envio_equipos = CASE
+                WHEN estado_envio_equipos = 'RECIBIDO' THEN estado_envio_equipos
+                ELSE 'PENDIENTE'
+            END
         WHERE id = %s
     """, (id,))
     db.commit()
