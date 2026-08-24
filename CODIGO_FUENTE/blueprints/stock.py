@@ -1,15 +1,30 @@
-from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from CODIGO_FUENTE.decorators import (
+    get_current_user,
+    log_action,
+    login_required,
+    permission_required,
+    role_required,
+)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
-from CODIGO_FUENTE.services.stock import check_stock_alert
 
 stock_bp = Blueprint("stock", __name__, url_prefix="/stock")
 
+def calcular_nivel_alerta(cantidad):
+    if cantidad == 0:
+        return "ROJO"
+    elif cantidad == 1:
+        return "AMARILLO"
+    elif cantidad == 2:
+        return "NARANJA"
+    else:
+        return "OK"
 
 @stock_bp.route("")
 @login_required
 @permission_required(read_roles=["DML_ST"], write_roles=["DML_REPUESTOS", "RAYPAC"])
+
 def stock_list(readonly=False):
     user = get_current_user()
     db = get_db()
@@ -43,7 +58,7 @@ def stock_list(readonly=False):
     # Agregar información de alerta
     stocks_con_alerta = []
     for stock in stocks:
-        alerta = check_stock_alert(stock['codigo_repuesto'], ubicacion)
+        alerta = calcular_nivel_alerta(stock['cantidad'])
         stocks_con_alerta.append({
             **dict(stock),
             'alerta': alerta,
@@ -138,7 +153,7 @@ def stock_new():
             flash(f"Repuesto {codigo} agregado al stock de {ubicacion}.", "success")
             return redirect(url_for("stock.stock_list", ubicacion=ubicacion))
         except Exception as e:
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
             return render_template("stock_new.html", ubicacion=ubicacion, user=user)
 
     return render_template("stock_new.html", ubicacion=ubicacion, user=user)
@@ -194,7 +209,7 @@ def stock_edit(codigo):
             flash("Stock actualizado.", "success")
             return redirect(url_for("stock.stock_list", ubicacion=ubicacion))
         except Exception as e:
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
 
     return render_template("stock_edit.html", stock=stock, ubicacion=ubicacion, user=user)
 

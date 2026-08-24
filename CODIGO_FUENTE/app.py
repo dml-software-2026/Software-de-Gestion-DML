@@ -4,20 +4,19 @@ import sys
 from dotenv import load_dotenv
 from flask import Flask
 
-from CODIGO_FUENTE.config import Config, BASE_DIR
-from CODIGO_FUENTE.extensions import close_db, init_db, migrate_db
-from CODIGO_FUENTE.decorators import get_current_user_jinja
-
-from CODIGO_FUENTE.blueprints.auth import auth_bp
-from CODIGO_FUENTE.blueprints.raypac import raypac_bp
-from CODIGO_FUENTE.blueprints.dml import dml_bp
-from CODIGO_FUENTE.blueprints.tickets import tickets_bp
-from CODIGO_FUENTE.blueprints.envios import envios_bp
-from CODIGO_FUENTE.blueprints.stock import stock_bp
 from CODIGO_FUENTE.blueprints.admin import admin_bp
-from CODIGO_FUENTE.blueprints.estadisticas import estadisticas_bp
 from CODIGO_FUENTE.blueprints.api import api_bp
+from CODIGO_FUENTE.blueprints.auth import auth_bp
+from CODIGO_FUENTE.blueprints.dml import dml_bp
+from CODIGO_FUENTE.blueprints.envios import envios_bp
+from CODIGO_FUENTE.blueprints.estadisticas import estadisticas_bp
 from CODIGO_FUENTE.blueprints.notificaciones import notificaciones_bp
+from CODIGO_FUENTE.blueprints.raypac import raypac_bp
+from CODIGO_FUENTE.blueprints.stock import stock_bp
+from CODIGO_FUENTE.blueprints.tickets import tickets_bp
+from CODIGO_FUENTE.config import BASE_DIR, Config
+from CODIGO_FUENTE.decorators import get_current_user_jinja
+from CODIGO_FUENTE.extensions import close_db, init_db, migrate_db
 
 load_dotenv()
 

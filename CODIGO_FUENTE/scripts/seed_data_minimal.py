@@ -3,14 +3,16 @@
 Script para cargar datos MÍNIMOS REALISTAS de prueba.
 Ejecutar con: python seed_data_minimal.py
 """
-import sys
 import os
+import sys
 from datetime import datetime, timedelta
+
 from werkzeug.security import generate_password_hash
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'CODIGO_FUENTE'))
 
-from app import app, get_db, generate_ficha_number, crear_ticket, init_db
+from app import app, crear_ticket, generate_ficha_number, get_db, init_db
+
 
 def seed_minimal():
     """Carga datos mínimos realistas para demostración."""
@@ -34,7 +36,7 @@ def seed_minimal():
         for table in tables:
             try:
                 db.execute(f"DELETE FROM {table}")
-            except:
+            except Exception:
                 pass
         db.commit()
         print("✓ Base de datos limpiada")
@@ -259,9 +261,9 @@ def seed_minimal():
         print(f"  • {len(repuestos)} repuestos en matriz")
         print(f"  • {len(stock_raypac)} ítems en stock RAYPAC")
         print(f"  • {len(stock_dml)} ítems en stock DML")
-        print(f"  • 2 ingresos RAYPAC")
-        print(f"  • 1 ficha DML con ticket")
-        print(f"  • 1 envío de repuestos RAYPAC→DML")
+        print("  • 2 ingresos RAYPAC")
+        print("  • 1 ficha DML con ticket")
+        print("  • 1 envío de repuestos RAYPAC→DML")
         
         print("\n🔑 CREDENCIALES:")
         print("  • Admin:     admin@dml.local / admin")

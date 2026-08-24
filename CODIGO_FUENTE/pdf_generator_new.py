@@ -211,7 +211,7 @@ def generate_ficha_pdf_new(ficha_id):
         return pdf_buffer
     
     except Exception as e:
-        print(f"ERROR en generate_ficha_pdf_new: {str(e)}")
+        print(f"ERROR en generate_ficha_pdf_new: {e!s}")
         import traceback
         traceback.print_exc()
         raise

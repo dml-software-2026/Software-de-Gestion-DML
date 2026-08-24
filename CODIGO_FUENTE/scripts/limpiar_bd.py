@@ -8,6 +8,7 @@ Elimina: fichas, envíos, tickets, RAYPAC entries, logs, etc.
 import sqlite3
 import sys
 
+
 def limpiar_base_datos():
     """Limpia todos los datos excepto usuarios y stock"""
     

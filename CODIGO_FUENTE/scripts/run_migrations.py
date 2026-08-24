@@ -5,6 +5,7 @@ Ejecutar ANTES del primer uso después del deploy
 import sqlite3
 import sys
 
+
 def migrate_envios_repuestos(db):
     """Agregar columnas faltantes a envios_repuestos"""
     print("\n[1/2] Migrando envios_repuestos...")
@@ -143,7 +144,7 @@ def main():
         try:
             db.rollback()
             db.close()
-        except:
+        except Exception:
             pass
         return 1
 
