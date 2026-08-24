@@ -1,3 +1,4 @@
+
 DROP TABLE IF EXISTS mail_log CASCADE;
 DROP TABLE IF EXISTS logs_auditoria CASCADE;
 DROP TABLE IF EXISTS envios_repuestos_detalles CASCADE;
@@ -316,6 +317,8 @@ CREATE TABLE freezing_log (
     FOREIGN KEY(usuario_freeze) REFERENCES users(id),
     FOREIGN KEY(usuario_unfreeze) REFERENCES users(id)
 );
+
+
 
 -- ======================== STOCK INICIAL ========================
 -- Los repuestos se cargan automáticamente desde CSV en load_seed_data()

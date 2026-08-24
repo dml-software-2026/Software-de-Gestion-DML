@@ -84,6 +84,8 @@
             <li><a class="dropdown-item" href="{{ url_for('admin.usuarios_list') }}">👥 Usuarios</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('raypac.raypac_new') }}">➕ Nuevo Ingreso RAYPAC</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('notificaciones.listar_notificaciones') }}">🔔 Alertas de Stock</a></li>
           </ul>
         </li>
         {% endif %}

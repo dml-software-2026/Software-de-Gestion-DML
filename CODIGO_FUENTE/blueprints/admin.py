@@ -25,10 +25,7 @@ def usuarios_list():
 
 
 @admin_bp.route("/cargar-stock-csv", methods=["POST", "GET"])
-# TODO SEGURIDAD (Épica 2 - tarea ya cargada en el Kanban): esta ruta NO
-# tiene ningún decorador de autenticación. Cualquiera con la URL puede
-# ejecutarla y sobreescribir el stock completo. Falta agregar
-# @login_required y @role_required("ADMIN"), igual que el resto de /admin/*.
+
 def cargar_stock_desde_web():
     """Endpoint para cargar stock desde el CSV en producción"""
     output = []

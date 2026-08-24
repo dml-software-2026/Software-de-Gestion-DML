@@ -17,6 +17,7 @@ from CODIGO_FUENTE.blueprints.stock import stock_bp
 from CODIGO_FUENTE.blueprints.admin import admin_bp
 from CODIGO_FUENTE.blueprints.estadisticas import estadisticas_bp
 from CODIGO_FUENTE.blueprints.api import api_bp
+from CODIGO_FUENTE.blueprints.notificaciones import notificaciones_bp
 
 load_dotenv()
 
@@ -44,7 +45,7 @@ app.register_blueprint(stock_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(estadisticas_bp)
 app.register_blueprint(api_bp)
-
+app.register_blueprint(notificaciones_bp)
 
 @app.before_request
 def apply_migrations():
