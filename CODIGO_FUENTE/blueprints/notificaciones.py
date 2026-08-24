@@ -1,7 +1,8 @@
 # CODIGO_FUENTE/blueprints/notificaciones.py
-from flask import Blueprint, render_template, request, redirect, url_for
-from CODIGO_FUENTE.extensions import get_db
+from flask import Blueprint, redirect, render_template, request, url_for
+
 from CODIGO_FUENTE.decorators import login_required, role_required
+from CODIGO_FUENTE.extensions import get_db
 
 notificaciones_bp = Blueprint('notificaciones', __name__, url_prefix='/admin')
 
