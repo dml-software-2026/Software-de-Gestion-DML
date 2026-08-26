@@ -229,10 +229,10 @@
                         </button>
                     </form>
                     {% endif %}
-                    <form method="POST" action="{{ url_for('dml.eliminar_repuesto', ficha_id=ficha.id, repuesto_id=repuesto.id) }}" 
-                          style="display: inline;">
-                        <button type="submit" class="btn btn-danger btn-sm" 
-                                onclick="return confirm('¿Eliminar repuesto {{ repuesto.codigo_repuesto }}?')">
+                    <form method="POST" action="{{ url_for('dml.eliminar_repuesto', ficha_id=ficha.id, repuesto_id=repuesto.id) }}"
+                          id="form-eliminar-{{ repuesto.id }}" style="display: inline;">
+                        <button type="button" class="btn btn-danger btn-sm"
+                                onclick="confirmarEliminarRepuesto('{{ repuesto.codigo_repuesto }}', 'form-eliminar-{{ repuesto.id }}')">
                             🗑️ Eliminar
                         </button>
                     </form>
@@ -426,6 +426,53 @@
                 // corregir el código primero.
             });
         });
+
+        // Confirmación de eliminación de repuesto (reemplaza el confirm()
+        // nativo del navegador por un modal de Bootstrap, mismo estilo que
+        // el de verificación de stock más arriba).
+        function confirmarEliminarRepuesto(codigo, formId) {
+            if (!document.getElementById('deleteRepuestoModal')) {
+                const modalHtml = `
+                    <div class="modal fade" id="deleteRepuestoModal" tabindex="-1" aria-labelledby="deleteRepuestoModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title" id="deleteRepuestoModalLabel">
+                                        <i class="bi bi-trash-fill"></i> CONFIRMAR ELIMINACIÓN
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body" id="deleteRepuestoModalBody"></div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <i class="bi bi-x-circle"></i> Cancelar
+                                    </button>
+                                    <button type="button" class="btn btn-danger" id="confirmDeleteRepuesto">
+                                        <i class="bi bi-trash"></i> Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+            }
+
+            document.getElementById('deleteRepuestoModalBody').innerHTML = `
+                <p class="fw-bold mb-0">¿Eliminar el repuesto <strong>${codigo}</strong> de esta ficha?</p>
+                <p class="text-muted mb-0">Si estaba descontado del stock, se le devuelve automáticamente.</p>
+            `;
+
+            const modal = new bootstrap.Modal(document.getElementById('deleteRepuestoModal'));
+            modal.show();
+
+            const confirmBtn = document.getElementById('confirmDeleteRepuesto');
+            confirmBtn.replaceWith(confirmBtn.cloneNode(true)); // limpia listeners de aperturas anteriores
+            document.getElementById('confirmDeleteRepuesto').addEventListener('click', function() {
+                modal.hide();
+                document.getElementById(formId).submit();
+            }, { once: true });
+        }
         </script>
     </div>
 </div>
