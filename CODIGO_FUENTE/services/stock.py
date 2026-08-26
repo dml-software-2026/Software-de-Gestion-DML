@@ -26,9 +26,9 @@ def check_stock_alert(codigo, ubicacion="DML"):
     if qty == 0:
         return "ROJO"  # Falta completamente
     elif qty == 1:
-        return "AMARILLO"  # Último repuesto
+        return "NARANJA"  # Último repuesto
     elif qty == 2:
-        return "NARANJA"  # Pocos repuestos
+        return "AMARILLO"  # Pocos repuestos
     else:
         return "OK"
 
@@ -39,8 +39,8 @@ def get_alert_badge(codigo, ubicacion="DML"):
 
     badge_config = {
         "ROJO": {"color": "#dc3545", "texto": "REPUESTO FALTANTE", "emoji": "🔴"},
-        "AMARILLO": {"color": "#ffc107", "texto": "ÚLTIMO REPUESTO", "emoji": "⚠️"},
-        "NARANJA": {"color": "#ff6600", "texto": "POCOS REPUESTOS", "emoji": "⚠️"},
+        "AMARILLO": {"color": "#ffc107", "texto": "POCOS REPUESTOS", "emoji": "⚠️"},
+        "NARANJA": {"color": "#ff6600", "texto": "ÚLTIMO REPUESTO", "emoji": "⚠️"},
         "OK": {"color": "#28a745", "texto": "DISPONIBLE", "emoji": "✅"},
         "NO_EXISTE": {"color": "#6c757d", "texto": "NO EXISTE", "emoji": "❓"}
     }
@@ -105,7 +105,7 @@ def verificar_alerta_stock(codigo_repuesto, ubicacion="DML"):
     nivel_alerta = check_stock_alert(codigo_repuesto, stock['ubicacion'])
     item_nombre = stock['item'] or codigo_repuesto
 
-    if nivel_alerta in ["ROJO", "AMARILLO", "NARANJA"]:
+    if nivel_alerta in ["ROJO", "NARANJA", "AMARILLO"]:
         # Registrar alerta
         db.execute("""
             INSERT INTO stock_alertas (codigo_repuesto, item, cantidad_actual, nivel_alerta)
@@ -124,8 +124,8 @@ def enviar_alerta_stock(codigo, item, cantidad, nivel, ubicacion="DML"):
     """Envía email de alerta de stock."""
     colores = {
         "ROJO": "Repuesto AGOTADO",
-        "AMARILLO": "Último repuesto disponible",
-        "NARANJA": "Pocos repuestos disponibles"
+        "NARANJA": "Último repuesto disponible",
+        "AMARILLO": "Pocos repuestos disponibles"
     }
 
     body = f"""
