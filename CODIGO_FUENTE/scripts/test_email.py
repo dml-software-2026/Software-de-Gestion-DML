@@ -2,8 +2,9 @@
 Script de prueba para verificar configuración SMTP de Gmail
 """
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 
 def test_gmail_connection(gmail_user, gmail_password, recipient_email):
     """
@@ -33,18 +34,18 @@ def test_gmail_connection(gmail_user, gmail_password, recipient_email):
         msg['To'] = recipient_email
         msg['Subject'] = "✅ Prueba de conexión SMTP - Sistema DML"
         
-        html_body = """
+        html_body = f"""
         <html>
             <body>
                 <h2>✅ Configuración SMTP Exitosa</h2>
                 <p>Este email confirma que la conexión SMTP está funcionando correctamente.</p>
                 <p><strong>Sistema:</strong> DML Gestión de Reparaciones</p>
-                <p><strong>Fecha:</strong> {}</p>
+                <p><strong>Fecha:</strong> {MIMEText}</p>
                 <hr>
                 <p style="color: green;">Si recibiste este correo, el sistema está listo para enviar notificaciones automáticas.</p>
             </body>
         </html>
-        """.format(MIMEText)
+        """
         
         from datetime import datetime
         html_body = html_body.replace("{}", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -75,11 +76,11 @@ def test_gmail_connection(gmail_user, gmail_password, recipient_email):
         print("\n📋 PRÓXIMOS PASOS:")
         print("1. Revisa tu bandeja de entrada en:", recipient_email)
         print("2. Si lo recibiste, configura estas variables en Render:")
-        print(f"   MAIL_SERVER=smtp.gmail.com")
-        print(f"   MAIL_PORT=587")
-        print(f"   MAIL_USE_TLS=True")
+        print("   MAIL_SERVER=smtp.gmail.com")
+        print("   MAIL_PORT=587")
+        print("   MAIL_USE_TLS=True")
         print(f"   MAIL_USERNAME={gmail_user}")
-        print(f"   MAIL_PASSWORD=[tu_contraseña_app_16_caracteres]")
+        print("   MAIL_PASSWORD=[tu_contraseña_app_16_caracteres]")
         print(f"   MAIL_DEFAULT_SENDER=Sistema DML <{gmail_user}>")
         print("\n")
         return True
@@ -114,7 +115,7 @@ def test_gmail_connection(gmail_user, gmail_password, recipient_email):
         print("❌ ERROR INESPERADO")
         print("=" * 60)
         print(f"Tipo: {type(e).__name__}")
-        print(f"Mensaje: {str(e)}")
+        print(f"Mensaje: {e!s}")
         import traceback
         traceback.print_exc()
         return False

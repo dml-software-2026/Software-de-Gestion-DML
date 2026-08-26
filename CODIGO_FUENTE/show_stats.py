@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
 """Script para mostrar estadísticas finales del sistema."""
 
-import sqlite3
 import os
+import sqlite3
+
 
 def show_stats():
     conn = sqlite3.connect('dml.db')

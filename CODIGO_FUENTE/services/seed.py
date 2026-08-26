@@ -1,5 +1,5 @@
-import os
 import csv
+import os
 
 from psycopg2.extras import execute_values
 from werkzeug.security import generate_password_hash
@@ -98,7 +98,7 @@ def cargar_stock_completo_desde_csv(db):
         return repuestos_cargados
 
     except Exception as e:
-        print(f"[STOCK CSV] ❌ Error: {str(e)}")
+        print(f"[STOCK CSV] ❌ Error: {e!s}")
         import traceback
         traceback.print_exc()
         return 0

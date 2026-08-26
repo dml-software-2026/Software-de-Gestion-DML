@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS dml_fichas CASCADE;
 DROP TABLE IF EXISTS stock_ubicaciones CASCADE;
 DROP TABLE IF EXISTS stock_dml CASCADE;
 DROP TABLE IF EXISTS matriz_repuestos CASCADE;
+DROP TABLE IF EXISTS clientes CASCADE;
 DROP TABLE IF EXISTS raypac_entries CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS stock_alertas CASCADE;
@@ -43,7 +44,8 @@ CREATE TABLE users (
 
 -- Tabla RAYPAC - Ingreso inicial
 CREATE TABLE raypac_entries (
-    id SERIAL PRIMARY KEY,  
+    id SERIAL PRIMARY KEY,
+    numero_correlativo INTEGER,
     fecha_recepcion DATE NOT NULL,
     tipo_solicitud TEXT NOT NULL,
     cliente TEXT NOT NULL,
@@ -55,12 +57,21 @@ CREATE TABLE raypac_entries (
     diagnostico_ingreso TEXT,
     comercial TEXT NOT NULL,
     mail_comercial TEXT NOT NULL,
+    contacto_cliente TEXT,
+    email_cliente TEXT,
     numero_remito TEXT,
     is_frozen BOOLEAN DEFAULT FALSE,
     frozen_at DATE,
     unfrozen_by TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Catálogo de clientes RAYPAC (desplegable con autoaprendizaje, RF03)
+CREATE TABLE clientes (
+    id SERIAL PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Matriz de Repuestos (catálogo)
