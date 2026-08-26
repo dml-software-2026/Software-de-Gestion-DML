@@ -138,8 +138,14 @@ def enviar_alerta_stock(codigo, item, cantidad, nivel, ubicacion="DML"):
     <p>Por favor, verifique el stock y considere reposición.</p>
     """
 
-    # Enviar a repuestos@dml.local
-    send_mail("repuestos@dml.local", f"🔔 Alerta de Stock: {item}", body)
+     # Enviar a todos los destinatarios activos configurados en usuarios_notificaciones
+    db = get_db()
+    destinatarios = db.execute(
+        "SELECT email FROM usuarios_notificaciones WHERE activo = TRUE"
+    ).fetchall()
+
+    for destinatario in destinatarios:
+        send_mail(destinatario["email"], f"🔔 Alerta de Stock: {item}", body)
 
 
 def actualizar_estado_alerta_stock(codigo, ubicacion="DML"):
