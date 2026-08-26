@@ -562,7 +562,7 @@ def eliminar_repuesto(ficha_id, repuesto_id):
     repuesto = db.execute("SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s", (repuesto_id, ficha_id)).fetchone()
     if not repuesto:
         flash("Repuesto no encontrado.", "error")
-        return redirect(url_for("dml.dml_view", id=ficha_id))
+        return redirect(url_for("dml.dml_edit", id=ficha_id))
 
     # Si el repuesto estaba en stock, devolverlo a ubicación DML
     if repuesto['en_stock']:
@@ -583,7 +583,7 @@ def eliminar_repuesto(ficha_id, repuesto_id):
               f"Repuesto {repuesto['codigo_repuesto']} eliminado de ficha {ficha_id}")
 
     flash("Repuesto eliminado correctamente.", "success")
-    return redirect(url_for("dml.dml_view", id=ficha_id))
+    return redirect(url_for("dml.dml_edit", id=ficha_id))
 
 
 # ======================== TICKETS (asociados a ficha) ========================
