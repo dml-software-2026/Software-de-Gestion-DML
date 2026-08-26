@@ -17,6 +17,7 @@ from CODIGO_FUENTE.blueprints.tickets import tickets_bp
 from CODIGO_FUENTE.config import BASE_DIR, Config
 from CODIGO_FUENTE.decorators import get_current_user_jinja
 from CODIGO_FUENTE.extensions import close_db, init_db, migrate_db
+from CODIGO_FUENTE.services.stock import get_alert_badge
 
 load_dotenv()
 
@@ -28,8 +29,11 @@ app = Flask(
 )
 app.config.from_object(Config)
 
-# Hacer get_current_user disponible en todos los templates Jinja2
-app.jinja_env.globals.update(get_current_user=get_current_user_jinja)
+# Hacer funciones de negocio disponibles en todos los templates Jinja2
+app.jinja_env.globals.update(
+    get_current_user=get_current_user_jinja,
+    get_alert_badge=get_alert_badge,
+)
 
 # Cerrar la conexión a la BD al final de cada request
 app.teardown_appcontext(close_db)
