@@ -220,10 +220,10 @@
                 </div>
                 <div style="margin-left: 10px; display: flex; gap: 5px;">
                     {% if repuesto.en_falta %}
-                    <form method="POST" action="{{ url_for('dml.mover_repuesto_a_stock', ficha_id=ficha.id, repuesto_id=repuesto.id) }}" 
-                          style="display: inline;">
-                        <button type="submit" class="btn btn-warning btn-sm" 
-                                onclick="return confirm('¿Confirmar que el repuesto {{ repuesto.codigo_repuesto }} ya está disponible?')" 
+                    <form method="POST" action="{{ url_for('dml.mover_repuesto_a_stock', ficha_id=ficha.id, repuesto_id=repuesto.id) }}"
+                          id="form-mover-stock-{{ repuesto.id }}" style="display: inline;">
+                        <button type="button" class="btn btn-warning btn-sm"
+                                onclick="confirmarMoverAStock('{{ repuesto.codigo_repuesto }}', 'form-mover-stock-{{ repuesto.id }}')"
                                 title="Marcar como disponible cuando llegue el stock">
                             🔄 Mover a Stock
                         </button>
@@ -469,6 +469,51 @@
             const confirmBtn = document.getElementById('confirmDeleteRepuesto');
             confirmBtn.replaceWith(confirmBtn.cloneNode(true)); // limpia listeners de aperturas anteriores
             document.getElementById('confirmDeleteRepuesto').addEventListener('click', function() {
+                modal.hide();
+                document.getElementById(formId).submit();
+            }, { once: true });
+        }
+
+        // Confirmación de "Mover a Stock" (mismo patrón que eliminar).
+        function confirmarMoverAStock(codigo, formId) {
+            if (!document.getElementById('moveStockModal')) {
+                const modalHtml = `
+                    <div class="modal fade" id="moveStockModal" tabindex="-1" aria-labelledby="moveStockModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header bg-warning text-dark">
+                                    <h5 class="modal-title" id="moveStockModalLabel">
+                                        <i class="bi bi-arrow-repeat"></i> CONFIRMAR DISPONIBILIDAD
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body" id="moveStockModalBody"></div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <i class="bi bi-x-circle"></i> Cancelar
+                                    </button>
+                                    <button type="button" class="btn btn-warning" id="confirmMoveStock">
+                                        <i class="bi bi-check-circle"></i> Confirmar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+            }
+
+            document.getElementById('moveStockModalBody').innerHTML = `
+                <p class="fw-bold mb-0">¿Confirmar que el repuesto <strong>${codigo}</strong> ya está disponible?</p>
+                <p class="text-muted mb-0">Se descontará del stock actual en DML y quedará marcado como EN STOCK.</p>
+            `;
+
+            const modal = new bootstrap.Modal(document.getElementById('moveStockModal'));
+            modal.show();
+
+            const confirmBtn = document.getElementById('confirmMoveStock');
+            confirmBtn.replaceWith(confirmBtn.cloneNode(true)); // limpia listeners de aperturas anteriores
+            document.getElementById('confirmMoveStock').addEventListener('click', function() {
                 modal.hide();
                 document.getElementById(formId).submit();
             }, { once: true });
