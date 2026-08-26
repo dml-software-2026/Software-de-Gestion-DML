@@ -571,7 +571,7 @@ def eliminar_repuesto(ficha_id, repuesto_id):
         # Restar de estadísticas (reversar el uso)
         db.execute("""
             UPDATE estadisticas_repuestos
-            SET total_usos = total_usos - %s, ultima_actualizacion = CURRENT_TIMESTAMP
+            SET total_usos = total_usos - %s, updated_at = CURRENT_TIMESTAMP
             WHERE codigo_repuesto = %s
         """, (repuesto['cantidad_utilizada'], repuesto['codigo_repuesto']))
 
