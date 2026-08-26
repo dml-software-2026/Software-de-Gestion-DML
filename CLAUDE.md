@@ -18,7 +18,88 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-- **Última actualización:** 2026-08-20, cierre de sesión.
+- **Última actualización:** 2026-08-26, cierre de sesión.
+- **Issue #114 (bug de Ivo: `get_alert_badge` + columna `ultima_actualizacion`
+  al eliminar repuesto) — ✅ CERRADO, PR #129 mergeado.** Ivo había dicho que
+  creía que el bug de la columna no pasaba en Render, solo en su local —
+  confirmó después que sí pasaba en los dos, así que no era diferencia de
+  entorno: los dos bugs eran 100% de código (función no registrada en Jinja,
+  columna que nunca existió en `schema-postgres.sql`). Fix: `get_alert_badge`
+  registrada como global de Jinja en `app.py`, y la query usa `updated_at`
+  (la columna real) en vez de `ultima_actualizacion`.
+- **Issue #126 (`verificar_stock_api` roto, falso aviso de "sin stock") —
+  ✅ CERRADO, PR #130 mergeado.** Encontrado probando el #114: la función
+  usaba una variable `db` sin definir y una tabla `stock_repuestos`
+  inexistente. Reescrita con `get_db()` + `matriz_repuestos`/`stock_ubicaciones`,
+  mismo criterio que `check_stock_alert`.
+- **Issue #128 (scripts duplicados en `dml_edit.html`) — ✅ CERRADO, PR #131
+  mergeado.** Encontrado probando el #126 en el navegador: había DOS bloques
+  `<script>` completos enganchados a los mismos elementos (uno viejo con
+  `confirm()` nativo, uno nuevo con modal de Bootstrap cuyo chequeo de stock
+  nunca se conectó al backend - quedó como stub). Se unificaron en uno solo;
+  el submit ahora espera la verificación real antes de decidir.
+- **Issue #127 (redirect inconsistente Eliminar vs. Mover a Stock) — ✅
+  CERRADO, PR #136 mergeado.** `eliminar_repuesto()` ahora redirige a
+  `dml_edit` igual que `mover_repuesto_a_stock()` (antes sacaba a `dml_view`).
+  Sumado en el mismo PR (pedido de Facu durante el testing): los `confirm()`
+  nativos de los botones "Eliminar" y "Mover a Stock" en `dml_edit.html` se
+  reemplazaron por modales de Bootstrap (rojo/amarillo respectivamente),
+  mismo patrón que el modal de stock del #128.
+- **Gotcha nuevo, importante para la próxima vez que se abra un PR desde
+  GitHub:** los PRs de #126 y #128 se abrieron por error contra `main` en
+  vez de `dev` (default del repo si no se cambia el dropdown a mano). Contra
+  `main` — semanas atrás de `dev` — GitHub mostraba conflictos falsos y el
+  CI no llegaba a correr, dando la apariencia de "el CI tira error" sin serlo.
+  Diagnóstico: `gh pr view <n> --json mergeable,mergeStateStatus` +
+  `gh api repos/.../pulls/<n> -q .base.ref` para confirmar la base real.
+  Fix: `gh pr edit <n> --base dev`, y como cambiar la base sola NO dispara
+  el evento que activa el CI, hace falta además `gh pr close` + `gh pr reopen`
+  para forzar un run nuevo.
+- **Auditoría completa de `HALLAZGOS_REFACTOR.md` contra el kanban (pedido
+  de Facu, preocupado de que hubiera hallazgos sin trackear).** De los 11
+  hallazgos del documento, 8 ya estaban cubiertos por issues existentes
+  (algunos cerrados en la sesión de hoy). Se crearon los 3 que faltaban:
+  - **#132** — Auditoría UX/UI: `confirm()` nativos restantes (6, en
+    `raypac_view.html`, `stock_list.html`, `envios_view.html`,
+    `dml_view.html`, `usuarios_list.html`, `raypac_form.html`), el bug ya
+    documentado de sintaxis Bootstrap 4 en el modal de "Acuse"
+    (`dml_entregadas.html`), y el hallazgo #8 de los ~24 `<select>` sin
+    unificar. Backlog, Size L.
+  - **#133** — Centralizar `ADMIN2024` hardcodeado (5 ocurrencias) +
+    evaluar si el mecanismo de `raypac_edit()` (inalcanzable desde la UI
+    real, hallazgo #9) se elimina directamente. Backlog, Size S. Reemplaza
+    la nota de "próxima tarea" que quedó pendiente el 2026-08-20.
+  - **#134** — Botón "Generar Ficha" nunca conectado al frontend (hallazgo
+    #5): decidir si se agrega el botón o se borra la ruta. Backlog, Size S.
+  - **#135** — Borrar los 3 templates backup muertos (hallazgo #11:
+    `dml_view_OLD.html`, `dml_edit_FIXED.html`, `dml_edit_BACKUP.html`,
+    confirmado que siguen presentes). Backlog, Size XS.
+  - `app_backup.py` (hallazgo #10) ya estaba resuelto de antes (PR #81), sin
+    nada pendiente ahí.
+- **Kanban, además:** #55 pasó de XL a M (Facu lo re-scopeó a mano tras
+  revisar con Claude Code que la mayoría de los 7 puntos del checklist ya
+  estaban implementados). #44 se movió de Backlog a Ready.
+- **Aclarado, no es tarea:** la rama `refactor/85-unificar-los-3-generadores-de-pdf`
+  es de Ivo (issue #85), sin commits propios todavía (apunta a un commit
+  viejo de `dev` del 20/08) - no se toca, no se borra.
+- **Práctica de equipo confirmada esta sesión (Facu):** cuando aparece un
+  bug o inconsistencia que no generamos nosotros, primero chequear si ya
+  tiene tarea en el kanban; si no, crear una (por más que sea XS, para que
+  quede documentado) antes de decidir si se arregla en el momento o se deja
+  para después. Aplicado repetidas veces hoy (#126, #128, #132-#135) - seguir
+  con este flujo de acá en adelante.
+- **Ambiente local de esta máquina:** sigue armado de punta a punta, usado
+  activamente hoy para probar los 4 issues de arriba. El server de pruebas
+  se detuvo al cerrar la sesión.
+- **Bloqueos:** ninguno.
+- **Próximo paso concreto:** ninguna tarea de Facu en curso ahora mismo.
+  Candidatos para la próxima sesión, todos en Backlog: #132, #133, #134,
+  #135 (los de arriba), o alguna tarea nueva que salga del daily.
+
+<details>
+<summary>Checkpoint anterior (2026-08-20) — histórico, dejado sin borrar por
+las referencias a Issue #54/#62 más abajo</summary>
+
 - **Issue #54 (ingreso RAYPAC) — ✅ CERRADO.** Los 3 PRs (#109, #110, #115)
   están mergeados a `dev`. Checklist manual de 6 puntos y los 5 puntos del
   DoD original confirmados (incluidas 5 altas consecutivas sin error 500).
@@ -76,6 +157,8 @@ asumir contexto de nada más.
   bugs de setup conocidos: sección "Setup de entorno local" más abajo.
 - **Bloqueos:** ninguno.
 
+</details>
+
 ## Instrucciones de flujo de trabajo para Claude Code
 
 **PRs chicos, siempre.** No armar un PR gigante con toda una tarea/issue resuelta de
@@ -129,6 +212,22 @@ bloqueo, se decide el próximo paso), actualizar la sección "🔖 Checkpoint" a
 principio de este archivo con el estado real y el próximo paso concreto. Sigue el
 mismo flujo que cualquier cambio: rama chica (`docs/checkpoint-...`), commit, push,
 avisarle a Facu para que abra y mergee el PR contra `dev`.
+
+**Bug o inconsistencia que no generamos nosotros: primero kanban, después código.**
+Cuando aparece algo roto/feo que no es parte de la tarea en curso (encontrado
+mientras se prueba otra cosa), chequear primero si ya tiene issue en GitHub
+(`gh issue list --search ...` o revisar el board). Si no la tiene, crearla —
+por más que sea Size XS, para que quede documentado y no se pierda — y recién
+ahí preguntarle a Facu si conviene resolverla en el momento (si es chica) o
+dejarla para después. No arreglar directamente sin este paso primero.
+
+**Cuidado al abrir un PR desde GitHub: confirmar la base branch.** El dropdown
+de base del PR puede quedar en el default del repo si no se lo cambia a mano
+- pasó en esta sesión con dos PRs que se abrieron contra `main` en vez de
+`dev` por error, y el síntoma en pantalla (conflictos, CI que no corre) se ve
+igual que un problema real. Si un PR recién abierto muestra conflictos raros
+o el CI no corre, lo primero a chequear es `gh api repos/.../pulls/<n> -q
+.base.ref` antes de asumir que es un bug de código.
 
 ## Proyecto
 
@@ -475,19 +574,18 @@ Usuarios: `raypac@dml.local`/`raypac` · `tecnico@dml.local`/`tecnico` (DML_ST) 
 ## Hallazgos pendientes (no resueltos, documentados en HALLAZGOS_REFACTOR.md)
 
 **Seguridad (Épica 2):**
-- Hashes de contraseñas hardcodeados en `migrate_db()` (tarea de Ivo, #64/#65)
+- Hashes de contraseñas hardcodeados en `migrate_db()` (tarea de Ivo, #64/#65) — cerrado
 - Código `"ADMIN2024"` hardcodeado y repetido 5 veces (`raypac_edit`, `dml_edit`,
-  `stock_new`, `stock_edit`, `stock_delete`) — pendiente centralizar en variable de entorno
+  `stock_new`, `stock_edit`, `stock_delete`) — issue **#133**, Backlog
 
 **Bugs confirmados:**
-- `verificar_stock_api` en `blueprints/api.py` está roto (usa `db` sin definir y una
-  tabla `stock_repuestos` que no existe) — genera falsos avisos de "sin stock" en el
-  form de agregar repuestos, aunque el guardado real funciona bien. Documentado en el
-  propio código con docstring explicando el problema, no arreglar sin confirmar antes
-  si algo lo usa.
-- Botón "Generar Ficha" nunca conectado al frontend (la ruta existe, ningún template la llama)
+- ~~`verificar_stock_api` en `blueprints/api.py` roto~~ — **resuelto (2026-08-26),
+  issue #126, PR #130.** Reescrito con `get_db()` + `matriz_repuestos`/`stock_ubicaciones`.
+- Botón "Generar Ficha" nunca conectado al frontend (la ruta existe, ningún
+  template la llama) — issue **#134**, Backlog
 - Botón "Acuse" en `/dml/entregadas` usa sintaxis Bootstrap 4 en proyecto Bootstrap 5
-  (`data-toggle` → debería ser `data-bs-toggle`)
+  (`data-toggle` → debería ser `data-bs-toggle`) — agrupado en issue **#132**
+  (auditoría UX/UI), Backlog
 - `raypac_new()` en `blueprints/raypac.py` inserta y lee la columna `numero_correlativo`
   de `raypac_entries`, pero esa columna no existe en `schema-postgres.sql` ni tenía
   migración en `extensions.py` (a diferencia de `contacto_cliente`/`email_cliente`, que
@@ -495,19 +593,29 @@ Usuarios: `raypac@dml.local`/`raypac` · `tecnico@dml.local`/`tecnico` (DML_ST) 
   `no existe la columna «numero_correlativo»` al guardar un ingreso nuevo) — **resuelto,
   PR #110** (`fix/54-numero-correlativo-postgres`) ya mergeado a `dev`.
 - ~~`raypac_unfreeze()` no revierte `estado_envio_equipos` a `PENDIENTE` al desfreezar~~
-  — **resuelto (2026-08-20).** Encontrado probando el #54 (registro de prueba "Santi"
-  en la base local): un registro desfreezado podía quedar con `is_frozen=FALSE` pero
-  `estado_envio_equipos='ENVIADO'`, mostrando el badge "Enviado desde RAYPAC" como si
-  siguiera en tránsito aunque ya no estuviera freezado. Fix probado localmente,
-  pusheado en `fix/raypac-unfreeze-estado-envio` (commit `8b22dc0`), **PR pendiente
-  de abrir en GitHub.** Detalle en el Checkpoint de arriba.
+  — **resuelto, PR #119 mergeado a `dev`.** Encontrado probando el #54 (registro de
+  prueba "Santi" en la base local): un registro desfreezado podía quedar con
+  `is_frozen=FALSE` pero `estado_envio_equipos='ENVIADO'`, mostrando el badge
+  "Enviado desde RAYPAC" como si siguiera en tránsito aunque ya no estuviera freezado.
+- ~~`eliminar_repuesto()` en `dml_view.html` tira `UndefinedError` en `get_alert_badge`
+  y `UndefinedColumn` en `ultima_actualizacion`~~ — **resuelto (2026-08-26), issue
+  #114, PR #129.** Reportado por Ivo, confirmado que reproducía tanto en local como
+  en Render (no era diferencia de entorno).
+- ~~Scripts duplicados de verificación de stock en `dml_edit.html`~~ — **resuelto
+  (2026-08-26), issue #128, PR #131.** Dos bloques `<script>` completos enganchados a
+  los mismos elementos, mostrando alertas contradictorias.
+- ~~Redirect inconsistente entre "Eliminar" y "Mover a Stock" en `dml_edit.html`~~ —
+  **resuelto (2026-08-26), issue #127, PR #136.** De paso, se reemplazaron los
+  `confirm()` nativos de esos dos botones por modales de Bootstrap.
 
 **No urgente:**
 - Dos generadores de PDF sin unificar (`generar_ficha_pdf` y `generate_ficha_pdf`) más
   un tercero sin integrar (`generate_ficha_pdf_new`) — tarea de Ivo (#85) esta sprint,
   puede no completarse y pasar a E3
+- ~24 `<select>` nativos sin unificar visualmente con el desplegable armado a mano de
+  Cliente — agrupado en issue **#132** (auditoría UX/UI), Backlog
 - Archivos backup viejos candidatos a borrar: `dml_view_OLD.html`, `dml_edit_FIXED.html`,
-  `dml_edit_BACKUP.html`
+  `dml_edit_BACKUP.html` — issue **#135**, Backlog
 
 ## Rutas sin `@login_required` a propósito (no son bugs)
 
