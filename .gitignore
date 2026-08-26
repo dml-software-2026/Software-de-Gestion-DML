@@ -3,6 +3,7 @@ venv/
 env/
 ENV/
 *.venv
+.env
 
 # Database
 *.db
@@ -47,6 +48,11 @@ MANIFEST
 *.log
 logs/
 
+# DML Data
+CODIGO_FUENTE/scripts/data/maquinas.csv
+CODIGO_FUENTE/scripts/data/matriz.csv
+CODIGO_FUENTE/scripts/data/errores_*.csv
+
 # Temporary files
 *.tmp
 *.temp
@@ -63,3 +69,5 @@ build/
 # OS
 Thumbs.db
 .DS_Store
+
+
