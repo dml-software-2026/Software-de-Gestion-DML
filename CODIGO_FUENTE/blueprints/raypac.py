@@ -56,14 +56,18 @@ def raypac_list(readonly=False):
         flash(f"Error al cargar ingresos RAYPAC: {e!s}", "error")
         entries = []
 
-    # Configuración de badges para estados de fichas DML
+    # Configuración de badges para estados de fichas DML.
+    # Claves = valores reales de dml_fichas.estado_reparacion (ver dml_edit.html
+    # y dml.py estados_orden). Colores acordados con David - ver issue #44.
     estado_config = {
-        "REVISION_INICIAL": {"color": "#17a2b8", "texto": "Revisión Inicial"},
-        "EN_REPARACION": {"color": "#ffc107", "texto": "En Reparación"},
-        "PAUSADA": {"color": "#fd7e14", "texto": "Pausada"},
-        "FINALIZADA": {"color": "#28a745", "texto": "Finalizada"},
-        "ENTREGADA": {"color": "#6c757d", "texto": "Entregada"},
-        "MÁQUINA ENTREGADA": {"color": "#6c757d", "texto": "Máquina Entregada"}
+        "A LA ESPERA DE REVISIÓN": {"color": "#ffffff", "texto_color": "#000000", "texto": "A la Espera de Revisión"},
+        "REVISION_INICIAL": {"color": "#ffffff", "texto_color": "#000000", "texto": "A la Espera de Revisión"},  # alias legado, ver #44
+        "EN REPARACIÓN": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "En Reparación"},
+        "EN REPARACION": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "En Reparación"},  # alias sin tilde, ver #44
+        "A LA ESPERA DE REPUESTOS": {"color": "#fd7e14", "texto_color": "#000000", "texto": "A la Espera de Repuestos"},
+        "REPARACIÓN COMPLETADA": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "Reparación Completada"},
+        "MÁQUINA LISTA PARA RETIRAR": {"color": "#ffc107", "texto_color": "#000000", "texto": "Lista para Retirar"},
+        "MÁQUINA ENTREGADA": {"color": "#28a745", "texto_color": "#ffffff", "texto": "Máquina Entregada"}
     }
 
     return render_template("raypac_list.html", entries=entries, user_role=user['role'], readonly=readonly, estado_config=estado_config)
