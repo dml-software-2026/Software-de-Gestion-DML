@@ -112,7 +112,7 @@ def dml_new(raypac_id):
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso, tecnico,
-                      observaciones, n_ciclos, tecnico_resp, 'REVISION_INICIAL')).fetchone()
+                      observaciones, n_ciclos, tecnico_resp, 'A LA ESPERA DE REVISIÓN')).fetchone()
 
                 ficha_id = row['id']
 
@@ -130,7 +130,7 @@ def dml_new(raypac_id):
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (numero_ficha, raypac_id, fecha_ingreso, tecnico,
-                      observaciones, n_ciclos, tecnico_resp, 'REVISION_INICIAL')).fetchone()
+                      observaciones, n_ciclos, tecnico_resp, 'A LA ESPERA DE REVISIÓN')).fetchone()
 
                 ficha_id = row['id']
 
@@ -285,8 +285,10 @@ def dml_edit(id):
             # Orden lógico: A LA ESPERA DE REVISIÓN → EN REPARACIÓN → [A LA ESPERA DE REPUESTOS] → MÁQUINA LISTA PARA RETIRAR → MÁQUINA ENTREGADA
             estados_orden = {
                 'A LA ESPERA DE REVISIÓN': 0,
-                'EN REPARACION': 1,
-                'A LA ESPERA DE REPUESTOS': 1,  # Mismo nivel que EN REPARACION (puede ir y volver)
+                'REVISION_INICIAL': 0,  # alias legado, ver #44 - fichas creadas antes del fix
+                'EN REPARACIÓN': 1,
+                'EN REPARACION': 1,  # alias sin tilde, ver #44 - encoding legado en datos viejos
+                'A LA ESPERA DE REPUESTOS': 1,  # Mismo nivel que EN REPARACIÓN (puede ir y volver)
                 'REPARACIÓN COMPLETADA': 2,
                 'MÁQUINA LISTA PARA RETIRAR': 3,
                 'MÁQUINA ENTREGADA': 4,
@@ -296,7 +298,7 @@ def dml_edit(id):
             estado_actual_nivel = estados_orden.get(ficha['estado_reparacion'], 0)
             estado_nuevo_nivel = estados_orden.get(estado, 0)
 
-            # Prevenir retrocesos ilógicos (salvo entre EN REPARACION y A LA ESPERA DE REPUESTOS)
+            # Prevenir retrocesos ilógicos (salvo entre EN REPARACIÓN y A LA ESPERA DE REPUESTOS)
             if estado_actual_nivel >= 3 and estado_nuevo_nivel < estado_actual_nivel:
                 # No permitir retrocesos desde MÁQUINA LISTA o posterior
                 flash(f"⚠️ No se puede retroceder de '{ficha['estado_reparacion']}' a '{estado}'. Para cambios contacte al administrador.", "error")

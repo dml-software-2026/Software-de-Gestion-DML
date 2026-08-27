@@ -169,7 +169,7 @@
                 <select name="estado_reparacion" required>
                     <option value="A LA ESPERA DE REVISIÓN" {% if ficha.estado_reparacion == 'A LA ESPERA DE REVISIÓN' %}selected{% endif %}>A LA ESPERA DE REVISIÓN</option>
                     <option value="A LA ESPERA DE REPUESTOS" {% if ficha.estado_reparacion == 'A LA ESPERA DE REPUESTOS' %}selected{% endif %}>A LA ESPERA DE REPUESTOS</option>
-                    <option value="EN REPARACION" {% if ficha.estado_reparacion == 'EN REPARACION' %}selected{% endif %}>EN REPARACION</option>
+                    <option value="EN REPARACIÓN" {% if ficha.estado_reparacion in ('EN REPARACIÓN', 'EN REPARACION') %}selected{% endif %}>EN REPARACIÓN</option>
                     <option value="REPARACIÓN COMPLETADA" {% if ficha.estado_reparacion == 'REPARACIÓN COMPLETADA' %}selected{% endif %}>REPARACIÓN COMPLETADA</option>
                     <option value="MÁQUINA LISTA PARA RETIRAR" {% if ficha.estado_reparacion == 'MÁQUINA LISTA PARA RETIRAR' %}selected{% endif %}>MÁQUINA LISTA PARA RETIRAR</option>
                     <option value="MÁQUINA ENTREGADA" {% if ficha.estado_reparacion == 'MÁQUINA ENTREGADA' %}selected{% endif %}>MÁQUINA ENTREGADA</option>
