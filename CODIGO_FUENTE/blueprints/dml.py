@@ -80,6 +80,16 @@ def dml_new(raypac_id):
     # Buscar si existe un ticket asociado a este RAYPAC (nuevo flujo)
     ticket = db.execute("SELECT * FROM tickets WHERE raypac_id = %s AND ficha_id IS NULL", (raypac_id,)).fetchone()
 
+    # #55: la ficha solo se puede crear despues de generar el ticket. El
+    # boton "Crear Ficha" ya esta oculto en la UI hasta que exista ticket
+    # (raypac_list.html, raypac_view.html), pero eso no alcanzaba si alguien
+    # pegaba esta URL directo - habia un "flujo antiguo" que creaba la ficha
+    # igual y recien despues el ticket, salteando la inspeccion visual y el
+    # mail al comercial. Se saca esa rama y se bloquea acá tambien.
+    if not ticket:
+        flash("Debe crear un ticket primero antes de generar la ficha.", "error")
+        return redirect(url_for("raypac.raypac_view", id=raypac_id))
+
     if request.method == "POST":
         try:
             fecha_ingreso = request.form.get("fecha_ingreso") or datetime.now().strftime("%Y-%m-%d")
@@ -102,40 +112,23 @@ def dml_new(raypac_id):
 
             numero_ficha = generate_ficha_number()
 
-            # Si existe ticket, asociar la ficha con él
-            if ticket:
-                row = db.execute("""
-                    INSERT INTO dml_fichas
-                    (numero_ficha, raypac_id, ticket_id, numero_ticket, fecha_ingreso, tecnico,
-                     observaciones, n_ciclos, tecnico_resp,
-                     estado_reparacion)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso, tecnico,
-                      observaciones, n_ciclos, tecnico_resp, 'A LA ESPERA DE REVISIÓN')).fetchone()
+            # Ya se validó arriba que el ticket existe - se asocia la ficha con él
+            row = db.execute("""
+                INSERT INTO dml_fichas
+                (numero_ficha, raypac_id, ticket_id, numero_ticket, fecha_ingreso, tecnico,
+                 observaciones, n_ciclos, tecnico_resp,
+                 estado_reparacion)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso, tecnico,
+                  observaciones, n_ciclos, tecnico_resp, 'A LA ESPERA DE REVISIÓN')).fetchone()
 
-                ficha_id = row['id']
+            ficha_id = row['id']
 
-                # Actualizar ticket con el ficha_id
-                db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
+            # Actualizar ticket con el ficha_id
+            db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
 
-                numero_ticket = ticket['numero_ticket']
-            else:
-                # Flujo antiguo: crear ficha sin ticket previo
-                row = db.execute("""
-                    INSERT INTO dml_fichas
-                    (numero_ficha, raypac_id, fecha_ingreso, tecnico,
-                     observaciones, n_ciclos, tecnico_resp,
-                     estado_reparacion)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                """, (numero_ficha, raypac_id, fecha_ingreso, tecnico,
-                      observaciones, n_ciclos, tecnico_resp, 'A LA ESPERA DE REVISIÓN')).fetchone()
-
-                ficha_id = row['id']
-
-                # Crear ticket después (flujo antiguo)
-                numero_ticket = crear_ticket(ficha_id, raypac['numero_serie'])
+            numero_ticket = ticket['numero_ticket']
 
             db.commit()
 
@@ -146,43 +139,34 @@ def dml_new(raypac_id):
                 "SERVO", "RUEDA DE ARRASTRE", "RESORTE DE MANIJA", "OTROS"
             ]
 
-            # Si hay ticket, usar los estados del equipo completados en el ticket
-            if ticket:
-                # Mapeo de columnas del ticket a nombres de partes
-                ticket_to_parte = {
-                    'estado_equipo': 'ESTADO DEL EQUIPO',
-                    'carcaza': 'CARCAZA',
-                    'cubre_feedwheel': 'CUBRE FEEDWHEEL',
-                    'mango': 'MANGO',
-                    'botones': 'BOTONES',
-                    'motor_arrastre': 'MOTOR DE ARRASTRE',
-                    'motor_sellado': 'MOTOR DE SELLADO',
-                    'cuchilla': 'CUCHILLA',
-                    'servo': 'SERVO',
-                    'rueda_arrastre': 'RUEDA DE ARRASTRE',
-                    'resorte_manija': 'RESORTE DE MANIJA',
-                    'otros': 'OTROS'
-                }
+            # Usar los estados del equipo completados en el ticket (inspección visual)
+            ticket_to_parte = {
+                'estado_equipo': 'ESTADO DEL EQUIPO',
+                'carcaza': 'CARCAZA',
+                'cubre_feedwheel': 'CUBRE FEEDWHEEL',
+                'mango': 'MANGO',
+                'botones': 'BOTONES',
+                'motor_arrastre': 'MOTOR DE ARRASTRE',
+                'motor_sellado': 'MOTOR DE SELLADO',
+                'cuchilla': 'CUCHILLA',
+                'servo': 'SERVO',
+                'rueda_arrastre': 'RUEDA DE ARRASTRE',
+                'resorte_manija': 'RESORTE DE MANIJA',
+                'otros': 'OTROS'
+            }
 
-                for parte_nombre in partes_nombres:
-                    # Buscar el estado correspondiente en el ticket
-                    estado = "POR INSPECCIONAR"
-                    for ticket_col, parte_map in ticket_to_parte.items():
-                        if parte_map == parte_nombre and ticket_col in ticket.keys() and ticket[ticket_col]:
-                            estado = ticket[ticket_col]
-                            break
+            for parte_nombre in partes_nombres:
+                # Buscar el estado correspondiente en el ticket
+                estado = "POR INSPECCIONAR"
+                for ticket_col, parte_map in ticket_to_parte.items():
+                    if parte_map == parte_nombre and ticket_col in ticket.keys() and ticket[ticket_col]:
+                        estado = ticket[ticket_col]
+                        break
 
-                    db.execute(
-                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
-                        (ficha_id, parte_nombre, estado)
-                    )
-            else:
-                # Sin ticket, crear partes con estado por defecto
-                for parte in partes_nombres:
-                    db.execute(
-                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
-                        (ficha_id, parte, "POR INSPECCIONAR")
-                    )
+                db.execute(
+                    "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
+                    (ficha_id, parte_nombre, estado)
+                )
 
             db.commit()
 
