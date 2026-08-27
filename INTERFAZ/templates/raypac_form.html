@@ -20,7 +20,6 @@
                             <div class="col-md-6">
                                 <label for="tipo_solicitud" class="form-label">Tipo Solicitud *</label>
                                 <select class="form-control" id="tipo_solicitud" name="tipo_solicitud" required>
-                                    <option value="">Selecciona</option>
                                     <option value="REPARACIÓN" {% if entry and entry.tipo_solicitud == 'REPARACIÓN' %}selected{% endif %}>REPARACIÓN</option>
                                     <option value="PRESUPUESTO" {% if entry and entry.tipo_solicitud == 'PRESUPUESTO' %}selected{% endif %}>PRESUPUESTO</option>
                                 </select>
