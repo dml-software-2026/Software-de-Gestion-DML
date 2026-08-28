@@ -1,9 +1,14 @@
 from datetime import datetime
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from CODIGO_FUENTE.decorators import (
+    get_current_user,
+    log_action,
+    login_required,
+    role_required,
+)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, role_required, get_current_user, log_action
 from CODIGO_FUENTE.services.mail import send_mail
 from CODIGO_FUENTE.services.numeracion import generate_ticket_number
 
@@ -129,7 +134,7 @@ def ticket_nuevo(raypac_id):
             return redirect(url_for("tickets.ticket_view", numero_ticket=numero_ticket))
 
         except Exception as e:
-            flash(f"Error al crear ticket: {str(e)}", "error")
+            flash(f"Error al crear ticket: {e!s}", "error")
 
     return render_template("ticket_nuevo.html", raypac=raypac)
 

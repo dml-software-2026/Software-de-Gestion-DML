@@ -1,12 +1,35 @@
 import re
 from datetime import datetime
 
-from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from CODIGO_FUENTE.decorators import (
+    get_current_user,
+    log_action,
+    login_required,
+    permission_required,
+    role_required,
+)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user, log_action
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
+
+
+def _obtener_clientes(db):
+    """Lista de clientes para el desplegable con autoaprendizaje (RF03)."""
+    rows = db.execute("SELECT nombre FROM clientes ORDER BY nombre").fetchall()
+    return [r["nombre"] for r in rows]
+
+
+def _registrar_cliente_si_corresponde(db, cliente, guardar_nuevo):
+    """Si el usuario escribió un cliente que no estaba en la lista y confirmó
+    guardarlo (checkbox/confirm del form), lo agrega al catálogo para que
+    aparezca sugerido en los próximos ingresos."""
+    if not guardar_nuevo or not cliente:
+        return
+    existe = db.execute("SELECT id FROM clientes WHERE LOWER(nombre) = LOWER(%s)", (cliente,)).fetchone()
+    if not existe:
+        db.execute("INSERT INTO clientes (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING", (cliente,))
 
 
 @raypac_bp.route("")
@@ -30,17 +53,21 @@ def raypac_list(readonly=False):
     except Exception as e:
         db.rollback()  # En caso de error, revertir la transacción
         # Si hay error en la query, mostrar mensaje y retornar lista vacía
-        flash(f"Error al cargar ingresos RAYPAC: {str(e)}", "error")
+        flash(f"Error al cargar ingresos RAYPAC: {e!s}", "error")
         entries = []
 
-    # Configuración de badges para estados de fichas DML
+    # Configuración de badges para estados de fichas DML.
+    # Claves = valores reales de dml_fichas.estado_reparacion (ver dml_edit.html
+    # y dml.py estados_orden). Colores acordados con David - ver issue #44.
     estado_config = {
-        "REVISION_INICIAL": {"color": "#17a2b8", "texto": "Revisión Inicial"},
-        "EN_REPARACION": {"color": "#ffc107", "texto": "En Reparación"},
-        "PAUSADA": {"color": "#fd7e14", "texto": "Pausada"},
-        "FINALIZADA": {"color": "#28a745", "texto": "Finalizada"},
-        "ENTREGADA": {"color": "#6c757d", "texto": "Entregada"},
-        "MÁQUINA ENTREGADA": {"color": "#6c757d", "texto": "Máquina Entregada"}
+        "A LA ESPERA DE REVISIÓN": {"color": "#ffffff", "texto_color": "#000000", "texto": "A la Espera de Revisión"},
+        "REVISION_INICIAL": {"color": "#ffffff", "texto_color": "#000000", "texto": "A la Espera de Revisión"},  # alias legado, ver #44
+        "EN REPARACIÓN": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "En Reparación"},
+        "EN REPARACION": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "En Reparación"},  # alias sin tilde, ver #44
+        "A LA ESPERA DE REPUESTOS": {"color": "#fd7e14", "texto_color": "#000000", "texto": "A la Espera de Repuestos"},
+        "REPARACIÓN COMPLETADA": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "Reparación Completada"},
+        "MÁQUINA LISTA PARA RETIRAR": {"color": "#ffc107", "texto_color": "#000000", "texto": "Lista para Retirar"},
+        "MÁQUINA ENTREGADA": {"color": "#28a745", "texto_color": "#ffffff", "texto": "Máquina Entregada"}
     }
 
     return render_template("raypac_list.html", entries=entries, user_role=user['role'], readonly=readonly, estado_config=estado_config)
@@ -68,17 +95,18 @@ def raypac_new():
             mail_comercial = request.form.get("mail_comercial")
             contacto_cliente = request.form.get("contacto_cliente")
             email_cliente = request.form.get("email_cliente")
+            guardar_cliente_nuevo = request.form.get("guardar_cliente_nuevo") == "1"
 
             # Validación básica
             if not all([tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina, comercial, mail_comercial]):
                 flash("Por favor completa todos los campos obligatorios.", "error")
-                return render_template("raypac_form.html")
+                return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
             # Verificar que el número de serie es único
             existe = db.execute("SELECT id FROM raypac_entries WHERE numero_serie = %s", (numero_serie,)).fetchone()
             if existe:
                 flash("Este número de serie ya existe en el sistema.", "error")
-                return render_template("raypac_form.html")
+                return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
             # Número correlativo interno
             correlativo = db.execute("SELECT COALESCE(MAX(numero_correlativo), 0) + 1 AS next FROM raypac_entries").fetchone()['next']
@@ -95,6 +123,8 @@ def raypac_new():
                 RETURNING id
             """, (correlativo, fecha, tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina,
                   numero_bateria, numero_cargador, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente)).fetchone()
+
+            _registrar_cliente_si_corresponde(db, cliente, guardar_cliente_nuevo)
             db.commit()
 
             raypac_id = row['id']
@@ -105,10 +135,10 @@ def raypac_new():
             return redirect(url_for("raypac.raypac_view", id=raypac_id))
         except Exception as e:
             db.rollback()  # Revertir la transacción en caso de error
-            flash(f"Error al guardar: {str(e)}", "error")
-            return render_template("raypac_form.html")
+            flash(f"Error al guardar: {e!s}", "error")
+            return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
-    return render_template("raypac_form.html")
+    return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
 
 @raypac_bp.route("/<int:id>")
@@ -164,6 +194,7 @@ def raypac_edit(id):
             mail_comercial = request.form.get("mail_comercial")
             contacto_cliente = request.form.get("contacto_cliente")
             email_cliente = request.form.get("email_cliente")
+            guardar_cliente_nuevo = request.form.get("guardar_cliente_nuevo") == "1"
 
             db.execute("""
                 UPDATE raypac_entries
@@ -171,6 +202,8 @@ def raypac_edit(id):
                     diagnostico_ingreso=%s, comercial=%s, mail_comercial=%s, contacto_cliente=%s, email_cliente=%s, updated_at=CURRENT_TIMESTAMP
                 WHERE id = %s
             """, (fecha, tipo_solicitud, cliente, numero_serie, diagnostico, comercial, mail_comercial, contacto_cliente, email_cliente, id))
+
+            _registrar_cliente_si_corresponde(db, cliente, guardar_cliente_nuevo)
             db.commit()
 
             log_action(user['id'], "UPDATE", "raypac_entries", id, None,
@@ -180,9 +213,9 @@ def raypac_edit(id):
             return redirect(url_for("raypac.raypac_view", id=id))
         except Exception as e:
             db.rollback()
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {e!s}", "error")
 
-    return render_template("raypac_form.html", entry=entry, edit=True)
+    return render_template("raypac_form.html", entry=entry, edit=True, clientes=_obtener_clientes(db))
 
 
 @raypac_bp.route("/<int:id>/freeze", methods=["POST"])
@@ -271,9 +304,16 @@ def raypac_unfreeze(id):
         flash(f"⚠️ Código incorrecto. Use los últimos 4 dígitos del remito ({entry['numero_remito']}).", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
+    # Al desfreezar, el envío a DML queda sin confirmar de nuevo (vuelve a
+    # PENDIENTE) — salvo que DML ya haya recepcionado el equipo, en cuyo caso
+    # no se pisa esa confirmación solo porque se reabrió el registro para editar.
     db.execute("""
         UPDATE raypac_entries
-        SET is_frozen = FALSE, frozen_at = NULL
+        SET is_frozen = FALSE, frozen_at = NULL,
+            estado_envio_equipos = CASE
+                WHEN estado_envio_equipos = 'RECIBIDO' THEN estado_envio_equipos
+                ELSE 'PENDIENTE'
+            END
         WHERE id = %s
     """, (id,))
     db.commit()

@@ -4,7 +4,7 @@ Ejecutar después de configurar SMTP en Render
 """
 import sqlite3
 import sys
-from datetime import datetime
+
 
 def test_email_alerts():
     """Verifica configuración y preparación para pruebas de emails"""
@@ -117,8 +117,8 @@ def test_email_alerts():
         if raypac_entries and any(not e['is_frozen'] for e in raypac_entries):
             entry = next(e for e in raypac_entries if not e['is_frozen'])
             print(f"   1. Usar ingreso RAYPAC ID {entry['id']} (Serie: {entry['numero_serie']})")
-            print(f"   2. Freezar con remito (ej: 12345)")
-            print(f"   3. Crear ticket desde DML")
+            print("   2. Freezar con remito (ej: 12345)")
+            print("   3. Crear ticket desde DML")
             print(f"   4. Verificar email en: {entry['mail_comercial']}")
         else:
             print("   ⚠️  Crear nuevo ingreso RAYPAC con email primero")
@@ -127,9 +127,9 @@ def test_email_alerts():
         if tickets:
             ticket = tickets[0]
             print(f"   1. Abrir ticket {ticket['numero_ticket']}")
-            print(f"   2. Completar ficha asociada")
-            print(f"   3. Cambiar estado a 'MÁQUINA ENTREGADA'")
-            print(f"   4. Cerrar ficha")
+            print("   2. Completar ficha asociada")
+            print("   3. Cambiar estado a 'MÁQUINA ENTREGADA'")
+            print("   4. Cerrar ficha")
             print(f"   5. Verificar email en: {ticket['mail_comercial']}")
         else:
             print("   ⚠️  Completar Prueba 1 primero")

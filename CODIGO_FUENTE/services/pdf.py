@@ -2,11 +2,18 @@ import os
 from io import BytesIO
 
 from flask import current_app
-from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.platypus import (
+    Image,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from CODIGO_FUENTE.extensions import get_db
 
@@ -23,13 +30,13 @@ def generar_ficha_pdf(ficha_id):
     db = get_db()
 
     # Obtener datos de la ficha
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (ficha_id,)).fetchone()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (ficha_id,)).fetchone()
     if not ficha:
         return None
 
-    raypac = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (ficha['raypac_id'],)).fetchone()
-    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = ?", (ficha_id,)).fetchall()
-    repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = ?", (ficha_id,)).fetchall()
+    raypac = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (ficha['raypac_id'],)).fetchone()
+    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s", (ficha_id,)).fetchall()
+    repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = %s", (ficha_id,)).fetchall()
 
     # Crear PDF
     buffer = BytesIO()
@@ -244,7 +251,7 @@ def generate_ficha_pdf(ficha_id):
     """
     try:
         db = get_db()
-        ficha = db.execute("SELECT * FROM dml_fichas WHERE id = ?", (ficha_id,)).fetchone()
+        ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (ficha_id,)).fetchone()
 
         if not ficha:
             raise ValueError(f"No se encontró ficha con ID {ficha_id}")
@@ -252,10 +259,10 @@ def generate_ficha_pdf(ficha_id):
         # Obtener datos relacionados
         raypac = None
         if ficha['raypac_id']:
-            raypac = db.execute("SELECT * FROM raypac_entries WHERE id = ?", (ficha['raypac_id'],)).fetchone()
+            raypac = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (ficha['raypac_id'],)).fetchone()
 
-        partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = ? ORDER BY id", (ficha_id,)).fetchall()
-        repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = ? ORDER BY id", (ficha_id,)).fetchall()
+        partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s ORDER BY id", (ficha_id,)).fetchall()
+        repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = %s ORDER BY id", (ficha_id,)).fetchall()
 
         # Crear PDF
         pdf_buffer = BytesIO()
@@ -282,7 +289,7 @@ def generate_ficha_pdf(ficha_id):
         if os.path.exists(logo_path):
             try:
                 logo_img = Image(logo_path, width=1.5*inch, height=0.6*inch)
-            except:
+            except Exception:
                 pass
 
         header_data = [[
@@ -459,7 +466,7 @@ def generate_ficha_pdf(ficha_id):
         return pdf_buffer
 
     except Exception as e:
-        print(f"ERROR en generate_ficha_pdf_new: {str(e)}")
+        print(f"ERROR en generate_ficha_pdf_new: {e!s}")
         import traceback
         traceback.print_exc()
         raise

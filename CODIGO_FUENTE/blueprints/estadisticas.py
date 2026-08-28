@@ -2,10 +2,15 @@ import csv
 from datetime import datetime
 from io import StringIO
 
-from flask import Blueprint, request, render_template, make_response
+from flask import Blueprint, make_response, render_template, request
 
+from CODIGO_FUENTE.decorators import (
+    get_current_user,
+    login_required,
+    permission_required,
+    role_required,
+)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.decorators import login_required, role_required, permission_required, get_current_user
 
 estadisticas_bp = Blueprint("estadisticas", __name__)
 

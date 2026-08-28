@@ -8,7 +8,7 @@
         <div class="col-md-8 offset-md-2">
             <h2 class="mb-4">{% if entry %}Editar{% else %}Nuevo Ingreso{% endif %} RAYPAC</h2>
 
-            <form method="POST" class="needs-validation">
+            <form method="POST" id="raypac-form" class="needs-validation">
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <div class="row mb-3">
@@ -20,7 +20,6 @@
                             <div class="col-md-6">
                                 <label for="tipo_solicitud" class="form-label">Tipo Solicitud *</label>
                                 <select class="form-control" id="tipo_solicitud" name="tipo_solicitud" required>
-                                    <option value="">Selecciona</option>
                                     <option value="REPARACIÓN" {% if entry and entry.tipo_solicitud == 'REPARACIÓN' %}selected{% endif %}>REPARACIÓN</option>
                                     <option value="PRESUPUESTO" {% if entry and entry.tipo_solicitud == 'PRESUPUESTO' %}selected{% endif %}>PRESUPUESTO</option>
                                 </select>
@@ -28,10 +27,14 @@
                         </div>
 
                         <div class="row mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-6 position-relative">
                                 <label for="cliente" class="form-label">Cliente *</label>
-                                <input type="text" class="form-control" id="cliente" name="cliente" 
+                                <input type="text" class="form-control" id="cliente" name="cliente"
+                                       autocomplete="off"
                                        value="{{ entry.cliente if entry else '' }}" required>
+                                <ul class="dropdown-menu w-100 shadow-sm" id="clientes-sugerencias"
+                                    style="max-height: 220px; overflow-y: auto; top: 100%; left: 0;"></ul>
+                                <input type="hidden" id="guardar_cliente_nuevo" name="guardar_cliente_nuevo" value="0">
                             </div>
                             <div class="col-md-6">
                                 <label for="numero_serie" class="form-label">N° Serie *</label>
@@ -177,6 +180,77 @@
         
         if (email && !emailInput.value) {
             emailInput.value = email;
+        }
+    });
+
+    // Desplegable de clientes con autoaprendizaje (RF03).
+    // Se arma a mano con clases de Bootstrap (dropdown-menu/dropdown-item)
+    // en vez de <datalist>, que usa el picker nativo del navegador/SO y no
+    // se puede stylear para que coincida con el resto de los desplegables
+    // de la app.
+    const CLIENTES_CONOCIDOS = {{ clientes | tojson }};
+    const clienteInput = document.getElementById('cliente');
+    const clienteSugerencias = document.getElementById('clientes-sugerencias');
+    const guardarClienteInput = document.getElementById('guardar_cliente_nuevo');
+
+    function mostrarSugerenciasCliente() {
+        const texto = clienteInput.value.trim().toLowerCase();
+        clienteSugerencias.innerHTML = '';
+
+        // Sin texto (recién enfocado/clickeado): mostrar la lista completa,
+        // igual que un <select> común — que se pueda ver todo sin tener que
+        // escribir primero. Escribiendo, se filtra como antes.
+        const coincidencias = texto
+            ? CLIENTES_CONOCIDOS.filter(function (c) { return c.toLowerCase().includes(texto); }).slice(0, 15)
+            : CLIENTES_CONOCIDOS;
+
+        if (coincidencias.length === 0) {
+            clienteSugerencias.classList.remove('show');
+            return;
+        }
+
+        coincidencias.forEach(function (nombre) {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = '#';
+            a.className = 'dropdown-item';
+            a.textContent = nombre;
+            // mousedown (no click) para que dispare antes del blur del input
+            a.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                clienteInput.value = nombre;
+                clienteSugerencias.classList.remove('show');
+            });
+            li.appendChild(a);
+            clienteSugerencias.appendChild(li);
+        });
+
+        clienteSugerencias.classList.add('show');
+    }
+
+    clienteInput.addEventListener('input', mostrarSugerenciasCliente);
+    clienteInput.addEventListener('focus', mostrarSugerenciasCliente);
+    clienteInput.addEventListener('blur', function () {
+        clienteSugerencias.classList.remove('show');
+    });
+
+    // Autoaprendizaje: si el cliente escrito no está en la lista conocida,
+    // preguntar si se quiere guardar para futuros ingresos. El ingreso
+    // RAYPAC se guarda igual, esto solo decide si el nombre queda
+    // sugerido la próxima vez.
+    document.getElementById('raypac-form').addEventListener('submit', function() {
+        const valor = clienteInput.value.trim();
+        guardarClienteInput.value = '0';
+
+        if (valor) {
+            const esNuevo = !CLIENTES_CONOCIDOS.some(function (c) {
+                return c.toLowerCase() === valor.toLowerCase();
+            });
+
+            if (esNuevo) {
+                const guardar = confirm('"' + valor + '" no está en la lista de clientes. ¿Querés guardarlo para futuros ingresos?');
+                guardarClienteInput.value = guardar ? '1' : '0';
+            }
         }
     });
 </script>

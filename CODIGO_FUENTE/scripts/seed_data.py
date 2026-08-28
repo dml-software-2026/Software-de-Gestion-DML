@@ -3,15 +3,17 @@
 Script para cargar datos de prueba en la base de datos.
 Ejecutar con: python seed_data.py
 """
-import sys
 import os
+import sys
 from datetime import datetime, timedelta
+
 from werkzeug.security import generate_password_hash
 
 # Agregar CODIGO_FUENTE al path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'CODIGO_FUENTE'))
 
-from app import app, get_db, generate_ticket_number
+from app import app, generate_ticket_number, get_db
+
 
 def seed_database():
     """Carga datos iniciales de prueba."""

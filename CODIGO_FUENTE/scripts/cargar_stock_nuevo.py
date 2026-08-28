@@ -6,9 +6,9 @@ Columnas: C=CODIGO, D=ITEM, E=TOTAL, J=CODIGO DE UBICACION
 """
 
 import csv
+import os
 import sqlite3
 import sys
-import os
 
 # Determinar la ruta de la base de datos
 
@@ -124,7 +124,7 @@ def cargar_stock_desde_csv():
         conn.commit()
         
         print("=" * 80)
-        print(f"✅ ¡Stock cargado exitosamente!")
+        print("✅ ¡Stock cargado exitosamente!")
         print(f"   📦 Repuestos nuevos: {repuestos_cargados}")
         print(f"   🔄 Repuestos actualizados: {repuestos_actualizados}")
         print(f"   📊 Total procesado: {repuestos_cargados + repuestos_actualizados}")
@@ -138,7 +138,7 @@ def cargar_stock_desde_csv():
         
     except Exception as e:
         conn.rollback()
-        print(f"❌ ERROR al cargar stock: {str(e)}")
+        print(f"❌ ERROR al cargar stock: {e!s}")
         import traceback
         traceback.print_exc()
         return False

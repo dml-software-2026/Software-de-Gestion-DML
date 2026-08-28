@@ -1,0 +1,60 @@
+# CI mínimo del proyecto DML
+# Corre en cada PR contra dev/main y en cada push a esas ramas.
+# Objetivo: atrapar errores de sintaxis, imports rotos y app que no bootea
+# ANTES de que lleguen a dev y rompan la demo con David.
+
+name: CI
+
+# Cuándo se dispara este workflow
+on:
+  pull_request:
+    branches: [dev, main]   # PRs apuntando a dev o main
+  push:
+    branches: [dev, main]   # Y pushes directos (aunque la branch protection ya los bloquea)
+
+jobs:
+  # Un solo job llamado "check" — todo lo que valida corre acá adentro
+  check:
+    runs-on: ubuntu-latest   # GitHub nos da una VM Linux gratis por 2 min por run
+
+    steps:
+      # PASO 1 — bajar el código del repo a la VM
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      # PASO 2 — instalar Python
+      # Usamos 3.11 fijo para matchear lo que corre en Render (ver runtime.txt).
+      # Si algún día cambian de versión, actualizar acá TAMBIÉN.
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'   # Cachea las dependencias entre runs, acelera 30-60 seg
+
+      # PASO 3 — instalar libs de sistema que necesitan algunas deps de Python
+      # reportlab (para generar PDFs) trae pycairo como dep transitiva, y pycairo
+      # necesita libcairo2 + pkg-config compilados. Sin estas dos líneas, pip install falla.
+      - name: Instalar dependencias de sistema (para pycairo/reportlab)
+        run: sudo apt-get update && sudo apt-get install -y libcairo2-dev pkg-config
+
+      # PASO 4 — instalar las deps del proyecto
+      # Si requirements.txt está roto o falta algún paquete, esto falla acá.
+      - name: Instalar dependencias Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff   # linter — no lo agregamos a requirements.txt porque solo lo usa CI y devs
+
+      # PASO 5 — lint con ruff
+      # Usa la config de pyproject.toml automáticamente (exclusiones y line-length).
+      - name: Lint con ruff
+        run: ruff check CODIGO_FUENTE/
+
+      # PASO 6 — verificar que la app importa sin errores
+      # Este es el chequeo más valioso: si Claude alucinó un import o rompió
+      # un blueprint, la app no arranca y este comando explota acá, no en producción.
+      # Nota: se corre desde la raíz del repo (igual que gunicorn CODIGO_FUENTE.app:app en Render),
+      # ya que desde la migración a Postgres todos los imports son absolutos.
+      - name: Import check — la app bootea?
+        run: |
+          python -c "from CODIGO_FUENTE.app import app; print('OK: app importa correctamente')"
