@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS stock_ubicaciones CASCADE;
 DROP TABLE IF EXISTS stock_dml CASCADE;
 DROP TABLE IF EXISTS matriz_repuestos CASCADE;
 DROP TABLE IF EXISTS clientes CASCADE;
+DROP TABLE IF EXISTS usuarios_notificaciones CASCADE;
 DROP TABLE IF EXISTS raypac_entries CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS stock_alertas CASCADE;
@@ -72,6 +73,17 @@ CREATE TABLE raypac_entries (
 CREATE TABLE clientes (
     id SERIAL PRIMARY KEY,
     nombre TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Destinatarios del mail automático de stock crítico (#59). Ver #161: esta
+-- tabla nunca había estado en el schema versionado, aunque el código que la
+-- usa (blueprints/notificaciones.py, services/stock.py) ya está mergeado.
+CREATE TABLE usuarios_notificaciones (
+    id SERIAL PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    nombre TEXT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

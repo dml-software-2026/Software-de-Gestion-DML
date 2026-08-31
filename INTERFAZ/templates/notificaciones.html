@@ -4,11 +4,9 @@
 
 {% block content %}
 <div class="dropdown-tab">
-  <button type="button" class="dropdown-toggle" onclick="toggleDropdown()">
-    Destinatarios de alertas de stock ▾
-  </button>
+  <h5>Destinatarios de alertas de stock bajo</h5>
 
-  <div id="dropdown-panel" class="dropdown-panel" style="display:none;">
+  <div class="dropdown-panel">
     {% for d in destinatarios %}
       <form method="POST" action="{{ url_for('notificaciones.toggle_notificacion', id=d.id) }}"
             class="dropdown-item">
@@ -17,7 +15,7 @@
           {{ d.email }} {% if d.nombre %}({{ d.nombre }}){% endif %}
         </label>
         <button type="submit" formaction="{{ url_for('notificaciones.eliminar_notificacion', id=d.id) }}"
-                class="btn-eliminar" onclick="return confirm('¿Eliminar {{ d.email }}?')">✕</button>
+                class="btn-eliminar" onclick="return confirmarAccion(event, '¿Eliminar {{ d.email }}?')">✕</button>
       </form>
     {% endfor %}
 
@@ -28,11 +26,4 @@
     </form>
   </div>
 </div>
-
-<script>
-function toggleDropdown() {
-  const panel = document.getElementById('dropdown-panel');
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-}
-</script>
 {% endblock %}
