@@ -172,7 +172,11 @@
                     <option value="EN REPARACIÓN" {% if ficha.estado_reparacion in ('EN REPARACIÓN', 'EN REPARACION') %}selected{% endif %}>EN REPARACIÓN</option>
                     <option value="REPARACIÓN COMPLETADA" {% if ficha.estado_reparacion == 'REPARACIÓN COMPLETADA' %}selected{% endif %}>REPARACIÓN COMPLETADA</option>
                     <option value="MÁQUINA LISTA PARA RETIRAR" {% if ficha.estado_reparacion == 'MÁQUINA LISTA PARA RETIRAR' %}selected{% endif %}>MÁQUINA LISTA PARA RETIRAR</option>
-                    <option value="MÁQUINA ENTREGADA" {% if ficha.estado_reparacion == 'MÁQUINA ENTREGADA' %}selected{% endif %}>MÁQUINA ENTREGADA</option>
+                    {# #157: "MÁQUINA ENTREGADA" sacada del desplegable a proposito - el unico
+                       camino a ese estado tiene que ser el boton "Cerrar Ficha" (dml_view.html),
+                       que corre el checklist completo (repuestos/partes, cierre de ticket, mail)
+                       y recien ahi marca is_closed=TRUE. Elegirlo desde aca dejaba la ficha
+                       "huerfana": estado terminal pero is_closed=FALSE y editable sin restriccion. #}
                 </select>
             </div>
         </div>
