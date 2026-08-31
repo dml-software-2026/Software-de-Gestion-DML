@@ -106,7 +106,7 @@
                             {% if user.role == 'ADMIN' %}
                             <form method="POST" action="{{ url_for('stock.stock_delete', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" style="display:inline-block; width:180px;">
                                 <input type="password" name="admin_password" class="form-control form-control-sm mb-1" placeholder="Contraseña" required>
-                                <button type="submit" class="btn btn-sm btn-danger w-100" onclick="return confirm('¿Eliminar este repuesto?')">Eliminar</button>
+                                <button type="submit" class="btn btn-sm btn-danger w-100" onclick="return confirmarAccion(event, '¿Eliminar este repuesto?')">Eliminar</button>
                             </form>
                             {% endif %}
                         </td>
