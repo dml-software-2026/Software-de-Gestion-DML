@@ -18,7 +18,86 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-- **Última actualización:** 2026-08-26, cierre de sesión.
+- **Última actualización:** 2026-08-31, cierre de sesión.
+- **Issue #44 (colores de estados de reparación) — ✅ CERRADO manualmente.**
+  Facu había arrancado una rama local `fix/44-colores-estados-reparacion`
+  para esta tarea, pero al arrancar la sesión se encontró que el fix ya
+  estaba mergeado en `dev` desde hacía 4 días (PR #144, 27/08) - el PR usó
+  `Refs #44` en vez de `Closes #44`, así que el issue quedó abierto en
+  GitHub aunque el checklist de scope ya estaba completo. Se cerró el issue
+  a mano y se borró la rama local (ya redundante, sin nada propio para
+  aportar). **Lección:** antes de arrancar una tarea, chequear si ya tiene
+  un PR mergeado con `Refs` en vez de `Closes` - el issue puede seguir
+  "abierto" en el kanban por un detalle de wording del PR, no porque falte
+  trabajo real.
+- **Tarea de la sesión: #132 (Auditoría UX/UI), en curso.** Se avanzó en 2 de
+  los 3 sub-ítems planeados, cada uno en su propio PR chico:
+  1. **Bug Bootstrap 4→5 en el modal "Acuse"** (`dml_entregadas.html`) -
+     ✅ PR `fix/132-bootstrap5-modal-acuse` **mergeado**.
+  2. **7 `confirm()` nativos reemplazados por modal de Bootstrap** (los 6
+     que señalaba el issue + `notificaciones.html`, que se había quedado
+     afuera del conteo original) - modal genérico reutilizable
+     (`confirmarAccion()`) agregado a `base.html`, usado desde
+     `dml_view.html`, `envios_view.html`, `raypac_view.html`,
+     `stock_list.html`, `usuarios_list.html`, `notificaciones.html`. El de
+     `raypac_form.html` (autoaprendizaje de cliente) quedó aparte por tener
+     una estructura distinta (no bloquea el submit, decide un valor que
+     viaja igual) - PR `fix/132-reemplazar-confirm-nativos` **abierto, sin
+     mergear**; PR/rama `fix/132-confirm-cliente-nuevo-raypac` **pusheada,
+     PR todavía sin abrir en GitHub** (probado en vivo: guardar, no
+     guardar, y cerrar sin elegir, los 3 casos guardan el ingreso RAYPAC
+     igual).
+  3. **Queda sin arrancar:** unificar los ~24 `<select>` nativos al patrón
+     del desplegable de Cliente - la parte más grande del issue, decidido
+     dejarla para una próxima sesión.
+- **4 bugs nuevos encontrados y arreglados en el camino** (ninguno parte del
+  #132, todos siguiendo el flujo de kanban-primero):
+  - **#156 + #157** (relacionados, mismo PR) - ✅ CERRADOS, PR
+    `fix/156-157-estado-entregada-huerfano` **mergeado**. #156:
+    `dml_registrar_acuse()` rechazaba fichas con estado `'MÁQUINA
+    ENTREGADA'` (el valor canónico real, del `<select>` y de
+    `estados_orden`) porque validaba contra el string suelto `'ENTREGADA'`
+    que hardcodeaba `dml_close()` al cerrar una ficha - dejaba la ficha en
+    un estado huérfano (sin color de badge). #157: el `<select>` de
+    `dml_edit.html` tenía `MÁQUINA ENTREGADA` como opción elegible
+    directamente, sin pasar por "Cerrar Ficha" (que corre el checklist
+    obligatorio y recién ahí marca `is_closed=TRUE`) - se sacó la opción
+    del select y se agregó la misma validación en el backend.
+  - **#161 + #162** (relacionados, mismo PR) - PR
+    `fix/161-162-tabla-notificaciones-feedback` **abierto, sin mergear**.
+    #161: la tabla `usuarios_notificaciones` (destinatarios del mail de
+    stock crítico del #59, ya cerrado) no existía en ningún lado
+    versionado - ni `schema-postgres.sql` ni una migración en
+    `extensions.py` - rompía `/admin/notificaciones` con `UndefinedTable`.
+    Se agregó la tabla al schema + migración `CREATE TABLE IF NOT EXISTS`,
+    mismo patrón que ya tiene `clientes`. Emparentado con el #125
+    (sincronizar schema del repo con Supabase) - **sin confirmar si esta
+    tabla existe en Supabase prod**, candidato a revisar ahí también.
+    #162: las 3 rutas de escritura de `notificaciones.py` no flasheaban
+    nada y el panel de la lista volvía a colapsarse después de cada
+    guardado (aunque el dato sí se guardaba bien) - se agregaron `flash()`
+    y se sacó el toggle colapsado, la lista se muestra siempre.
+- **Issue nuevo creado, no relacionado con bugs: #158** (idea de Facu,
+  flujo guiado - jerarquía visual de botones importantes + botón al
+  siguiente paso cuando una acción habilita el siguiente). Kanban: Ready,
+  Size L (mismo criterio que el #132: alcance todavía sin desglosar),
+  sin Épica asignada (tampoco la tiene el propio #132), asignado a Facu.
+  Candidato para cuando se retome el #132 a fondo o como tarea propia.
+- **Próximo paso concreto:** dos cosas.
+  1. Facu tiene que abrir en GitHub el PR de la rama
+     `fix/132-confirm-cliente-nuevo-raypac` (`Refs #132`) - las otras 3
+     ramas de hoy ya tienen PR abierto o ya están mergeadas.
+  2. Retomar el #132: arrancar la unificación de los ~24 `<select>`
+     nativos (el ítem grande que quedó sin tocar), o alguna tarea nueva
+     que salga del daily.
+- **Ambiente local de esta máquina:** sigue armado de punta a punta, usado
+  activamente hoy. El server de pruebas se detuvo al cerrar la sesión.
+- **Bloqueos:** ninguno.
+
+<details>
+<summary>Checkpoint anterior (2026-08-26) — histórico, dejado sin borrar por
+referencia</summary>
+
 - **Issue #114 (bug de Ivo: `get_alert_badge` + columna `ultima_actualizacion`
   al eliminar repuesto) — ✅ CERRADO, PR #129 mergeado.** Ivo había dicho que
   creía que el bug de la columna no pasaba en Render, solo en su local —
@@ -95,6 +174,8 @@ asumir contexto de nada más.
 - **Próximo paso concreto:** ninguna tarea de Facu en curso ahora mismo.
   Candidatos para la próxima sesión, todos en Backlog: #132, #133, #134,
   #135 (los de arriba), o alguna tarea nueva que salga del daily.
+
+</details>
 
 <details>
 <summary>Checkpoint anterior (2026-08-20) — histórico, dejado sin borrar por
