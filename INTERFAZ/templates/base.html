@@ -131,10 +131,66 @@
   </div>
 </footer>
 
+<!-- Modal genérico de confirmación: reemplaza los confirm() nativos del
+     navegador (ver #132). Cualquier form/botón puede usarlo con
+     onsubmit/onclick="return confirmarAccion(event, 'mensaje')". -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmModalLabel"><i class="bi bi-question-circle-fill text-primary"></i> Confirmar acción</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="confirmModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="confirmModalAccept">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function get_current_user() {
   // Función auxiliar para JavaScript si es necesaria
+}
+
+// Reemplazo genérico de confirm() nativo (#132). Se usa desde
+// onsubmit="return confirmarAccion(event, 'mensaje')" en un <form>, o desde
+// onclick="return confirmarAccion(event, 'mensaje')" en un botón submit
+// dentro de un <form>. Preserva la validación nativa (required, etc.) vía
+// requestSubmit() y evita el loop infinito de volver a confirmar el mismo
+// submit con la bandera data-confirmado.
+function confirmarAccion(event, mensaje) {
+  const form = event.target.closest('form');
+  if (form.dataset.confirmado === 'true') {
+    delete form.dataset.confirmado;
+    return true;
+  }
+  event.preventDefault();
+
+  // Si lo que disparó la confirmación fue un botón (onclick) en vez del
+  // form entero (onsubmit), hay que volver a mandarlo como "submitter" de
+  // requestSubmit - si no, se pierde un formaction distinto al del form
+  // (caso del botón "Eliminar" en notificaciones.html).
+  const submitter = event.target.closest('button, input[type="submit"]');
+
+  document.getElementById('confirmModalBody').textContent = mensaje;
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal'));
+
+  const acceptBtn = document.getElementById('confirmModalAccept');
+  const freshBtn = acceptBtn.cloneNode(true); // limpia listeners de confirmaciones anteriores
+  acceptBtn.replaceWith(freshBtn);
+  freshBtn.addEventListener('click', function () {
+    modal.hide();
+    form.dataset.confirmado = 'true';
+    if (form.requestSubmit) form.requestSubmit(submitter || undefined);
+    else form.submit();
+  }, { once: true });
+
+  modal.show();
+  return false;
 }
 </script>
 </body>

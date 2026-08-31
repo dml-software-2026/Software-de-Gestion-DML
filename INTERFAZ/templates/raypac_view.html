@@ -72,7 +72,7 @@
                     {% if user_role in ['ADMIN', 'DML_ST'] and entry.is_frozen %}
                     <br><br>
                     <form method="POST" action="{{ url_for('raypac.raypac_recepcionar_dml', id=entry.id) }}" class="d-inline">
-                        <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('¿Confirmar recepción del equipo en DML?')">
+                        <button type="submit" class="btn btn-success btn-sm" onclick="return confirmarAccion(event, '¿Confirmar recepción del equipo en DML?')">
                             <i class="bi bi-check-circle"></i> Dar de Alta en DML
                         </button>
                     </form>
