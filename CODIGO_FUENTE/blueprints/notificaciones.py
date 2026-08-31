@@ -1,5 +1,5 @@
 # CODIGO_FUENTE/blueprints/notificaciones.py
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from CODIGO_FUENTE.decorators import login_required, role_required
 from CODIGO_FUENTE.extensions import get_db
@@ -23,14 +23,22 @@ def listar_notificaciones():
 def agregar_notificacion():
     email = request.form.get('email', '').strip()
     nombre = request.form.get('nombre', '').strip()
-    if email:
-        db = get_db()
-        db.execute(
-            "INSERT INTO usuarios_notificaciones (email, nombre, activo) VALUES (%s, %s, TRUE) "
-            "ON CONFLICT (email) DO NOTHING",
-            (email, nombre)
-        )
-        db.commit()
+    if not email:
+        flash("El email es obligatorio.", "error")
+        return redirect(url_for('notificaciones.listar_notificaciones'))
+
+    db = get_db()
+    row = db.execute(
+        "INSERT INTO usuarios_notificaciones (email, nombre, activo) VALUES (%s, %s, TRUE) "
+        "ON CONFLICT (email) DO NOTHING RETURNING id",
+        (email, nombre)
+    ).fetchone()
+    db.commit()
+
+    if row:
+        flash(f"Destinatario {email} agregado.", "success")
+    else:
+        flash(f"{email} ya estaba en la lista.", "info")
     return redirect(url_for('notificaciones.listar_notificaciones'))
 
 
@@ -39,8 +47,15 @@ def agregar_notificacion():
 @role_required("ADMIN")
 def toggle_notificacion(id):
     db = get_db()
-    db.execute("UPDATE usuarios_notificaciones SET activo = NOT activo WHERE id = %s", (id,))
+    row = db.execute(
+        "UPDATE usuarios_notificaciones SET activo = NOT activo WHERE id = %s RETURNING email, activo",
+        (id,)
+    ).fetchone()
     db.commit()
+
+    if row:
+        estado = "activado" if row['activo'] else "desactivado"
+        flash(f"{row['email']} {estado}.", "success")
     return redirect(url_for('notificaciones.listar_notificaciones'))
 
 
@@ -49,6 +64,9 @@ def toggle_notificacion(id):
 @role_required("ADMIN")
 def eliminar_notificacion(id):
     db = get_db()
-    db.execute("DELETE FROM usuarios_notificaciones WHERE id = %s", (id,))
+    row = db.execute("DELETE FROM usuarios_notificaciones WHERE id = %s RETURNING email", (id,)).fetchone()
     db.commit()
+
+    if row:
+        flash(f"Destinatario {row['email']} eliminado.", "success")
     return redirect(url_for('notificaciones.listar_notificaciones'))
