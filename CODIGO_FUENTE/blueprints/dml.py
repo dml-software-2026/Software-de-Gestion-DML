@@ -265,6 +265,14 @@ def dml_edit(id):
             numero_remito = request.form.get("numero_remito_salida")
             tecnico_resp = request.form.get("tecnico_resp") or ""
 
+            # #157: "MÁQUINA ENTREGADA" ya no es una opción del <select> (ver
+            # dml_edit.html), pero valido igual por si llega un POST armado a
+            # mano - el único camino a ese estado es "Cerrar Ficha", que corre
+            # el checklist completo y marca is_closed=TRUE.
+            if estado == 'MÁQUINA ENTREGADA':
+                flash("Para marcar la ficha como entregada, usá el botón 'Cerrar Ficha'.", "error")
+                return redirect(url_for("dml.dml_edit", id=id))
+
             # Validación de flujo lógico de estados según documento David
             # Orden lógico: A LA ESPERA DE REVISIÓN → EN REPARACIÓN → [A LA ESPERA DE REPUESTOS] → MÁQUINA LISTA PARA RETIRAR → MÁQUINA ENTREGADA
             estados_orden = {
@@ -693,11 +701,15 @@ def dml_close(id):
         return redirect(url_for("dml.dml_edit", id=id))
 
     try:
-        # Cerrar la ficha y marcar como ENTREGADA
+        # Cerrar la ficha y marcar como entregada. #156: usar el valor
+        # canonico real ('MÁQUINA ENTREGADA', el mismo del <select> de
+        # dml_edit.html y de estados_orden/color map) en vez del 'ENTREGADA'
+        # suelto que dejaba la ficha en un estado huerfano - mismo patron
+        # de bug que el #44, pero en el flujo de cierre en vez del de alta.
         fecha_egreso = datetime.now().strftime("%Y-%m-%d")
         db.execute("""
             UPDATE dml_fichas
-            SET is_closed = TRUE, fecha_egreso = %s, estado_reparacion = 'ENTREGADA'
+            SET is_closed = TRUE, fecha_egreso = %s, estado_reparacion = 'MÁQUINA ENTREGADA'
             WHERE id = %s
         """, (fecha_egreso, id))
 
@@ -788,8 +800,11 @@ def dml_registrar_acuse(id):
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_entregadas"))
 
-    if ficha['estado_reparacion'] != 'ENTREGADA':
-        flash("Solo se puede registrar acuse de fichas marcadas como ENTREGADA.", "error")
+    # 'ENTREGADA' queda como alias legado: fichas cerradas antes de este fix
+    # (#156) quedaron con ese valor suelto en vez del canonico 'MÁQUINA
+    # ENTREGADA'. Mismo criterio de alias que dejo el #44.
+    if ficha['estado_reparacion'] not in ('MÁQUINA ENTREGADA', 'ENTREGADA'):
+        flash("Solo se puede registrar acuse de fichas marcadas como entregadas.", "error")
         return redirect(url_for("dml.dml_view", id=id))
 
     try:
