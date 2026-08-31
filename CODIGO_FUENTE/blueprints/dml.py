@@ -1,4 +1,5 @@
 from datetime import datetime
+from io import BytesIO
 
 from flask import (
     Blueprint,
@@ -21,7 +22,7 @@ from CODIGO_FUENTE.decorators import (
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.mail import send_mail
 from CODIGO_FUENTE.services.numeracion import crear_ticket, generate_ficha_number
-from CODIGO_FUENTE.services.pdf import generar_ficha_pdf, generate_ficha_pdf
+from CODIGO_FUENTE.services.pdf import generar_pdf_ficha
 from CODIGO_FUENTE.services.stock import (
     actualizar_estadistica_repuesto,
     ajustar_stock_ubicacion,
@@ -867,7 +868,7 @@ def generar_ficha(id):
 
     try:
         # Generar PDF para validar que no hay errores
-        pdf_buffer = generate_ficha_pdf(id)
+        pdf_bytes = generar_pdf_ficha(id)
 
         # Guardar en BD
         db.execute(
@@ -930,17 +931,14 @@ def descargar_ficha_pdf(id):
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_list"))
 
-    # Generar PDF on-demand
-    pdf_buffer = generar_ficha_pdf(id)
-
-    if not pdf_buffer:
+     # Generar PDF on-demand
+    pdf_bytes = generar_pdf_ficha(id)
+    if not pdf_bytes:
         flash("No se pudo generar el PDF.", "error")
         return redirect(url_for("dml.dml_view", id=id))
-
     log_action(user['id'], "DOWNLOAD_FICHA_PDF", "dml_fichas", id, None,
               f"Ficha #{ficha['numero_ficha']}")
-
     # Devolver PDF
-    return send_file(pdf_buffer, mimetype='application/pdf',
+    return send_file(BytesIO(pdf_bytes), mimetype='application/pdf',
                     as_attachment=True,
                     download_name=f"ficha_{ficha['numero_ficha']:07d}.pdf")
