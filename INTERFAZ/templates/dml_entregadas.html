@@ -66,7 +66,7 @@
                             <i class="fas fa-eye"></i> Ver
                         </a>
                         {% if not ficha.recibido_por %}
-                        <button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#modalAcuse{{ ficha.id }}" title="Registrar Acuse">
+                        <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalAcuse{{ ficha.id }}" title="Registrar Acuse">
                             <i class="fas fa-check"></i> Acuse
                         </button>
                         {% endif %}
@@ -88,9 +88,7 @@
                 <h5 class="modal-title" id="modalAcuseLabel{{ ficha.id }}">
                     📋 Registrar Acuse de Recibo - Ficha #{{ '%07d' % ficha.numero_ficha }}
                 </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="{{ url_for('dml.dml_registrar_acuse', id=ficha.id) }}">
                 <div class="modal-body">
@@ -119,7 +117,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-check"></i> Registrar Acuse
                     </button>
