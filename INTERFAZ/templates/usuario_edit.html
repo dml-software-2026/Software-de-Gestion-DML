@@ -13,7 +13,7 @@
                 
                 <div class="form-group">
                     <label for="role">Rol:</label>
-                    <select class="form-control" id="role" name="role" required>
+                    <select class="form-control js-select-enhance" id="role" name="role" required>
                         {% for r in roles %}
                         <option value="{{ r }}" {% if r == target_user.role %}selected{% endif %}>{{ r }}</option>
                         {% endfor %}
