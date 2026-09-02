@@ -18,6 +18,54 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+- **Última actualización:** 2026-09-02, sesión corta de arranque (sin tarea
+  de código todavía).
+- **Los 4 PRs de la sesión del 2026-08-31 que en el checkpoint anterior
+  figuraban "sin mergear" ya están mergeados a `dev`** (confirmado al
+  arrancar hoy: `fix/132-reemplazar-confirm-nativos` #163,
+  `fix/132-confirm-cliente-nuevo-raypac` #165,
+  `fix/161-162-tabla-notificaciones-feedback` #164, más el checkpoint
+  mismo #166) — Facu los revisó y mergeó después del cierre de esa sesión.
+  De paso se mergeó también `refactor/85-unificar-los-3-generadores-de-pdf`
+  de Ivo (#167, issue #85), sin relación con el #132.
+- **Hallazgo de proceso (importante, corregido hoy): `Closes #N` nunca
+  autocierra un issue en este repo.** El default branch es `main`, todo se
+  mergea a `dev`, y GitHub solo dispara el auto-close cuando el merge es a
+  la default branch del repo — nunca pasa acá. Confirmado revisando el
+  timeline de issues: #127 lo había cerrado Facu a mano (no fue automático,
+  aunque el checkpoint de su momento lo diera por hecho), y **#156, #157,
+  #161, #162 seguían `OPEN` en GitHub** pese a tener sus PRs (#160, #164)
+  ya mergeados a `dev` con `Closes #N` bien escrito en el body. La nota que
+  había quedado archivada sobre el #44 ("el PR usó `Refs` en vez de
+  `Closes`") atribuía esto a un detalle de wording — es la causa
+  equivocada, el problema es estructural y le pasa a **todos** los PRs.
+  **Acción tomada:** se cerraron a mano #156, #157, #161 y #162 (los 4 ya
+  estaban resueltos y mergeados, solo desactualizados en GitHub), y se
+  agregó una nota permanente a la sección "Branches y flujo de PRs" de
+  este archivo con la práctica nueva: cerrar el issue a mano
+  (`gh issue close N`) como parte del mismo paso de confirmar que un PR
+  quedó mergeado, no asumir que Github lo hace solo.
+- **Tarea #132 (Auditoría UX/UI):** con los merges de arriba, quedan
+  resueltos los 2 sub-ítems chicos (bug Bootstrap 4→5 del modal Acuse, los
+  7 `confirm()` nativos reemplazados). **Sigue sin arrancar el ítem grande:**
+  unificar los ~24 `<select>` nativos al patrón del desplegable de Cliente.
+  El issue #132 se dejó abierto a propósito (ese ítem grande todavía no se
+  hizo).
+- **Próximo paso concreto:** todavía sin definir - la sesión de hoy arrancó
+  con la limpieza de kanban de arriba, no se llegó a elegir la próxima
+  tarea de código. Candidatos: retomar el #132 (unificación de `<select>`),
+  o algo del resto del backlog (#133 ADMIN2024 hardcodeado, #134 botón
+  Generar Ficha sin conectar, #135 templates backup muertos, #146
+  Diagnóstico Inicial descartado, #154 datos de prueba expuestos en login,
+  #155 Cargar Histórico, #158 flujo guiado) - o lo que salga del daily.
+- **Ambiente local de esta máquina:** no se usó hoy (sesión de solo
+  kanban/docs, sin levantar el server).
+- **Bloqueos:** ninguno.
+
+<details>
+<summary>Checkpoint anterior (2026-08-31) — histórico, dejado sin borrar por
+referencia</summary>
+
 - **Última actualización:** 2026-08-31, cierre de sesión.
 - **Issue #44 (colores de estados de reparación) — ✅ CERRADO manualmente.**
   Facu había arrancado una rama local `fix/44-colores-estados-reparacion`
@@ -26,10 +74,10 @@ asumir contexto de nada más.
   `Refs #44` en vez de `Closes #44`, así que el issue quedó abierto en
   GitHub aunque el checklist de scope ya estaba completo. Se cerró el issue
   a mano y se borró la rama local (ya redundante, sin nada propio para
-  aportar). **Lección:** antes de arrancar una tarea, chequear si ya tiene
-  un PR mergeado con `Refs` en vez de `Closes` - el issue puede seguir
-  "abierto" en el kanban por un detalle de wording del PR, no porque falte
-  trabajo real.
+  aportar). **Nota (corregida el 2026-09-02): la causa real no era el
+  wording `Refs` vs. `Closes` — es que `Closes #N` no autocierra nada al
+  mergear a `dev` en este repo, le pasa a cualquier PR. Ver el checkpoint
+  de arriba.**
 - **Tarea de la sesión: #132 (Auditoría UX/UI), en curso.** Se avanzó en 2 de
   los 3 sub-ítems planeados, cada uno en su propio PR chico:
   1. **Bug Bootstrap 4→5 en el modal "Acuse"** (`dml_entregadas.html`) -
@@ -42,17 +90,13 @@ asumir contexto de nada más.
      `stock_list.html`, `usuarios_list.html`, `notificaciones.html`. El de
      `raypac_form.html` (autoaprendizaje de cliente) quedó aparte por tener
      una estructura distinta (no bloquea el submit, decide un valor que
-     viaja igual) - PR `fix/132-reemplazar-confirm-nativos` **abierto, sin
-     mergear**; PR/rama `fix/132-confirm-cliente-nuevo-raypac` **pusheada,
-     PR todavía sin abrir en GitHub** (probado en vivo: guardar, no
-     guardar, y cerrar sin elegir, los 3 casos guardan el ingreso RAYPAC
-     igual).
+     viaja igual).
   3. **Queda sin arrancar:** unificar los ~24 `<select>` nativos al patrón
      del desplegable de Cliente - la parte más grande del issue, decidido
      dejarla para una próxima sesión.
 - **4 bugs nuevos encontrados y arreglados en el camino** (ninguno parte del
   #132, todos siguiendo el flujo de kanban-primero):
-  - **#156 + #157** (relacionados, mismo PR) - ✅ CERRADOS, PR
+  - **#156 + #157** (relacionados, mismo PR) - PR
     `fix/156-157-estado-entregada-huerfano` **mergeado**. #156:
     `dml_registrar_acuse()` rechazaba fichas con estado `'MÁQUINA
     ENTREGADA'` (el valor canónico real, del `<select>` y de
@@ -64,7 +108,7 @@ asumir contexto de nada más.
     obligatorio y recién ahí marca `is_closed=TRUE`) - se sacó la opción
     del select y se agregó la misma validación en el backend.
   - **#161 + #162** (relacionados, mismo PR) - PR
-    `fix/161-162-tabla-notificaciones-feedback` **abierto, sin mergear**.
+    `fix/161-162-tabla-notificaciones-feedback` **mergeado**.
     #161: la tabla `usuarios_notificaciones` (destinatarios del mail de
     stock crítico del #59, ya cerrado) no existía en ningún lado
     versionado - ni `schema-postgres.sql` ni una migración en
@@ -83,16 +127,11 @@ asumir contexto de nada más.
   Size L (mismo criterio que el #132: alcance todavía sin desglosar),
   sin Épica asignada (tampoco la tiene el propio #132), asignado a Facu.
   Candidato para cuando se retome el #132 a fondo o como tarea propia.
-- **Próximo paso concreto:** dos cosas.
-  1. Facu tiene que abrir en GitHub el PR de la rama
-     `fix/132-confirm-cliente-nuevo-raypac` (`Refs #132`) - las otras 3
-     ramas de hoy ya tienen PR abierto o ya están mergeadas.
-  2. Retomar el #132: arrancar la unificación de los ~24 `<select>`
-     nativos (el ítem grande que quedó sin tocar), o alguna tarea nueva
-     que salga del daily.
 - **Ambiente local de esta máquina:** sigue armado de punta a punta, usado
   activamente hoy. El server de pruebas se detuvo al cerrar la sesión.
 - **Bloqueos:** ninguno.
+
+</details>
 
 <details>
 <summary>Checkpoint anterior (2026-08-26) — histórico, dejado sin borrar por
@@ -274,7 +313,9 @@ Cuando un cambio esté commiteado y pusheado y listo para convertirse en PR, Cla
 Code tiene que **avisarle explícitamente a Facu** — algo como: "Ya pusheé la rama
 `nombre-rama`, andá a GitHub y abrí el PR contra `dev`. Título sugerido: '...'.
 Descripción sugerida: '...' (con el `Closes #N` o `Refs #N` que corresponda)."
-No dar por hecho que el PR se abre solo ni asumir que ya está abierto.
+No dar por hecho que el PR se abre solo ni asumir que ya está abierto. **Al confirmar
+que un PR con `Closes #N` quedó mergeado, cerrar ese issue a mano** (`gh issue close`)
+— ver el gotcha en "Branches y flujo de PRs", `Closes #N` no autocierra nada acá.
 
 **Antes de tocar cualquier rama:** seguir la rutina de sincronización de siempre —
 `git status` (si hay cambios sin commitear, resolverlos primero: `git diff` para ver
@@ -366,8 +407,25 @@ El monolito original de 4163 líneas ya fue dividido en esto. Ya no hay rutas en
 - **IMPORTANTE — PRs chicos:** el equipo pidió explícitamente hacer PRs pequeños, uno por
   sub-tarea, no un PR gigante al terminar toda una issue completa.
 - Todo PR necesita review de al menos 1 integrante antes de mergear (Definition of Done).
-- Al abrir un PR, usar `Closes #N` en la descripción para que el issue se cierre solo al
-  mergear (probar con más de un `Closes #N` si el PR resuelve varios issues duplicados).
+- Al abrir un PR, usar `Closes #N` en la descripción (más de un `Closes #N` si el PR
+  resuelve varios issues) — sirve como documentación de qué resuelve el PR, pero
+  **no cierra el issue solo** (ver gotcha abajo). Cerrar el issue a mano después de
+  mergear.
+
+**Gotcha importante — `Closes #N` NUNCA autocierra un issue al mergear a `dev`.**
+El default branch del repo es `main`, y GitHub solo dispara el auto-close de
+`Closes #N`/`Fixes #N` cuando el PR se mergea a la default branch del repo — no
+cuando se mergea a `dev`. Como acá **todo** se mergea a `dev`, ningún PR cierra
+issues solo, tenga `Closes` o `Refs`, esté bien escrito o no. Confirmado revisando
+el timeline de varios issues (2026-09-02): #127 lo había cerrado Facu a mano (no
+fue un cierre automático), y #156/#157/#161/#162 seguían `OPEN` en GitHub con sus
+PRs ya mergeados a `dev` (con `Closes #N` correcto en el body). La nota que había
+quedado en el checkpoint del #44 ("el PR usó `Refs` en vez de `Closes`") atribuía
+esto a un problema de wording — es la causa equivocada, el problema es estructural.
+**Práctica a partir de ahora:** después de mergear un PR a `dev` que resuelve un
+issue, cerrarlo a mano (`gh issue close N --comment "..."`) como parte del mismo
+paso — no asumir que GitHub lo hizo. Antes de dar una tarea por "cerrada", chequear
+el estado real del issue en GitHub, no solo que el PR esté mergeado.
 
 ## Setup de entorno local
 
