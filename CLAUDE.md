@@ -18,8 +18,7 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-- **Última actualización:** 2026-09-02, sesión corta de arranque (sin tarea
-  de código todavía).
+- **Última actualización:** 2026-09-02, cierre de sesión.
 - **Los 4 PRs de la sesión del 2026-08-31 que en el checkpoint anterior
   figuraban "sin mergear" ya están mergeados a `dev`** (confirmado al
   arrancar hoy: `fix/132-reemplazar-confirm-nativos` #163,
@@ -45,21 +44,69 @@ asumir contexto de nada más.
   este archivo con la práctica nueva: cerrar el issue a mano
   (`gh issue close N`) como parte del mismo paso de confirmar que un PR
   quedó mergeado, no asumir que Github lo hace solo.
-- **Tarea #132 (Auditoría UX/UI):** con los merges de arriba, quedan
-  resueltos los 2 sub-ítems chicos (bug Bootstrap 4→5 del modal Acuse, los
-  7 `confirm()` nativos reemplazados). **Sigue sin arrancar el ítem grande:**
-  unificar los ~24 `<select>` nativos al patrón del desplegable de Cliente.
-  El issue #132 se dejó abierto a propósito (ese ítem grande todavía no se
-  hizo).
-- **Próximo paso concreto:** todavía sin definir - la sesión de hoy arrancó
-  con la limpieza de kanban de arriba, no se llegó a elegir la próxima
-  tarea de código. Candidatos: retomar el #132 (unificación de `<select>`),
-  o algo del resto del backlog (#133 ADMIN2024 hardcodeado, #134 botón
-  Generar Ficha sin conectar, #135 templates backup muertos, #146
-  Diagnóstico Inicial descartado, #154 datos de prueba expuestos en login,
-  #155 Cargar Histórico, #158 flujo guiado) - o lo que salga del daily.
-- **Ambiente local de esta máquina:** no se usó hoy (sesión de solo
-  kanban/docs, sin levantar el server).
+- **Tarea de la sesión: #132, arrancado el ítem grande (unificar los ~24
+  `<select>` nativos al patrón del desplegable de Cliente).** Componente
+  reutilizable `enhanceSelect()` agregado a `base.html` + estilos en
+  `style.css`: cualquier `<select class="js-select-enhance">` se pilotea
+  desde un botón + `dropdown-menu` de Bootstrap en vez del popup nativo del
+  SO — opt-in por template (rollout gradual), el `<select>` real sigue en
+  el DOM (oculto con `opacity:0`, no `display:none`, para que
+  `required`/`reportValidity()` lo sigan encontrando) y es el que viaja en
+  el submit, sin tocar nada de backend. 4 ramas chicas, **apiladas en este
+  orden** (cada una parte de la anterior, no de `dev` — necesitan el
+  componente para poder probarse):
+  1. `feature/132-unificar-select-usuario_form` (el componente + 1er caso,
+     el select de Rol en `usuario_form.html`) — **✅ mergeada a `dev`.**
+  2. `feature/132-unificar-select-usuario_edit` (mismo select de Rol en
+     `usuario_edit.html`, caso con clase `form-control` en vez de
+     `form-select` y con opción pre-seleccionada) — **PR #173 abierto,
+     esperando aprobación de Facu.**
+  3. `feature/132-unificar-select-envios-tickets` (`envios_form.html` +
+     el filtro de Estado en `tickets_list.html`) — **pusheada, PR
+     todavía sin abrir en GitHub.**
+  4. `feature/132-unificar-select-dml_edit` (los 12 selects de "partes del
+     equipo" + el de "Estado de la Reparación") — **pusheada, PR todavía
+     sin abrir. Primer caso con selects sin ninguna clase de Bootstrap**
+     (el template estila `<select>` con CSS propio) - se le agregó una
+     base visual propia a `.dml-select-toggle` en `style.css` (calcada de
+     los valores por defecto de `.form-select` de Bootstrap 5.3) para que
+     el componente se vea bien la tenga o no. **Sin probar en navegador
+     todavía** (se cortó la conexión con Brave a mitad de sesión) - antes
+     de mergear esta, probar en vivo `/dml/<id>/edit` con Facu.
+  - **Regla para mergear:** abrir los 4 PRs en cualquier orden está bien,
+    pero mergear estrictamente 1→2→3→4 (cada rama carga los commits de la
+    anterior todavía no mergeada).
+  - **Quedan 2 templates grandes sin arrancar:** `raypac_form.html` (5
+    selects) y `ticket_nuevo.html` (12 selects, el más grande de todos).
+- **Hallazgo en el camino: `ficha_view.html` es un template muerto.**
+  Ninguna ruta de `blueprints/dml.py` (ni de ningún otro blueprint) lo
+  renderiza - la vista real de una ficha es `dml_view.html`. Se descubrió
+  al ir a probar el select "Cambiar estado" de ese archivo (uno de los 8
+  templates que el propio #132/`HALLAZGOS_REFACTOR.md` contaban). Se creó
+  el **issue #168** documentándolo y se sacó del alcance de esta tanda de
+  PRs - el scope real de #132 queda en **7 templates vivos, 23 selects**,
+  no 8/24. No se tocó el archivo, decisión pendiente (¿borrar como los
+  backups del #135, o reconectar bajo otro flujo?).
+- **Hallazgo de infraestructura, no de código: el Render de "Dev" apunta a
+  `main`, no a `dev`.** Facu estaba probando en el Render de `dev` y no
+  aparecía el modal de "cliente nuevo" de RAYPAC (#165, mergeado el
+  31/08) aunque sí aparecían fixes más viejos (#127, del 26/08).
+  Confirmado con una captura del dashboard: el servicio
+  `Software-de-Gestion-DML-Dev` tiene configurada la rama `main` (no
+  `dev`) como origen del deploy, con el último deploy en vivo del 28/08
+  (PR #153). No es un bug de código ni de auto-deploy - simplemente sigue
+  otra rama. **Facu avisó que un compañero lo va a corregir**, sin
+  necesidad de acción de nuestro lado.
+- **Próximo paso concreto:**
+  1. Facu mergea el PR #173 (rama 2) cuando se lo aprueben.
+  2. Abrir y mergear el PR de la rama 3 (`envios-tickets`).
+  3. Abrir el PR de la rama 4 (`dml_edit`), pero **probarlo en el navegador
+     con Facu antes de mergear** (pendiente de la sesión de hoy).
+  4. Retomar el #132 con los 2 templates grandes que quedan:
+     `raypac_form.html` y `ticket_nuevo.html`.
+- **Ambiente local de esta máquina:** usado activamente hoy (server
+  levantado, testeado en el navegador vía Brave + extensión de Claude in
+  Chrome). El server de pruebas se detuvo al cerrar la sesión.
 - **Bloqueos:** ninguno.
 
 <details>
