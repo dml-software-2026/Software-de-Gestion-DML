@@ -192,6 +192,103 @@ function confirmarAccion(event, mensaje) {
   modal.show();
   return false;
 }
+
+// Reemplazo genérico de <select> nativo (#132, hallazgo #8 de
+// HALLAZGOS_REFACTOR.md) - el popup de un <select> lo dibuja el sistema
+// operativo, no la página, así que nunca puede tomar el estilo de
+// Bootstrap del resto de la app. Mismo problema que ya se había resuelto
+// a mano para el desplegable de Cliente en raypac_form.html; esto lo
+// generaliza para no repetir el mismo bloque de JS en cada template.
+//
+// Opt-in: solo agarra <select class="js-select-enhance">, no todos los
+// selects de la app (rollout gradual, un template a la vez). El <select>
+// real sigue en el DOM (visualmente oculto vía CSS, no display:none) y es
+// el que efectivamente viaja en el submit del form - esta caja de acá al
+// lado solo lo pilotea, así que required/pattern/disabled siguen
+// funcionando como si el <select> nunca se hubiera tocado.
+function enhanceSelect(select) {
+  if (select.dataset.enhanced === 'true') return;
+  select.dataset.enhanced = 'true';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'dml-select-wrapper';
+  select.parentNode.insertBefore(wrapper, select);
+  wrapper.appendChild(select);
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  // El className del <select> original varía entre templates (algunos
+  // usan .form-select, que ya trae su propia flechita vía background-image;
+  // otros .form-control, que no trae ninguna) - en vez de depender de eso,
+  // se anula la flecha nativa a mano y se agrega siempre el mismo ícono
+  // (chevron de bootstrap-icons), para que las 24 queden consistentes
+  // entre sí sin importar de qué clase venía cada una.
+  toggle.className = (select.className + ' dml-select-toggle').trim();
+  toggle.style.backgroundImage = 'none';
+  if (select.disabled) toggle.disabled = true;
+
+  const texto = document.createElement('span');
+  const flecha = document.createElement('i');
+  flecha.className = 'bi bi-chevron-down small';
+  toggle.appendChild(texto);
+  toggle.appendChild(flecha);
+
+  const menu = document.createElement('ul');
+  menu.className = 'dropdown-menu dml-select-menu w-100 shadow-sm';
+
+  function renderOptions() {
+    menu.innerHTML = '';
+    Array.from(select.options).forEach(function (opt) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = '#';
+      // No resaltar como "active" un placeholder vacío (value="") aunque
+      // técnicamente sea el value actual - confunde, parece la opción
+      // recomendada en vez de "todavía no elegiste nada".
+      const esSeleccionada = opt.value !== '' && opt.value === select.value;
+      a.className = 'dropdown-item' + (esSeleccionada ? ' active' : '');
+      a.textContent = opt.textContent;
+      if (opt.disabled) a.classList.add('disabled');
+      // mousedown (no click) para que dispare antes del blur/close del toggle
+      a.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        if (opt.disabled) return;
+        select.value = opt.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        actualizarToggle();
+        menu.classList.remove('show');
+      });
+      li.appendChild(a);
+      menu.appendChild(li);
+    });
+  }
+
+  function actualizarToggle() {
+    const seleccionada = select.options[select.selectedIndex];
+    texto.textContent = seleccionada ? seleccionada.textContent : '';
+    toggle.classList.toggle('text-muted', !select.value);
+  }
+
+  toggle.addEventListener('click', function () {
+    if (toggle.disabled) return;
+    renderOptions();
+    menu.classList.toggle('show');
+  });
+  document.addEventListener('click', function (e) {
+    if (!wrapper.contains(e.target)) menu.classList.remove('show');
+  });
+  // Si el <select> real cambia por otro motivo (ej. JS de la página que le
+  // setea .value directo), mantener el texto mostrado sincronizado.
+  select.addEventListener('change', actualizarToggle);
+
+  wrapper.appendChild(toggle);
+  wrapper.appendChild(menu);
+  actualizarToggle();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('select.js-select-enhance').forEach(enhanceSelect);
+});
 </script>
 </body>
 </html>

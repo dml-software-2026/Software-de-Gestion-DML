@@ -81,3 +81,46 @@ table.table-striped tbody td.text-dark {
 table.table tbody td {
     color: #212529 !important;
 }
+
+/* Desplegable "a mano" para reemplazar <select> nativos (#132) - el
+   <select> real queda en el DOM (oculto con opacity, no display:none, para
+   que la validación required/reportValidity() del navegador lo siga
+   encontrando y enfocando) y esta caja imita su lugar visualmente. Ver
+   enhanceSelect() en base.html. */
+.dml-select-wrapper {
+    position: relative;
+}
+
+.dml-select-wrapper select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.dml-select-toggle {
+    width: 100%;
+    text-align: left;
+    background-color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
+.dml-select-toggle span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dml-select-toggle.text-muted {
+    color: #6c757d;
+}
+
+.dml-select-menu {
+    max-height: 240px;
+    overflow-y: auto;
+}
