@@ -108,6 +108,18 @@ table.table tbody td {
     align-items: center;
     justify-content: space-between;
     gap: .5rem;
+    /* Base propia (no solo heredada de .form-select/.form-control): hay
+       templates (ej. dml_edit.html) que estilan sus <select> con CSS
+       propio en vez de clases de Bootstrap, así que el <select> original
+       no tiene ninguna clase para copiarle a este botón. Al cargar
+       style.css después de Bootstrap en base.html, esto gana por orden de
+       cascada sobre .form-select/.form-control cuando ambas aplican - de
+       paso normaliza el tamaño de los ~24 selects entre sí, que es
+       justamente el objetivo de unificarlos. */
+    padding: .375rem .75rem;
+    border: 1px solid #dee2e6;
+    border-radius: .375rem;
+    font-size: 1rem;
 }
 
 .dml-select-toggle span {
