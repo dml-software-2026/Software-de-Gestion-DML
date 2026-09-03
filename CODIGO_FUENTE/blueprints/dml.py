@@ -18,6 +18,7 @@ from CODIGO_FUENTE.decorators import (
     login_required,
     permission_required,
     role_required,
+    verify_admin_password,
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.mail import send_mail
@@ -237,10 +238,10 @@ def dml_edit(id):
     if request.method == "POST":
         try:
             unfreeze_code = request.form.get("unfreeze_code")
-            # TODO SEGURIDAD (Épica 2): código hardcodeado "ADMIN2024", mismo
-            # que en raypac_edit. Se repite en al menos 2 lugares del código -
-            # candidato claro para centralizar en una sola variable de entorno.
-            if ficha['is_closed'] and unfreeze_code != "ADMIN2024":
+            # #133: se confirma contra la contraseña del propio usuario
+            # logueado (mismo mecanismo que el login), no un código fijo
+            # separado que había que memorizar aparte.
+            if ficha['is_closed'] and not verify_admin_password(unfreeze_code):
                 flash("Código incorrecto.", "error")
                 return redirect(url_for("dml.dml_view", id=id))
 

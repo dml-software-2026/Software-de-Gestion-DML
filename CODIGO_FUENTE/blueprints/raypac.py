@@ -9,6 +9,7 @@ from CODIGO_FUENTE.decorators import (
     login_required,
     permission_required,
     role_required,
+    verify_admin_password,
 )
 from CODIGO_FUENTE.extensions import get_db
 
@@ -178,10 +179,11 @@ def raypac_edit(id):
     if request.method == "POST":
         try:
             unfreeze_code = request.form.get("unfreeze_code")
-            # TODO SEGURIDAD (Épica 2): código de desbloqueo hardcodeado
-            # ("ADMIN2024"). Mismo patrón que los hashes hardcodeados en
-            # migrate_db() y debería resolverse junto con esa tarea.
-            if entry['is_frozen'] and unfreeze_code != "ADMIN2024":
+            # #133: se confirma contra la contraseña del propio usuario
+            # logueado, mismo mecanismo que el resto de estas confirmaciones.
+            # (Nota: este bloque es inalcanzable desde la UI real - ver #133 -
+            # se deja consistente igual en vez de tocar esa decisión aparte.)
+            if entry['is_frozen'] and not verify_admin_password(unfreeze_code):
                 flash("Código de desbloqueo incorrecto.", "error")
                 return render_template("raypac_view.html", entry=entry)
 
