@@ -246,7 +246,10 @@ def dml_edit(id):
 
             # Capturar SOLO los campos editables (no los de RAYPAC)
             fecha_ingreso = request.form.get("fecha_ingreso")
-            fecha_egreso = request.form.get("fecha_egreso")
+            # #176: "Fecha de Egreso" no es required (recién se completa al
+            # cerrar la ficha) - el string vacío rompía el UPDATE de más
+            # abajo (Postgres no acepta '' para una columna date).
+            fecha_egreso = request.form.get("fecha_egreso") or None
 
             estado = request.form.get("estado_reparacion")
             # CAMBIO DAVID: No usar diagnostico_inicial, ya viene de RAYPAC
