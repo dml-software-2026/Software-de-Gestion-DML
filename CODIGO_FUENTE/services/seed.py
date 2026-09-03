@@ -104,6 +104,22 @@ def cargar_stock_completo_desde_csv(db):
         return 0
 
 
+def _get_seed_password(env_var_name):
+    """Lee una contraseña de seed desde una variable de entorno.
+ 
+    Falla explícitamente si falta, en vez de caer en un valor por defecto
+    débil de forma silenciosa (eso fue lo que causó que las credenciales
+    de prueba quedaran expuestas)."""
+    pwd = os.environ.get(env_var_name)
+    if not pwd:
+        raise RuntimeError(
+            f"[SEED] ❌ Falta la variable de entorno {env_var_name}. "
+            "No se van a crear usuarios con contraseñas por defecto. "
+            "Configurala en el entorno (.env local o variables de Render) antes de continuar."
+        )
+    return pwd
+ 
+ 
 def load_seed_data(db=None):
     """Carga datos iniciales en la base de datos - BASADO EN seed_data_minimal.py"""
     if db is None:
@@ -115,11 +131,15 @@ def load_seed_data(db=None):
     check_users = db.execute("SELECT COUNT(*) as total FROM users").fetchone()
     if check_users and check_users['total'] == 0:
         print("[SEED] 🔧 Creando usuarios por defecto...")
+
+        # Las contraseñas NO viven en el código: se leen de variables de
+        # entorno. Si falta alguna, el seed falla explícitamente en vez de
+        # sembrar un valor por defecto débil.
         usuarios = [
-            ('admin@dml.local', 'admin', 'Administrador', 'ADMIN'),
-            ('raypac@dml.local', 'raypac', 'Casa Matriz RAYPAC', 'RAYPAC'),
-            ('tecnico@dml.local', 'tecnico', 'Juan Pérez', 'DML_ST'),
-            ('repuestos@dml.local', 'repuestos', 'Carlos López', 'DML_REPUESTOS'),
+            ('admin@dml.local', _get_seed_password("SEED_ADMIN_PASSWORD"), 'Administrador', 'ADMIN'),
+            ('raypac@dml.local', _get_seed_password("SEED_RAYPAC_PASSWORD"), 'Casa Matriz RAYPAC', 'RAYPAC'),
+            ('tecnico@dml.local', _get_seed_password("SEED_TECNICO_PASSWORD"), 'Juan Pérez', 'DML_ST'),
+            ('repuestos@dml.local', _get_seed_password("SEED_REPUESTOS_PASSWORD"), 'Carlos López', 'DML_REPUESTOS'),
         ]
 
         for email, pwd, nombre, role in usuarios:
