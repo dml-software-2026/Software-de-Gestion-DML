@@ -6,6 +6,7 @@ from CODIGO_FUENTE.decorators import (
     login_required,
     permission_required,
     role_required,
+    verify_admin_password,
 )
 from CODIGO_FUENTE.extensions import get_db
 
@@ -98,11 +99,10 @@ def stock_new():
             # Solo ADMIN necesita contraseña
             if user['role'] == 'ADMIN':
                 admin_password = (request.form.get("admin_password") or "").strip()
-                # TODO SEGURIDAD (Épica 2): contraseña hardcodeada "ADMIN2024".
-                # Misma constante repetida en raypac_edit, dml_edit, stock_edit
-                # y stock_delete (5 apariciones en total en el código) -
-                # centralizar en una sola variable de entorno.
-                if admin_password != "ADMIN2024":
+                # #133: se confirma contra la contraseña del propio usuario
+                # logueado (mismo mecanismo que el login), no un código fijo
+                # separado que había que memorizar aparte.
+                if not verify_admin_password(admin_password):
                     flash("Contraseña de administración incorrecta.", "error")
                     return render_template("stock_new.html", ubicacion=ubicacion, user=user)
 
@@ -188,9 +188,8 @@ def stock_edit(codigo):
             # Solo ADMIN necesita contraseña
             if user['role'] == 'ADMIN':
                 admin_password = (request.form.get("admin_password") or "").strip()
-                # TODO SEGURIDAD (Épica 2): ver nota en stock_new sobre
-                # "ADMIN2024" hardcodeado.
-                if admin_password != "ADMIN2024":
+                # #133: ver nota en stock_new sobre verify_admin_password().
+                if not verify_admin_password(admin_password):
                     flash("Contraseña de administración incorrecta.", "error")
                     return render_template("stock_edit.html", stock=stock, ubicacion=ubicacion, user=user)
 
@@ -226,9 +225,8 @@ def stock_delete(codigo):
 
     # Solo ADMIN necesita contraseña
     admin_password = (request.form.get("admin_password") or "").strip()
-    # TODO SEGURIDAD (Épica 2): ver nota en stock_new sobre "ADMIN2024"
-    # hardcodeado.
-    if admin_password != "ADMIN2024":
+    # #133: ver nota en stock_new sobre verify_admin_password().
+    if not verify_admin_password(admin_password):
         flash("Contraseña de administración incorrecta.", "error")
         return redirect(url_for("stock.stock_list", ubicacion=ubicacion))
 

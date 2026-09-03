@@ -1,6 +1,7 @@
 from functools import wraps
 
 from flask import flash, redirect, session, url_for
+from werkzeug.security import check_password_hash
 
 from CODIGO_FUENTE.extensions import get_db
 
@@ -16,6 +17,24 @@ def get_current_user():
 def get_current_user_jinja():
     """Obtiene usuario actual para uso en Jinja2 (mismo resultado que get_current_user)."""
     return get_current_user()
+
+
+def verify_admin_password(submitted_password):
+    """Confirma una acción sensible (editar/eliminar stock, desfreezar un
+    ingreso RAYPAC) contra la contraseña del usuario que ya tiene la sesión
+    abierta - #133.
+
+    Reemplaza el código fijo "ADMIN2024" que antes se comparaba a mano y
+    repetido en varios blueprints: ahora se valida con el mismo mecanismo
+    que el login (check_password_hash contra users.password_hash), así no
+    hace falta memorizar una segunda contraseña separada ni queda un valor
+    hardcodeado dando vueltas por el código (y, de paso, visible como
+    placeholder en el HTML - ver comentario del #133 en GitHub).
+    """
+    user = get_current_user()
+    if not user or not submitted_password:
+        return False
+    return check_password_hash(user["password_hash"], submitted_password)
 
 
 def log_action(user_id, action, table_name, record_id=None, old_value=None, new_value=None):

@@ -18,6 +18,287 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+- **Última actualización:** 2026-09-03, cierre de sesión (Facu cambia de
+  máquina para la próxima sesión — por eso este checkpoint se pushea hoy,
+  a diferencia de otros días que queda solo en commits locales).
+- **Los 4 PRs de la sesión del 2026-08-31 que en el checkpoint anterior
+  figuraban "sin mergear" ya están mergeados a `dev`** (confirmado al
+  arrancar hoy: `fix/132-reemplazar-confirm-nativos` #163,
+  `fix/132-confirm-cliente-nuevo-raypac` #165,
+  `fix/161-162-tabla-notificaciones-feedback` #164, más el checkpoint
+  mismo #166) — Facu los revisó y mergeó después del cierre de esa sesión.
+  De paso se mergeó también `refactor/85-unificar-los-3-generadores-de-pdf`
+  de Ivo (#167, issue #85), sin relación con el #132.
+- **Hallazgo de proceso (importante, corregido hoy): `Closes #N` nunca
+  autocierra un issue en este repo.** El default branch es `main`, todo se
+  mergea a `dev`, y GitHub solo dispara el auto-close cuando el merge es a
+  la default branch del repo — nunca pasa acá. Confirmado revisando el
+  timeline de issues: #127 lo había cerrado Facu a mano (no fue automático,
+  aunque el checkpoint de su momento lo diera por hecho), y **#156, #157,
+  #161, #162 seguían `OPEN` en GitHub** pese a tener sus PRs (#160, #164)
+  ya mergeados a `dev` con `Closes #N` bien escrito en el body. La nota que
+  había quedado archivada sobre el #44 ("el PR usó `Refs` en vez de
+  `Closes`") atribuía esto a un detalle de wording — es la causa
+  equivocada, el problema es estructural y le pasa a **todos** los PRs.
+  **Acción tomada:** se cerraron a mano #156, #157, #161 y #162 (los 4 ya
+  estaban resueltos y mergeados, solo desactualizados en GitHub), y se
+  agregó una nota permanente a la sección "Branches y flujo de PRs" de
+  este archivo con la práctica nueva: cerrar el issue a mano
+  (`gh issue close N`) como parte del mismo paso de confirmar que un PR
+  quedó mergeado, no asumir que Github lo hace solo.
+- **Tarea de la sesión: #132, ítem grande (unificar los ~24 `<select>`
+  nativos al patrón del desplegable de Cliente) — sub-tanda de 4 PRs
+  ✅ COMPLETA, los 4 mergeados a `dev` en el orden correcto (2026-09-03):**
+  Componente reutilizable `enhanceSelect()` agregado a `base.html` +
+  estilos en `style.css`: cualquier `<select class="js-select-enhance">`
+  se pilotea desde un botón + `dropdown-menu` de Bootstrap en vez del
+  popup nativo del SO — opt-in por template (rollout gradual), el
+  `<select>` real sigue en el DOM (oculto con `opacity:0`, no
+  `display:none`, para que `required`/`reportValidity()` lo sigan
+  encontrando) y es el que viaja en el submit, sin tocar nada de backend.
+  1. `feature/132-unificar-select-usuario_form` (el componente + 1er caso,
+     select de Rol en `usuario_form.html`) — **PR #172, mergeado.**
+  2. `feature/132-unificar-select-usuario_edit` (mismo select de Rol en
+     `usuario_edit.html`, caso con clase `form-control` y opción
+     pre-seleccionada) — **PR #173, mergeado.**
+  3. `feature/132-unificar-select-envios-tickets` (`envios_form.html` +
+     el filtro de Estado en `tickets_list.html`) — **PR #174, mergeado.**
+  4. `feature/132-unificar-select-dml_edit` (los 12 selects de "partes del
+     equipo" + el de "Estado de la Reparación") — **PR #175, mergeado.**
+     Probado en vivo el 2026-09-03 en `/dml/4/edit` (ficha #504 de
+     prueba) antes de pushear: el dropdown abre con estilo Bootstrap (no
+     el popup nativo), la selección sincroniza el `<select>` oculto
+     (confirmado por JS), el submit persiste el valor bien (`CUBRE
+     FEEDWHEEL` → `OK`, verificado en la vista de solo lectura después de
+     guardar), y "MÁQUINA ENTREGADA" sigue sin aparecer como opción en
+     "Estado de la Reparación" (fix del #157 no se rompió). Primer caso
+     con selects sin ninguna clase de Bootstrap (el template estila
+     `<select>` con CSS propio) - se le agregó una base visual propia a
+     `.dml-select-toggle` en `style.css` (calcada de los valores por
+     defecto de `.form-select` de Bootstrap 5.3) para que el componente se
+     vea bien la tenga o no.
+  - **Gotcha del día, para la próxima vez que se apilen ramas así:** los
+    PRs #173 y #174 se mergearon a `dev` mientras la rama 4 (#175)
+    todavía los tenía apilados encima sin mergear - como el merge a `dev`
+    generó commits nuevos (no fast-forward), la rama 4 quedó con historia
+    divergente y GitHub marcó el PR #175 en conflicto (`CONFLICTING`),
+    sin ni siquiera correr el CI. Se resolvió con `git merge origin/dev`
+    en la rama 4 (único conflicto real: unas líneas de CSS de
+    `.dml-select-toggle` que las ramas 2/3 no tenían), corriendo los 2
+    checks del CI en local antes de pushear (`ruff check CODIGO_FUENTE/` +
+    el import-check de la app), y recién ahí pusheando - mismo patrón que
+    el gotcha ya documentado del `ruff --fix` del #113 en la sesión del
+    #54, pero esta vez con PRs propios en vez de uno de otro integrante.
+  - **Los 2 templates grandes que quedaban del #132 ✅ HECHOS, pusheados
+    hoy mismo (2026-09-03), probados en vivo end-to-end:**
+    - `raypac_form.html` (4 `<select>` reales - el conteo original de "5"
+      incluía el desplegable de Cliente, que ya es un patrón armado a
+      mano, no un `<select>` nativo, así que no necesita el wrapper):
+      Tipo Solicitud, Modelo Máquina, Tipo Máquina, Comercial
+      Responsable. Caso con un listener de JS enganchado (el `change` de
+      Comercial autocompleta el mail) - confirmado que sigue andando
+      porque `enhanceSelect()` dispara un evento `change` sintético al
+      elegir una opción. Probado con un alta completa en `/raypac/new`
+      (incluido el modal de cliente nuevo). Rama
+      `feature/132-unificar-select-raypac_form` → **PR #178, mergeado.**
+    - `ticket_nuevo.html` (12 selects idénticos de "Estado del Equipo",
+      mismo set de 7 opciones que ya se unificó en `dml_edit.html`) - el
+      caso más simple, sin ningún listener de JS. Probado con un alta de
+      ticket completa en `/tickets/nuevo/<id>`, confirmado en la base
+      (`SELECT estado_equipo FROM tickets`) que el valor elegido persiste
+      bien. Rama `feature/132-unificar-select-ticket_nuevo` → **PR #179,
+      mergeado.**
+    - Con esto, **los 7 templates / 23 selects reales del #132 quedan con
+      el componente aplicado** (el 8vo/24to que contaba el issue
+      original era `ficha_view.html`, template muerto, ver #168 más
+      abajo). El PR de la última rama (usuario_form, la que trae el
+      componente en sí) es independiente de este orden - no hace falta
+      apilar `raypac_form`/`ticket_nuevo` una sobre otra, las dos parten
+      de `dev` ya actualizado con las 4 anteriores mergeadas.
+- **Hallazgo en el camino: `ficha_view.html` es un template muerto.**
+  Ninguna ruta de `blueprints/dml.py` (ni de ningún otro blueprint) lo
+  renderiza - la vista real de una ficha es `dml_view.html`. Se descubrió
+  al ir a probar el select "Cambiar estado" de ese archivo (uno de los 8
+  templates que el propio #132/`HALLAZGOS_REFACTOR.md` contaban). Se creó
+  el **issue #168** documentándolo y se sacó del alcance de esta tanda de
+  PRs - el scope real de #132 queda en **7 templates vivos, 23 selects**,
+  no 8/24. No se tocó el archivo, decisión pendiente (¿borrar como los
+  backups del #135, o reconectar bajo otro flujo?).
+- **Hallazgo en el camino, probando la rama 4 en vivo: issue #176.**
+  `dml_edit()` (`blueprints/dml.py:249`) rompe con un 500 (error de sintaxis
+  SQL) al guardar cualquier ficha abierta que todavía no tiene "Fecha de
+  Egreso DML" — que es el estado normal de una ficha en curso, no un caso
+  raro. El input HTML no tiene `required` (a propósito, la fecha de egreso
+  recién se completa al cerrar la ficha), pero el backend nunca convierte
+  el string vacío a `None` antes de pasarlo a un `UPDATE` parametrizado
+  contra una columna `date` de Postgres. **Confirmado que no tiene nada
+  que ver con el #132** (`git diff dev feature/132-unificar-select-dml_edit
+  -- CODIGO_FUENTE/blueprints/dml.py` no devuelve cambios) - es un bug
+  preexistente en `dev`. Documentado en el issue #176. Facu decidió
+  resolverlo en el momento (Size XS) - **✅ arreglado y probado hoy
+  mismo**, rama `fix/176-fecha-egreso-vacia-rompe-guardado` (fix de una
+  línea, mismo patrón `... or None` que ya usan `n_ciclos`/`horas_adic`
+  en el mismo archivo), reproducido el 500 en local antes del fix y
+  confirmado que guarda bien después. Rama
+  `fix/176-fecha-egreso-vacia-rompe-guardado` → **PR #177, mergeado.**
+- **#132 (Auditoría UX/UI) — ✅ los 3 PRs pendientes confirmados mergeados
+  hoy mismo por Facu (#177, #178, #179).** Con esto, los 3 ítems del
+  checklist del issue quedan completos en código. **Decisión de Facu:
+  no cerrar el issue todavía** - queda abierto por ahora, sin fecha
+  concreta para revisarlo (el 4to ítem del checklist, "revisar si
+  aparecen más inconsistencias", es abierto por naturaleza). **Kanban
+  movido a Done** (decisión de Facu: el trabajo concreto está terminado,
+  aunque el issue en GitHub se deje abierto).
+- **Encargo aparte de Facu: recorrida guiada de diseño para armar un
+  issue nuevo de rediseño UX/UI** (la intención original al pedir el
+  #132 era más amplia que la lista puntual que terminó siendo - "que la
+  app sea más amigable y fácil de usar" en general). Se hizo una
+  recorrida completa de la app (server local + navegador): los 4 roles
+  (ADMIN, RAYPAC, DML_ST, DML_REPUESTOS), la vista pública del ticket
+  (con y sin sesión, confirmado con `curl` sin cookies que no filtra
+  nada a un cliente anónimo real), y los formularios principales
+  incluidos los del panel Admin que no se habían mirado antes. Resultado:
+  **issue #181 creado** (Backlog, Size L, asignado a Facu, mismo
+  criterio que el propio #132: alcance a desglosar cuando se retome), 7
+  hallazgos confirmados en código o probados en vivo (no opiniones
+  sueltas) - entre ellos: la vista de Ficha DML rompe el lenguaje visual
+  del resto de la app, 3 formularios de admin sin tarjeta de Bootstrap
+  (Nuevo Usuario/Nuevo Repuesto/Notificaciones), botones internos
+  visibles sin chequeo de sesión en la vista pública del ticket
+  (`ticket_view.html` - un cliente real termina en un login sin
+  volver), filtros de búsqueda inconsistentes entre listados parecidos,
+  y responsive/mobile sin poder verificar (limitación de la herramienta
+  de browser usada, no del código - queda pendiente de revisión
+  dedicada). Referencia cruzada con el **#158** (jerarquía de botones,
+  se solapa) para no duplicar trabajo cuando se aborden.
+- **#134 (botón "Generar Ficha" nunca conectado) — ✅ CERRADO en código,
+  PR #182 mergeado.** Se investigó bien antes de decidir: la unificación
+  de generadores de PDF del #85 (de un compañero, ya mergeada) resolvió
+  un problema distinto - había 3 *funciones* que generaban el PDF, quedó
+  1 sola (`generar_pdf_ficha`) - pero eso no tocó el problema real del
+  #134, que son las *rutas*: seguía habiendo 2 endpoints que la llaman,
+  uno conectado (`descargar_ficha_pdf`, el botón real "Descargar PDF")
+  y otro huérfano (`generar_ficha`, sin ningún botón). Se confirmó que
+  lo que hacía la ruta huérfana (generar PDF + mail "máquina lista" al
+  comercial + marcar un flag) ya estaba 100% cubierto por
+  `descargar_ficha_pdf()` y por `dml_close()` (el botón real "Cerrar
+  Ficha", que manda ese mismo mail) - **se eliminó la ruta** en vez de
+  conectarla. Probado en local: `/dml/4/generar-ficha` ahora da 404,
+  `/dml/4/pdf` (el botón real) sigue funcionando igual (200).
+- **#135 (borrar templates backup muertos) — ✅ CERRADO, PR #183
+  mergeado.** El más chico y directo del día: `dml_view_OLD.html`,
+  `dml_edit_FIXED.html`, `dml_edit_BACKUP.html` - confirmado con `grep`
+  que ningún `render_template()` ni `{% include %}`/`{% extends %}` los
+  referenciaba, se borraron los 3 sin necesidad de probar en navegador.
+- **Limpieza de ramas locales (pedido de Facu).** Se revisaron las ~24
+  ramas locales acumuladas de sesiones anteriores, cruzando cada una
+  contra su PR en GitHub (`gh pr list --state all`) y si la rama remota
+  seguía existiendo. Se borraron 22 (`git branch -D`) - 20 ya mergeadas
+  con su copia remota ya borrada por GitHub al mergear, más
+  `docs/agregar-log-ia` (mergeada a `main` hace mucho) y
+  `test/integracion-local-2026-08-27` (rama de prueba local vieja, nunca
+  pusheada, olvidada de una sesión anterior). **Se dejaron sin tocar:**
+  `docs/checkpoint-sesion-2026-09-02` (esta misma, con commits sin
+  pushear) y `docs/closes-no-autocierra-issues-en-dev` (hallazgo
+  importante: **nunca se había mergeado a `dev`** - no tiene PR abierto,
+  y `dev` seguía con el checkpoint viejo sin ese hallazgo. Es la base
+  sobre la que está construida la rama de checkpoint de hoy - por eso el
+  PR de hoy va a incluir esos commits también, no hace falta un PR
+  aparte para esa rama).
+  - **De paso, se encontró un PR ajeno:** **#180** (issue #154,
+    `fix/154-eliminar-exposición-de-datos-de-prueba-en-la-vista-de-inicio-de-sesión`),
+    abierto por un compañero, todavía sin mergear. Cambia de dónde
+    salen las contraseñas de los 4 usuarios de prueba (ahora se leen de
+    variables de entorno `SEED_ADMIN_PASSWORD` etc., con fallo explícito
+    si faltan, en vez de estar hardcodeadas) y saca el cartel "Usuarios
+    de prueba" de `login.html`. No se tocó, es de otra persona - **cuando
+    se mergee, hace falta configurar esas 4 variables de entorno en el
+    `.env` local de cada máquina** (y en Render) o el seed va a fallar al
+    arrancar la app en una base nueva.
+- **#133 (ADMIN2024 hardcodeado) — arrancado y con PR pusheado, sin
+  mergear.** Facu decidió el enfoque: en vez de centralizar
+  `"ADMIN2024"` en una variable de entorno (la propuesta original del
+  issue), usar **la contraseña del propio usuario logueado** para las
+  confirmaciones de ADMIN (editar/eliminar stock, desfreezar) - así no
+  hay una segunda contraseña que memorizar aparte de la del login. No
+  hacía falta esperar al PR #180 del compañero (son mecanismos
+  distintos: #180 cambia de dónde sale la contraseña *del login*, esto
+  valida contra la contraseña *que el usuario ya tiene guardada en la
+  tabla `users`*, funciona igual sin importar de dónde salió esa
+  contraseña).
+  - Implementado: `verify_admin_password()` nuevo en `decorators.py`
+    (usa `check_password_hash` contra `users.password_hash`, mismo
+    mecanismo que el login). Reemplazados los 5 usos de `!= "ADMIN2024"`
+    en `dml.py`, `raypac.py`, `stock.py` (x3). De paso se arreglaron los
+    3 `placeholder` que mostraban la contraseña real como pista visual
+    (`stock_new.html`, `stock_edit.html`, `raypac_form.html` - el
+    hallazgo de seguridad de la recorrida de ayer, ya comentado en el
+    #133) - ahora dicen "Tu contraseña" en vez del valor real, y el
+    campo de `raypac_form.html` pasó de `type="text"` a `type="password"`.
+  - Probado en vivo en los 3 casos alcanzables desde la UI real
+    (`stock_new`, `stock_edit`, `stock_delete`): rechaza con la
+    contraseña vieja `ADMIN2024` (ya no sirve) y con una incorrecta,
+    acepta con la contraseña real del usuario logueado (`admin`) - alta
+    y baja de un repuesto de prueba confirmados de punta a punta.
+  - **Hallazgo nuevo en el camino, sumado como 2do comentario al #133:
+    `dml_edit()` (reabrir una ficha DML cerrada) es código muerto,
+    igual que `raypac_edit()`.** No es solo que falte un botón - la
+    condición `if ficha['is_closed'] and not request.form.get(...)` se
+    evalúa también en el `GET` (no solo en el POST), y un `GET` nunca
+    trae `request.form`, así que cualquier intento de abrir
+    `/dml/<id>/edit` en una ficha cerrada rebota a la vista antes de
+    mostrar el formulario - sin importar nada. Confirmado con `grep` que
+    ningún template vivo tiene un `unfreeze_code` apuntando a
+    `dml.dml_edit`. El cambio de hoy se aplicó igual ahí (por
+    consistencia, sin queda ningún `"ADMIN2024"` hardcodeado en el
+    código), pero no se pudo probar en vivo por no haber forma de
+    llegar. **Decisión pendiente, sin resolver:** ¿construir el flujo
+    real de reabrir una ficha cerrada, o eliminar ese código muerto
+    igual que se hizo con `raypac_edit`/`generar_ficha`? Mismo criterio
+    que el resto de estos hallazgos - no se decide de rebote, queda
+    anotado para cuando se retome.
+  - Rama `fix/133-usar-password-login-en-vez-de-admin2024` →
+    **pusheada, PR todavía sin abrir en GitHub.**
+- **Hallazgo de infraestructura, no de código: el Render de "Dev" apunta a
+  `main`, no a `dev`.** Facu estaba probando en el Render de `dev` y no
+  aparecía el modal de "cliente nuevo" de RAYPAC (#165, mergeado el
+  31/08) aunque sí aparecían fixes más viejos (#127, del 26/08).
+  Confirmado con una captura del dashboard: el servicio
+  `Software-de-Gestion-DML-Dev` tiene configurada la rama `main` (no
+  `dev`) como origen del deploy, con el último deploy en vivo del 28/08
+  (PR #153). No es un bug de código ni de auto-deploy - simplemente sigue
+  otra rama. **Facu avisó que un compañero lo va a corregir**, sin
+  necesidad de acción de nuestro lado.
+- **Próximo paso concreto:**
+  1. **Facu tiene que abrir el PR de `fix/133-usar-password-login-en-vez-de-admin2024`**
+     contra `dev` (`Refs #133` - no `Closes`, porque quedan las 2
+     decisiones pendientes documentadas arriba: qué hacer con
+     `dml_edit`/`raypac_edit` como código muerto). Probarlo antes de
+     mergear no hace falta - ya se probó en vivo en esta sesión los 3
+     casos alcanzables.
+  2. **Facu tiene que abrir y mergear el PR de este mismo checkpoint**
+     (`docs/checkpoint-sesion-2026-09-02`, que incluye también los
+     commits de `docs/closes-no-autocierra-issues-en-dev`) contra `dev`
+     - importante hacerlo *antes* de arrancar la próxima sesión en la
+     otra máquina, para que esa sesión arranque con `dev` al día en vez
+     de perder todo este contexto.
+  3. Después de eso, candidatos para la próxima tarea, todos en
+     Backlog: **#181** (rediseño UX/UI, recién creado - probablemente lo
+     primero a desglosar en sub-issues chicos, mismo patrón que
+     funcionó con el #132), o **#168** (`ficha_view.html`, template
+     muerto - decisión pendiente, borrar o reconectar).
+- **Ambiente local de esta máquina:** usado activamente hoy (server
+  levantado, testeado en el navegador vía Chrome + extensión de Claude in
+  Chrome). El server de pruebas se detuvo al cerrar la sesión. La
+  próxima sesión arranca en **otra máquina** - repetir el setup de
+  entorno local de cero ahí (ver sección "Setup de entorno local" más
+  abajo) si todavía no está armado.
+- **Bloqueos:** ninguno.
+
+<details>
+<summary>Checkpoint anterior (2026-08-31) — histórico, dejado sin borrar por
+referencia</summary>
+
 - **Última actualización:** 2026-08-31, cierre de sesión.
 - **Issue #44 (colores de estados de reparación) — ✅ CERRADO manualmente.**
   Facu había arrancado una rama local `fix/44-colores-estados-reparacion`
@@ -26,10 +307,10 @@ asumir contexto de nada más.
   `Refs #44` en vez de `Closes #44`, así que el issue quedó abierto en
   GitHub aunque el checklist de scope ya estaba completo. Se cerró el issue
   a mano y se borró la rama local (ya redundante, sin nada propio para
-  aportar). **Lección:** antes de arrancar una tarea, chequear si ya tiene
-  un PR mergeado con `Refs` en vez de `Closes` - el issue puede seguir
-  "abierto" en el kanban por un detalle de wording del PR, no porque falte
-  trabajo real.
+  aportar). **Nota (corregida el 2026-09-02): la causa real no era el
+  wording `Refs` vs. `Closes` — es que `Closes #N` no autocierra nada al
+  mergear a `dev` en este repo, le pasa a cualquier PR. Ver el checkpoint
+  de arriba.**
 - **Tarea de la sesión: #132 (Auditoría UX/UI), en curso.** Se avanzó en 2 de
   los 3 sub-ítems planeados, cada uno en su propio PR chico:
   1. **Bug Bootstrap 4→5 en el modal "Acuse"** (`dml_entregadas.html`) -
@@ -42,17 +323,13 @@ asumir contexto de nada más.
      `stock_list.html`, `usuarios_list.html`, `notificaciones.html`. El de
      `raypac_form.html` (autoaprendizaje de cliente) quedó aparte por tener
      una estructura distinta (no bloquea el submit, decide un valor que
-     viaja igual) - PR `fix/132-reemplazar-confirm-nativos` **abierto, sin
-     mergear**; PR/rama `fix/132-confirm-cliente-nuevo-raypac` **pusheada,
-     PR todavía sin abrir en GitHub** (probado en vivo: guardar, no
-     guardar, y cerrar sin elegir, los 3 casos guardan el ingreso RAYPAC
-     igual).
+     viaja igual).
   3. **Queda sin arrancar:** unificar los ~24 `<select>` nativos al patrón
      del desplegable de Cliente - la parte más grande del issue, decidido
      dejarla para una próxima sesión.
 - **4 bugs nuevos encontrados y arreglados en el camino** (ninguno parte del
   #132, todos siguiendo el flujo de kanban-primero):
-  - **#156 + #157** (relacionados, mismo PR) - ✅ CERRADOS, PR
+  - **#156 + #157** (relacionados, mismo PR) - PR
     `fix/156-157-estado-entregada-huerfano` **mergeado**. #156:
     `dml_registrar_acuse()` rechazaba fichas con estado `'MÁQUINA
     ENTREGADA'` (el valor canónico real, del `<select>` y de
@@ -64,7 +341,7 @@ asumir contexto de nada más.
     obligatorio y recién ahí marca `is_closed=TRUE`) - se sacó la opción
     del select y se agregó la misma validación en el backend.
   - **#161 + #162** (relacionados, mismo PR) - PR
-    `fix/161-162-tabla-notificaciones-feedback` **abierto, sin mergear**.
+    `fix/161-162-tabla-notificaciones-feedback` **mergeado**.
     #161: la tabla `usuarios_notificaciones` (destinatarios del mail de
     stock crítico del #59, ya cerrado) no existía en ningún lado
     versionado - ni `schema-postgres.sql` ni una migración en
@@ -83,16 +360,11 @@ asumir contexto de nada más.
   Size L (mismo criterio que el #132: alcance todavía sin desglosar),
   sin Épica asignada (tampoco la tiene el propio #132), asignado a Facu.
   Candidato para cuando se retome el #132 a fondo o como tarea propia.
-- **Próximo paso concreto:** dos cosas.
-  1. Facu tiene que abrir en GitHub el PR de la rama
-     `fix/132-confirm-cliente-nuevo-raypac` (`Refs #132`) - las otras 3
-     ramas de hoy ya tienen PR abierto o ya están mergeadas.
-  2. Retomar el #132: arrancar la unificación de los ~24 `<select>`
-     nativos (el ítem grande que quedó sin tocar), o alguna tarea nueva
-     que salga del daily.
 - **Ambiente local de esta máquina:** sigue armado de punta a punta, usado
   activamente hoy. El server de pruebas se detuvo al cerrar la sesión.
 - **Bloqueos:** ninguno.
+
+</details>
 
 <details>
 <summary>Checkpoint anterior (2026-08-26) — histórico, dejado sin borrar por
@@ -274,7 +546,9 @@ Cuando un cambio esté commiteado y pusheado y listo para convertirse en PR, Cla
 Code tiene que **avisarle explícitamente a Facu** — algo como: "Ya pusheé la rama
 `nombre-rama`, andá a GitHub y abrí el PR contra `dev`. Título sugerido: '...'.
 Descripción sugerida: '...' (con el `Closes #N` o `Refs #N` que corresponda)."
-No dar por hecho que el PR se abre solo ni asumir que ya está abierto.
+No dar por hecho que el PR se abre solo ni asumir que ya está abierto. **Al confirmar
+que un PR con `Closes #N` quedó mergeado, cerrar ese issue a mano** (`gh issue close`)
+— ver el gotcha en "Branches y flujo de PRs", `Closes #N` no autocierra nada acá.
 
 **Antes de tocar cualquier rama:** seguir la rutina de sincronización de siempre —
 `git status` (si hay cambios sin commitear, resolverlos primero: `git diff` para ver
@@ -366,8 +640,25 @@ El monolito original de 4163 líneas ya fue dividido en esto. Ya no hay rutas en
 - **IMPORTANTE — PRs chicos:** el equipo pidió explícitamente hacer PRs pequeños, uno por
   sub-tarea, no un PR gigante al terminar toda una issue completa.
 - Todo PR necesita review de al menos 1 integrante antes de mergear (Definition of Done).
-- Al abrir un PR, usar `Closes #N` en la descripción para que el issue se cierre solo al
-  mergear (probar con más de un `Closes #N` si el PR resuelve varios issues duplicados).
+- Al abrir un PR, usar `Closes #N` en la descripción (más de un `Closes #N` si el PR
+  resuelve varios issues) — sirve como documentación de qué resuelve el PR, pero
+  **no cierra el issue solo** (ver gotcha abajo). Cerrar el issue a mano después de
+  mergear.
+
+**Gotcha importante — `Closes #N` NUNCA autocierra un issue al mergear a `dev`.**
+El default branch del repo es `main`, y GitHub solo dispara el auto-close de
+`Closes #N`/`Fixes #N` cuando el PR se mergea a la default branch del repo — no
+cuando se mergea a `dev`. Como acá **todo** se mergea a `dev`, ningún PR cierra
+issues solo, tenga `Closes` o `Refs`, esté bien escrito o no. Confirmado revisando
+el timeline de varios issues (2026-09-02): #127 lo había cerrado Facu a mano (no
+fue un cierre automático), y #156/#157/#161/#162 seguían `OPEN` en GitHub con sus
+PRs ya mergeados a `dev` (con `Closes #N` correcto en el body). La nota que había
+quedado en el checkpoint del #44 ("el PR usó `Refs` en vez de `Closes`") atribuía
+esto a un problema de wording — es la causa equivocada, el problema es estructural.
+**Práctica a partir de ahora:** después de mergear un PR a `dev` que resuelve un
+issue, cerrarlo a mano (`gh issue close N --comment "..."`) como parte del mismo
+paso — no asumir que GitHub lo hizo. Antes de dar una tarea por "cerrada", chequear
+el estado real del issue en GitHub, no solo que el PR esté mergeado.
 
 ## Setup de entorno local
 
