@@ -98,15 +98,14 @@ asumir contexto de nada más.
       porque `enhanceSelect()` dispara un evento `change` sintético al
       elegir una opción. Probado con un alta completa en `/raypac/new`
       (incluido el modal de cliente nuevo). Rama
-      `feature/132-unificar-select-raypac_form`, **pusheada, PR sin
-      abrir todavía.**
+      `feature/132-unificar-select-raypac_form` → **PR #178, mergeado.**
     - `ticket_nuevo.html` (12 selects idénticos de "Estado del Equipo",
       mismo set de 7 opciones que ya se unificó en `dml_edit.html`) - el
       caso más simple, sin ningún listener de JS. Probado con un alta de
       ticket completa en `/tickets/nuevo/<id>`, confirmado en la base
       (`SELECT estado_equipo FROM tickets`) que el valor elegido persiste
-      bien. Rama `feature/132-unificar-select-ticket_nuevo`, **pusheada,
-      PR sin abrir todavía.**
+      bien. Rama `feature/132-unificar-select-ticket_nuevo` → **PR #179,
+      mergeado.**
     - Con esto, **los 7 templates / 23 selects reales del #132 quedan con
       el componente aplicado** (el 8vo/24to que contaba el issue
       original era `ficha_view.html`, template muerto, ver #168 más
@@ -138,8 +137,50 @@ asumir contexto de nada más.
   mismo**, rama `fix/176-fecha-egreso-vacia-rompe-guardado` (fix de una
   línea, mismo patrón `... or None` que ya usan `n_ciclos`/`horas_adic`
   en el mismo archivo), reproducido el 500 en local antes del fix y
-  confirmado que guarda bien después. **Pusheada, PR todavía sin abrir
-  en GitHub.**
+  confirmado que guarda bien después. Rama
+  `fix/176-fecha-egreso-vacia-rompe-guardado` → **PR #177, mergeado.**
+- **#132 (Auditoría UX/UI) — ✅ los 3 PRs pendientes confirmados mergeados
+  hoy mismo por Facu (#177, #178, #179).** Con esto, los 3 ítems del
+  checklist del issue quedan completos en código. **Decisión de Facu:
+  no cerrar el issue todavía** - queda abierto por ahora, sin fecha
+  concreta para revisarlo (el 4to ítem del checklist, "revisar si
+  aparecen más inconsistencias", es abierto por naturaleza).
+- **Encargo aparte de Facu: recorrida guiada de diseño para armar un
+  issue nuevo de rediseño UX/UI** (la intención original al pedir el
+  #132 era más amplia que la lista puntual que terminó siendo - "que la
+  app sea más amigable y fácil de usar" en general). Se hizo una
+  recorrida completa de la app (server local + navegador): los 4 roles
+  (ADMIN, RAYPAC, DML_ST, DML_REPUESTOS), la vista pública del ticket
+  (con y sin sesión, confirmado con `curl` sin cookies que no filtra
+  nada a un cliente anónimo real), y los formularios principales
+  incluidos los del panel Admin que no se habían mirado antes. Resultado:
+  **issue #181 creado** (Backlog, Size L, asignado a Facu, mismo
+  criterio que el propio #132: alcance a desglosar cuando se retome), 7
+  hallazgos confirmados en código o probados en vivo (no opiniones
+  sueltas) - entre ellos: la vista de Ficha DML rompe el lenguaje visual
+  del resto de la app, 3 formularios de admin sin tarjeta de Bootstrap
+  (Nuevo Usuario/Nuevo Repuesto/Notificaciones), botones internos
+  visibles sin chequeo de sesión en la vista pública del ticket
+  (`ticket_view.html` - un cliente real termina en un login sin
+  volver), filtros de búsqueda inconsistentes entre listados parecidos,
+  y responsive/mobile sin poder verificar (limitación de la herramienta
+  de browser usada, no del código - queda pendiente de revisión
+  dedicada). Referencia cruzada con el **#158** (jerarquía de botones,
+  se solapa) para no duplicar trabajo cuando se aborden.
+- **Hallazgo de seguridad, encontrado en la misma recorrida: comentario
+  agregado al #133 (sin tocar código).** Además del problema ya conocido
+  (`"ADMIN2024"` hardcodeado y repetido), **el frontend expone la
+  contraseña real como `placeholder`** en 3 formularios
+  (`stock_new.html`, `stock_edit.html`, `raypac_form.html`) - cualquiera
+  con acceso a esas pantallas la ve sin leer el código fuente. **Facu
+  pidió no tocarlo todavía:** un compañero ya está cambiando las
+  contraseñas del sistema (todavía sin mergear a este repo, confirmado
+  con `git fetch` que no hay nada nuevo en `origin/dev` al respecto), y
+  se está evaluando que la contraseña de confirmación de ADMIN sea
+  directamente la misma que la del login (en vez de un código
+  separado) - si se resuelve por ese camino, el problema del
+  `placeholder` se soluciona de raíz. Evaluar todo junto cuando se tome
+  la tarea del #133, no como fix aislado.
 - **Hallazgo de infraestructura, no de código: el Render de "Dev" apunta a
   `main`, no a `dev`.** Facu estaba probando en el Render de `dev` y no
   aparecía el modal de "cliente nuevo" de RAYPAC (#165, mergeado el
@@ -150,16 +191,20 @@ asumir contexto de nada más.
   (PR #153). No es un bug de código ni de auto-deploy - simplemente sigue
   otra rama. **Facu avisó que un compañero lo va a corregir**, sin
   necesidad de acción de nuestro lado.
-- **Próximo paso concreto — 3 PRs pusheados hoy, todos esperando que Facu
-  los abra en GitHub (ninguno depende de otro, se pueden abrir/mergear en
-  cualquier orden):**
-  1. `fix/176-fecha-egreso-vacia-rompe-guardado` → `Closes #176`.
-  2. `feature/132-unificar-select-raypac_form` → `Refs #132`.
-  3. `feature/132-unificar-select-ticket_nuevo` → `Refs #132`. Con este
-     mergeado, el #132 queda con **todo el código de la unificación de
-     selects hecho** - lo único que quedaría del issue original es la
-     decisión sobre `ficha_view.html` (#168) y evaluar si cerrar el #132
-     mismo o dejarlo abierto por si aparecen más hallazgos.
+- **Próximo paso concreto:** sin tarea propia en curso ahora mismo -
+  candidatos para retomar en la próxima sesión, todos en Backlog:
+  - **#181** (rediseño UX/UI, recién creado) - probablemente lo primero
+    a desglosar en sub-issues chicos si se retoma, mismo patrón que
+    funcionó con el #132.
+  - **#133** (ADMIN2024 hardcodeado + el hallazgo nuevo del `placeholder`)
+    - depende de que el compañero de Facu termine su cambio de
+    contraseñas y se decida el enfoque (código propio vs. misma
+    contraseña que el login).
+  - **#168** (`ficha_view.html`, template muerto) - decisión pendiente,
+    borrar o reconectar.
+  - Los 2 templates grandes del #132 (`raypac_form.html`,
+    `ticket_nuevo.html`) ya no son candidato - **quedaron resueltos
+    hoy**, ver arriba.
 - **Ambiente local de esta máquina:** usado activamente hoy (server
   levantado, testeado en el navegador vía Chrome + extensión de Claude in
   Chrome). El server de pruebas se detuvo al cerrar la sesión.
