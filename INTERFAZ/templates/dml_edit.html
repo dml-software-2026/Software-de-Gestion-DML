@@ -125,7 +125,7 @@
             {% for parte in partes %}
                 <div class="form-group">
                     <label>{{ parte.nombre_parte }}:</label>
-                    <select name="parte_{{ loop.index0 }}">
+                    <select name="parte_{{ loop.index0 }}" class="js-select-enhance">
                         <option value="BUENO" {% if parte.estado == 'BUENO' or not parte.estado %}selected{% endif %}>BUENO</option>
                         <option value="OK" {% if parte.estado == 'OK' %}selected{% endif %}>OK</option>
                         <option value="A PROBAR" {% if parte.estado == 'A PROBAR' %}selected{% endif %}>A PROBAR</option>
@@ -166,7 +166,7 @@
             </div>
             <div class="form-group">
                 <label>Estado de la Reparación:</label>
-                <select name="estado_reparacion" required>
+                <select name="estado_reparacion" class="js-select-enhance" required>
                     <option value="A LA ESPERA DE REVISIÓN" {% if ficha.estado_reparacion == 'A LA ESPERA DE REVISIÓN' %}selected{% endif %}>A LA ESPERA DE REVISIÓN</option>
                     <option value="A LA ESPERA DE REPUESTOS" {% if ficha.estado_reparacion == 'A LA ESPERA DE REPUESTOS' %}selected{% endif %}>A LA ESPERA DE REPUESTOS</option>
                     <option value="EN REPARACIÓN" {% if ficha.estado_reparacion in ('EN REPARACIÓN', 'EN REPARACION') %}selected{% endif %}>EN REPARACIÓN</option>
