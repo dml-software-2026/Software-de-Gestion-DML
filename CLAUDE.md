@@ -108,13 +108,13 @@ asumir contexto de nada más.
   contra una columna `date` de Postgres. **Confirmado que no tiene nada
   que ver con el #132** (`git diff dev feature/132-unificar-select-dml_edit
   -- CODIGO_FUENTE/blueprints/dml.py` no devuelve cambios) - es un bug
-  preexistente en `dev`. Documentado en el issue #176 (Backlog, Size XS,
-  asignado a Facu) con la causa exacta y el fix propuesto (mismo patrón
-  `... or None` que ya usan `n_ciclos`/`horas_adic` en el mismo archivo).
-  Para poder completar la prueba de la rama 4 se lo rodeó a mano
-  (completando la fecha en el form antes de guardar), sin tocar código -
-  **sin arrancar todavía, a decidir con Facu si se resuelve ahora (es
-  chico) o se deja para después.**
+  preexistente en `dev`. Documentado en el issue #176. Facu decidió
+  resolverlo en el momento (Size XS) - **✅ arreglado y probado hoy
+  mismo**, rama `fix/176-fecha-egreso-vacia-rompe-guardado` (fix de una
+  línea, mismo patrón `... or None` que ya usan `n_ciclos`/`horas_adic`
+  en el mismo archivo), reproducido el 500 en local antes del fix y
+  confirmado que guarda bien después. **Pusheada, PR todavía sin abrir
+  en GitHub.**
 - **Hallazgo de infraestructura, no de código: el Render de "Dev" apunta a
   `main`, no a `dev`.** Facu estaba probando en el Render de `dev` y no
   aparecía el modal de "cliente nuevo" de RAYPAC (#165, mergeado el
@@ -126,8 +126,8 @@ asumir contexto de nada más.
   otra rama. **Facu avisó que un compañero lo va a corregir**, sin
   necesidad de acción de nuestro lado.
 - **Próximo paso concreto:**
-  1. Decidir con Facu si el #176 (bug de `fecha_egreso` recién encontrado,
-     sin relación con el #132) se resuelve ahora o se deja para después.
+  1. Facu abre en GitHub el PR de `fix/176-fecha-egreso-vacia-rompe-guardado`
+     (`Closes #176`) y lo mergea cuando esté conforme.
   2. Retomar el #132 con los 2 templates grandes que quedan:
      `raypac_form.html` y `ticket_nuevo.html`.
 - **Ambiente local de esta máquina:** usado activamente hoy (server
