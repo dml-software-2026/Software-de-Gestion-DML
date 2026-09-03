@@ -87,8 +87,33 @@ asumir contexto de nada más.
     el import-check de la app), y recién ahí pusheando - mismo patrón que
     el gotcha ya documentado del `ruff --fix` del #113 en la sesión del
     #54, pero esta vez con PRs propios en vez de uno de otro integrante.
-  - **Quedan 2 templates grandes sin arrancar:** `raypac_form.html` (5
-    selects) y `ticket_nuevo.html` (12 selects, el más grande de todos).
+  - **Los 2 templates grandes que quedaban del #132 ✅ HECHOS, pusheados
+    hoy mismo (2026-09-03), probados en vivo end-to-end:**
+    - `raypac_form.html` (4 `<select>` reales - el conteo original de "5"
+      incluía el desplegable de Cliente, que ya es un patrón armado a
+      mano, no un `<select>` nativo, así que no necesita el wrapper):
+      Tipo Solicitud, Modelo Máquina, Tipo Máquina, Comercial
+      Responsable. Caso con un listener de JS enganchado (el `change` de
+      Comercial autocompleta el mail) - confirmado que sigue andando
+      porque `enhanceSelect()` dispara un evento `change` sintético al
+      elegir una opción. Probado con un alta completa en `/raypac/new`
+      (incluido el modal de cliente nuevo). Rama
+      `feature/132-unificar-select-raypac_form`, **pusheada, PR sin
+      abrir todavía.**
+    - `ticket_nuevo.html` (12 selects idénticos de "Estado del Equipo",
+      mismo set de 7 opciones que ya se unificó en `dml_edit.html`) - el
+      caso más simple, sin ningún listener de JS. Probado con un alta de
+      ticket completa en `/tickets/nuevo/<id>`, confirmado en la base
+      (`SELECT estado_equipo FROM tickets`) que el valor elegido persiste
+      bien. Rama `feature/132-unificar-select-ticket_nuevo`, **pusheada,
+      PR sin abrir todavía.**
+    - Con esto, **los 7 templates / 23 selects reales del #132 quedan con
+      el componente aplicado** (el 8vo/24to que contaba el issue
+      original era `ficha_view.html`, template muerto, ver #168 más
+      abajo). El PR de la última rama (usuario_form, la que trae el
+      componente en sí) es independiente de este orden - no hace falta
+      apilar `raypac_form`/`ticket_nuevo` una sobre otra, las dos parten
+      de `dev` ya actualizado con las 4 anteriores mergeadas.
 - **Hallazgo en el camino: `ficha_view.html` es un template muerto.**
   Ninguna ruta de `blueprints/dml.py` (ni de ningún otro blueprint) lo
   renderiza - la vista real de una ficha es `dml_view.html`. Se descubrió
@@ -125,11 +150,16 @@ asumir contexto de nada más.
   (PR #153). No es un bug de código ni de auto-deploy - simplemente sigue
   otra rama. **Facu avisó que un compañero lo va a corregir**, sin
   necesidad de acción de nuestro lado.
-- **Próximo paso concreto:**
-  1. Facu abre en GitHub el PR de `fix/176-fecha-egreso-vacia-rompe-guardado`
-     (`Closes #176`) y lo mergea cuando esté conforme.
-  2. Retomar el #132 con los 2 templates grandes que quedan:
-     `raypac_form.html` y `ticket_nuevo.html`.
+- **Próximo paso concreto — 3 PRs pusheados hoy, todos esperando que Facu
+  los abra en GitHub (ninguno depende de otro, se pueden abrir/mergear en
+  cualquier orden):**
+  1. `fix/176-fecha-egreso-vacia-rompe-guardado` → `Closes #176`.
+  2. `feature/132-unificar-select-raypac_form` → `Refs #132`.
+  3. `feature/132-unificar-select-ticket_nuevo` → `Refs #132`. Con este
+     mergeado, el #132 queda con **todo el código de la unificación de
+     selects hecho** - lo único que quedaría del issue original es la
+     decisión sobre `ficha_view.html` (#168) y evaluar si cerrar el #132
+     mismo o dejarlo abierto por si aparecen más hallazgos.
 - **Ambiente local de esta máquina:** usado activamente hoy (server
   levantado, testeado en el navegador vía Chrome + extensión de Claude in
   Chrome). El server de pruebas se detuvo al cerrar la sesión.
