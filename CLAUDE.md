@@ -18,7 +18,7 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-- **Última actualización:** 2026-09-02, cierre de sesión.
+- **Última actualización:** 2026-09-03, sesión en curso.
 - **Los 4 PRs de la sesión del 2026-08-31 que en el checkpoint anterior
   figuraban "sin mergear" ya están mergeados a `dev`** (confirmado al
   arrancar hoy: `fix/132-reemplazar-confirm-nativos` #163,
@@ -65,14 +65,19 @@ asumir contexto de nada más.
      el filtro de Estado en `tickets_list.html`) — **pusheada, PR
      todavía sin abrir en GitHub.**
   4. `feature/132-unificar-select-dml_edit` (los 12 selects de "partes del
-     equipo" + el de "Estado de la Reparación") — **pusheada, PR todavía
-     sin abrir. Primer caso con selects sin ninguna clase de Bootstrap**
-     (el template estila `<select>` con CSS propio) - se le agregó una
-     base visual propia a `.dml-select-toggle` en `style.css` (calcada de
-     los valores por defecto de `.form-select` de Bootstrap 5.3) para que
-     el componente se vea bien la tenga o no. **Sin probar en navegador
-     todavía** (se cortó la conexión con Brave a mitad de sesión) - antes
-     de mergear esta, probar en vivo `/dml/<id>/edit` con Facu.
+     equipo" + el de "Estado de la Reparación") — **pusheada, probada en
+     vivo hoy (2026-09-03) en `/dml/4/edit` (ficha #504 de prueba) y
+     funciona correctamente: el dropdown abre con estilo Bootstrap (no el
+     popup nativo), la selección sincroniza el `<select>` oculto
+     (confirmado por JS), el submit persiste el valor bien (`CUBRE
+     FEEDWHEEL` → `OK`, verificado en la vista de solo lectura después de
+     guardar), y "MÁQUINA ENTREGADA" sigue sin aparecer como opción en
+     "Estado de la Reparación" (fix del #157 no se rompió). Primer caso
+     con selects sin ninguna clase de Bootstrap** (el template estila
+     `<select>` con CSS propio) - se le agregó una base visual propia a
+     `.dml-select-toggle` en `style.css` (calcada de los valores por
+     defecto de `.form-select` de Bootstrap 5.3) para que el componente se
+     vea bien la tenga o no. **Lista para abrir el PR en GitHub.**
   - **Regla para mergear:** abrir los 4 PRs en cualquier orden está bien,
     pero mergear estrictamente 1→2→3→4 (cada rama carga los commits de la
     anterior todavía no mergeada).
@@ -87,6 +92,23 @@ asumir contexto de nada más.
   PRs - el scope real de #132 queda en **7 templates vivos, 23 selects**,
   no 8/24. No se tocó el archivo, decisión pendiente (¿borrar como los
   backups del #135, o reconectar bajo otro flujo?).
+- **Hallazgo en el camino, probando la rama 4 en vivo: issue #176.**
+  `dml_edit()` (`blueprints/dml.py:249`) rompe con un 500 (error de sintaxis
+  SQL) al guardar cualquier ficha abierta que todavía no tiene "Fecha de
+  Egreso DML" — que es el estado normal de una ficha en curso, no un caso
+  raro. El input HTML no tiene `required` (a propósito, la fecha de egreso
+  recién se completa al cerrar la ficha), pero el backend nunca convierte
+  el string vacío a `None` antes de pasarlo a un `UPDATE` parametrizado
+  contra una columna `date` de Postgres. **Confirmado que no tiene nada
+  que ver con el #132** (`git diff dev feature/132-unificar-select-dml_edit
+  -- CODIGO_FUENTE/blueprints/dml.py` no devuelve cambios) - es un bug
+  preexistente en `dev`. Documentado en el issue #176 (Backlog, Size XS,
+  asignado a Facu) con la causa exacta y el fix propuesto (mismo patrón
+  `... or None` que ya usan `n_ciclos`/`horas_adic` en el mismo archivo).
+  Para poder completar la prueba de la rama 4 se lo rodeó a mano
+  (completando la fecha en el form antes de guardar), sin tocar código -
+  **sin arrancar todavía, a decidir con Facu si se resuelve ahora (es
+  chico) o se deja para después.**
 - **Hallazgo de infraestructura, no de código: el Render de "Dev" apunta a
   `main`, no a `dev`.** Facu estaba probando en el Render de `dev` y no
   aparecía el modal de "cliente nuevo" de RAYPAC (#165, mergeado el
@@ -99,13 +121,15 @@ asumir contexto de nada más.
   necesidad de acción de nuestro lado.
 - **Próximo paso concreto:**
   1. Facu mergea el PR #173 (rama 2) cuando se lo aprueben.
-  2. Abrir y mergear el PR de la rama 3 (`envios-tickets`).
-  3. Abrir el PR de la rama 4 (`dml_edit`), pero **probarlo en el navegador
-     con Facu antes de mergear** (pendiente de la sesión de hoy).
-  4. Retomar el #132 con los 2 templates grandes que quedan:
+  2. Abrir el PR de la rama 3 (`envios-tickets`) — ya pusheada.
+  3. Abrir el PR de la rama 4 (`dml_edit`) — ya pusheada y **probada en vivo,
+     lista para abrir.** Recordar mergear estrictamente 1→2→3→4.
+  4. Decidir con Facu si el #176 (bug de `fecha_egreso` recién encontrado)
+     se resuelve ahora o se deja para después.
+  5. Retomar el #132 con los 2 templates grandes que quedan:
      `raypac_form.html` y `ticket_nuevo.html`.
 - **Ambiente local de esta máquina:** usado activamente hoy (server
-  levantado, testeado en el navegador vía Brave + extensión de Claude in
+  levantado, testeado en el navegador vía Chrome + extensión de Claude in
   Chrome). El server de pruebas se detuvo al cerrar la sesión.
 - **Bloqueos:** ninguno.
 
