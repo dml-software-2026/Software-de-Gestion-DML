@@ -19,7 +19,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="tipo_solicitud" class="form-label">Tipo Solicitud *</label>
-                                <select class="form-control" id="tipo_solicitud" name="tipo_solicitud" required>
+                                <select class="form-control js-select-enhance" id="tipo_solicitud" name="tipo_solicitud" required>
                                     <option value="REPARACIÓN" {% if entry and entry.tipo_solicitud == 'REPARACIÓN' %}selected{% endif %}>REPARACIÓN</option>
                                     <option value="PRESUPUESTO" {% if entry and entry.tipo_solicitud == 'PRESUPUESTO' %}selected{% endif %}>PRESUPUESTO</option>
                                 </select>
@@ -63,7 +63,7 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="modelo_maquina" class="form-label">Modelo Máquina *</label>
-                                <select class="form-control" id="modelo_maquina" name="modelo_maquina" required>
+                                <select class="form-control js-select-enhance" id="modelo_maquina" name="modelo_maquina" required>
                                     <option value="">Selecciona</option>
                                     <option value="ITA10" {% if entry and entry.modelo_maquina == 'ITA10' %}selected{% endif %}>ITA10</option>
                                     <option value="ITA11" {% if entry and entry.modelo_maquina == 'ITA11' %}selected{% endif %}>ITA11</option>
@@ -82,7 +82,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="tipo_maquina" class="form-label">Tipo Máquina *</label>
-                                <select class="form-control" id="tipo_maquina" name="tipo_maquina" required>
+                                <select class="form-control js-select-enhance" id="tipo_maquina" name="tipo_maquina" required>
                                     <option value="">Selecciona</option>
                                     <option value="A BATERIA" {% if entry and entry.tipo_maquina == 'A BATERIA' %}selected{% endif %}>A BATERIA</option>
                                     <option value="MANUAL" {% if entry and entry.tipo_maquina == 'MANUAL' %}selected{% endif %}>MANUAL</option>
@@ -115,7 +115,7 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="comercial" class="form-label">Comercial Responsable *</label>
-                                <select class="form-control" id="comercial" name="comercial" required>
+                                <select class="form-control js-select-enhance" id="comercial" name="comercial" required>
                                     <option value="">Selecciona</option>
                                     <option value="Ezequiel Pacheco" data-email="ezequiel.pacheco@raypac.net" {% if entry and entry.comercial == 'Ezequiel Pacheco' %}selected{% endif %}>Ezequiel Pacheco</option>
                                     <option value="Leonardo Gastager" data-email="leonardo.gastager@raypac.net" {% if entry and entry.comercial == 'Leonardo Gastager' %}selected{% endif %}>Leonardo Gastager</option>
