@@ -337,7 +337,7 @@
         {% endif %}
         
         {% if not ficha.is_closed %}
-        <form method="POST" action="{{ url_for('dml.dml_close', id=ficha.id) }}" style="display: inline;" onsubmit="return confirm('¿Deseas FINALIZAR esta ficha? Se enviará notificación al comercial.');">
+        <form method="POST" action="{{ url_for('dml.dml_close', id=ficha.id) }}" style="display: inline;" onsubmit="return confirmarAccion(event, '¿Deseas FINALIZAR esta ficha? Se enviará notificación al comercial.');">
             <button type="submit" class="btn btn-danger btn-lg" style="margin-right: 10px;">
                 🔒 Cerrar Ficha
             </button>

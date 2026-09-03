@@ -47,14 +47,19 @@
                     <td style="color: black;">{{ ficha.tecnico_resp }}</td>
                     <td style="color: black;">{{ ficha.fecha_ingreso }}</td>
                     <td>
+                        {# Colores acordados con David (Excel "CAMPOS DE INGRESO DML") - ver issue #44 #}
                         {% set estado_color = {
-                            'A LA ESPERA DE REVISIÓN': '#6c757d',
-                            'EN REPARACIÓN': '#ffc107',
-                            'A LA ESPERA DE REPUESTOS': '#dc3545',
-                            'MÁQUINA LISTA PARA RETIRAR': '#28a745',
-                            'MÁQUINA ENTREGADA': '#17a2b8'
+                            'A LA ESPERA DE REVISIÓN': {'bg': '#ffffff', 'border': '#adb5bd', 'text': '#000000'},
+                            'REVISION_INICIAL': {'bg': '#ffffff', 'border': '#adb5bd', 'text': '#000000'},
+                            'EN REPARACIÓN': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
+                            'EN REPARACION': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
+                            'A LA ESPERA DE REPUESTOS': {'bg': '#fd7e14', 'border': '#fd7e14', 'text': '#000000'},
+                            'REPARACIÓN COMPLETADA': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
+                            'MÁQUINA LISTA PARA RETIRAR': {'bg': '#ffc107', 'border': '#ffc107', 'text': '#000000'},
+                            'MÁQUINA ENTREGADA': {'bg': '#28a745', 'border': '#28a745', 'text': '#ffffff'}
                         } %}
-                        <span class="badge" style="background-color: {{ estado_color.get(ficha.estado_reparacion, '#6c757d') }}; color: black; font-size: 12px;">
+                        {% set estado_style = estado_color.get(ficha.estado_reparacion, {'bg': '#6c757d', 'border': '#6c757d', 'text': '#ffffff'}) %}
+                        <span class="badge" style="background-color: {{ estado_style.bg }}; border: 1px solid {{ estado_style.border }}; color: {{ estado_style.text }}; font-size: 12px;">
                             {{ ficha.estado_reparacion }}
                         </span>
                     </td>

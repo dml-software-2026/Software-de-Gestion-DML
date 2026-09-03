@@ -44,7 +44,6 @@ def envios_list():
             id,
             'MAQUINA' as tipo_envio,
             numero_remito,
-            numero_serie as numero_remito,
             fecha_recepcion as fecha_envio,
             NULL as fecha_recepcion,
             estado_envio_equipos as estado_envio,

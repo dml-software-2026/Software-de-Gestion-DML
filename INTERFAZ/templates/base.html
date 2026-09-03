@@ -84,6 +84,8 @@
             <li><a class="dropdown-item" href="{{ url_for('admin.usuarios_list') }}">👥 Usuarios</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('raypac.raypac_new') }}">➕ Nuevo Ingreso RAYPAC</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('notificaciones.listar_notificaciones') }}">🔔 Alertas de Stock</a></li>
           </ul>
         </li>
         {% endif %}
@@ -129,11 +131,164 @@
   </div>
 </footer>
 
+<!-- Modal genérico de confirmación: reemplaza los confirm() nativos del
+     navegador (ver #132). Cualquier form/botón puede usarlo con
+     onsubmit/onclick="return confirmarAccion(event, 'mensaje')". -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmModalLabel"><i class="bi bi-question-circle-fill text-primary"></i> Confirmar acción</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="confirmModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="confirmModalAccept">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function get_current_user() {
   // Función auxiliar para JavaScript si es necesaria
 }
+
+// Reemplazo genérico de confirm() nativo (#132). Se usa desde
+// onsubmit="return confirmarAccion(event, 'mensaje')" en un <form>, o desde
+// onclick="return confirmarAccion(event, 'mensaje')" en un botón submit
+// dentro de un <form>. Preserva la validación nativa (required, etc.) vía
+// requestSubmit() y evita el loop infinito de volver a confirmar el mismo
+// submit con la bandera data-confirmado.
+function confirmarAccion(event, mensaje) {
+  const form = event.target.closest('form');
+  if (form.dataset.confirmado === 'true') {
+    delete form.dataset.confirmado;
+    return true;
+  }
+  event.preventDefault();
+
+  // Si lo que disparó la confirmación fue un botón (onclick) en vez del
+  // form entero (onsubmit), hay que volver a mandarlo como "submitter" de
+  // requestSubmit - si no, se pierde un formaction distinto al del form
+  // (caso del botón "Eliminar" en notificaciones.html).
+  const submitter = event.target.closest('button, input[type="submit"]');
+
+  document.getElementById('confirmModalBody').textContent = mensaje;
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal'));
+
+  const acceptBtn = document.getElementById('confirmModalAccept');
+  const freshBtn = acceptBtn.cloneNode(true); // limpia listeners de confirmaciones anteriores
+  acceptBtn.replaceWith(freshBtn);
+  freshBtn.addEventListener('click', function () {
+    modal.hide();
+    form.dataset.confirmado = 'true';
+    if (form.requestSubmit) form.requestSubmit(submitter || undefined);
+    else form.submit();
+  }, { once: true });
+
+  modal.show();
+  return false;
+}
+
+// Reemplazo genérico de <select> nativo (#132, hallazgo #8 de
+// HALLAZGOS_REFACTOR.md) - el popup de un <select> lo dibuja el sistema
+// operativo, no la página, así que nunca puede tomar el estilo de
+// Bootstrap del resto de la app. Mismo problema que ya se había resuelto
+// a mano para el desplegable de Cliente en raypac_form.html; esto lo
+// generaliza para no repetir el mismo bloque de JS en cada template.
+//
+// Opt-in: solo agarra <select class="js-select-enhance">, no todos los
+// selects de la app (rollout gradual, un template a la vez). El <select>
+// real sigue en el DOM (visualmente oculto vía CSS, no display:none) y es
+// el que efectivamente viaja en el submit del form - esta caja de acá al
+// lado solo lo pilotea, así que required/pattern/disabled siguen
+// funcionando como si el <select> nunca se hubiera tocado.
+function enhanceSelect(select) {
+  if (select.dataset.enhanced === 'true') return;
+  select.dataset.enhanced = 'true';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'dml-select-wrapper';
+  select.parentNode.insertBefore(wrapper, select);
+  wrapper.appendChild(select);
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  // El className del <select> original varía entre templates (algunos
+  // usan .form-select, que ya trae su propia flechita vía background-image;
+  // otros .form-control, que no trae ninguna) - en vez de depender de eso,
+  // se anula la flecha nativa a mano y se agrega siempre el mismo ícono
+  // (chevron de bootstrap-icons), para que las 24 queden consistentes
+  // entre sí sin importar de qué clase venía cada una.
+  toggle.className = (select.className + ' dml-select-toggle').trim();
+  toggle.style.backgroundImage = 'none';
+  if (select.disabled) toggle.disabled = true;
+
+  const texto = document.createElement('span');
+  const flecha = document.createElement('i');
+  flecha.className = 'bi bi-chevron-down small';
+  toggle.appendChild(texto);
+  toggle.appendChild(flecha);
+
+  const menu = document.createElement('ul');
+  menu.className = 'dropdown-menu dml-select-menu w-100 shadow-sm';
+
+  function renderOptions() {
+    menu.innerHTML = '';
+    Array.from(select.options).forEach(function (opt) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = '#';
+      // No resaltar como "active" un placeholder vacío (value="") aunque
+      // técnicamente sea el value actual - confunde, parece la opción
+      // recomendada en vez de "todavía no elegiste nada".
+      const esSeleccionada = opt.value !== '' && opt.value === select.value;
+      a.className = 'dropdown-item' + (esSeleccionada ? ' active' : '');
+      a.textContent = opt.textContent;
+      if (opt.disabled) a.classList.add('disabled');
+      // mousedown (no click) para que dispare antes del blur/close del toggle
+      a.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        if (opt.disabled) return;
+        select.value = opt.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        actualizarToggle();
+        menu.classList.remove('show');
+      });
+      li.appendChild(a);
+      menu.appendChild(li);
+    });
+  }
+
+  function actualizarToggle() {
+    const seleccionada = select.options[select.selectedIndex];
+    texto.textContent = seleccionada ? seleccionada.textContent : '';
+    toggle.classList.toggle('text-muted', !select.value);
+  }
+
+  toggle.addEventListener('click', function () {
+    if (toggle.disabled) return;
+    renderOptions();
+    menu.classList.toggle('show');
+  });
+  document.addEventListener('click', function (e) {
+    if (!wrapper.contains(e.target)) menu.classList.remove('show');
+  });
+  // Si el <select> real cambia por otro motivo (ej. JS de la página que le
+  // setea .value directo), mantener el texto mostrado sincronizado.
+  select.addEventListener('change', actualizarToggle);
+
+  wrapper.appendChild(toggle);
+  wrapper.appendChild(menu);
+  actualizarToggle();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('select.js-select-enhance').forEach(enhanceSelect);
+});
 </script>
 </body>
 </html>

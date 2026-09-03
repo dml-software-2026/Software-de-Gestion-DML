@@ -181,7 +181,7 @@
         <!-- FECHA -->
         <div class="content-section">
             <div class="label">📅 Fecha Ingreso:</div>
-            <div class="value">{{ ticket.fecha_creacion[:10] if ticket.fecha_creacion else 'N/A' }}</div>
+            <div class="value">{{ ticket.fecha_creacion.strftime('%Y-%m-%d') if ticket.fecha_creacion else 'N/A' }}</div>
         </div>
 
         <!-- INSTRUCCIONES -->
@@ -249,7 +249,7 @@
         <!-- FECHA -->
         <div class="content-section">
             <div class="label">📅 Fecha Ingreso:</div>
-            <div class="value">{{ ticket.fecha_creacion[:10] if ticket.fecha_creacion else 'N/A' }}</div>
+            <div class="value">{{ ticket.fecha_creacion.strftime('%Y-%m-%d') if ticket.fecha_creacion else 'N/A' }}</div>
         </div>
 
         <!-- INSTRUCCIONES -->

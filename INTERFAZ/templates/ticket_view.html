@@ -115,7 +115,7 @@
                         <div class="card-body">
                             <p class="text-muted">{{ ticket.diagnostico_reparacion or 'En proceso...' }}</p>
                             <hr>
-                            <p><strong>Fecha de Creación:</strong> {{ ticket.fecha_creacion[:10] }}</p>
+                            <p><strong>Fecha de Creación:</strong> {{ ticket.fecha_creacion.strftime('%Y-%m-%d') if ticket.fecha_creacion else 'N/A' }}</p>
                         </div>
                     </div>
                 </div>

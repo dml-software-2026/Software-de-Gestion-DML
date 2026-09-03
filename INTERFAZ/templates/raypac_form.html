@@ -19,8 +19,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="tipo_solicitud" class="form-label">Tipo Solicitud *</label>
-                                <select class="form-control" id="tipo_solicitud" name="tipo_solicitud" required>
-                                    <option value="">Selecciona</option>
+                                <select class="form-control js-select-enhance" id="tipo_solicitud" name="tipo_solicitud" required>
                                     <option value="REPARACIÓN" {% if entry and entry.tipo_solicitud == 'REPARACIÓN' %}selected{% endif %}>REPARACIÓN</option>
                                     <option value="PRESUPUESTO" {% if entry and entry.tipo_solicitud == 'PRESUPUESTO' %}selected{% endif %}>PRESUPUESTO</option>
                                 </select>
@@ -64,7 +63,7 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="modelo_maquina" class="form-label">Modelo Máquina *</label>
-                                <select class="form-control" id="modelo_maquina" name="modelo_maquina" required>
+                                <select class="form-control js-select-enhance" id="modelo_maquina" name="modelo_maquina" required>
                                     <option value="">Selecciona</option>
                                     <option value="ITA10" {% if entry and entry.modelo_maquina == 'ITA10' %}selected{% endif %}>ITA10</option>
                                     <option value="ITA11" {% if entry and entry.modelo_maquina == 'ITA11' %}selected{% endif %}>ITA11</option>
@@ -83,7 +82,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="tipo_maquina" class="form-label">Tipo Máquina *</label>
-                                <select class="form-control" id="tipo_maquina" name="tipo_maquina" required>
+                                <select class="form-control js-select-enhance" id="tipo_maquina" name="tipo_maquina" required>
                                     <option value="">Selecciona</option>
                                     <option value="A BATERIA" {% if entry and entry.tipo_maquina == 'A BATERIA' %}selected{% endif %}>A BATERIA</option>
                                     <option value="MANUAL" {% if entry and entry.tipo_maquina == 'MANUAL' %}selected{% endif %}>MANUAL</option>
@@ -116,7 +115,7 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="comercial" class="form-label">Comercial Responsable *</label>
-                                <select class="form-control" id="comercial" name="comercial" required>
+                                <select class="form-control js-select-enhance" id="comercial" name="comercial" required>
                                     <option value="">Selecciona</option>
                                     <option value="Ezequiel Pacheco" data-email="ezequiel.pacheco@raypac.net" {% if entry and entry.comercial == 'Ezequiel Pacheco' %}selected{% endif %}>Ezequiel Pacheco</option>
                                     <option value="Leonardo Gastager" data-email="leonardo.gastager@raypac.net" {% if entry and entry.comercial == 'Leonardo Gastager' %}selected{% endif %}>Leonardo Gastager</option>
@@ -154,6 +153,27 @@
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: autoaprendizaje de cliente nuevo (reemplaza el confirm() nativo,
+     ver #132). A diferencia del modal genérico de base.html, acá las dos
+     opciones dejan pasar el submit igual - el ingreso RAYPAC se guarda
+     siempre, la pregunta solo decide si el nombre queda sugerido la
+     próxima vez. -->
+<div class="modal fade" id="clienteNuevoModal" tabindex="-1" aria-labelledby="clienteNuevoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="clienteNuevoModalLabel"><i class="bi bi-person-plus-fill text-primary"></i> Cliente nuevo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="clienteNuevoModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="clienteNuevoNo">No, solo por esta vez</button>
+                <button type="button" class="btn btn-primary" id="clienteNuevoSi">Sí, guardar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -238,21 +258,58 @@
     // Autoaprendizaje: si el cliente escrito no está en la lista conocida,
     // preguntar si se quiere guardar para futuros ingresos. El ingreso
     // RAYPAC se guarda igual, esto solo decide si el nombre queda
-    // sugerido la próxima vez.
-    document.getElementById('raypac-form').addEventListener('submit', function() {
+    // sugerido la próxima vez (reemplaza el confirm() nativo, ver #132).
+    document.getElementById('raypac-form').addEventListener('submit', function (e) {
+        const form = this;
+
+        if (form.dataset.clienteResuelto === 'true') {
+            delete form.dataset.clienteResuelto;
+            return; // ya se decidió si guardar el cliente nuevo, dejar pasar el submit
+        }
+
         const valor = clienteInput.value.trim();
         guardarClienteInput.value = '0';
+        if (!valor) return;
 
-        if (valor) {
-            const esNuevo = !CLIENTES_CONOCIDOS.some(function (c) {
-                return c.toLowerCase() === valor.toLowerCase();
-            });
+        const esNuevo = !CLIENTES_CONOCIDOS.some(function (c) {
+            return c.toLowerCase() === valor.toLowerCase();
+        });
+        if (!esNuevo) return;
 
-            if (esNuevo) {
-                const guardar = confirm('"' + valor + '" no está en la lista de clientes. ¿Querés guardarlo para futuros ingresos?');
-                guardarClienteInput.value = guardar ? '1' : '0';
-            }
+        e.preventDefault();
+
+        document.getElementById('clienteNuevoModalBody').textContent =
+            '"' + valor + '" no está en la lista de clientes. ¿Querés guardarlo para futuros ingresos?';
+        const modalEl = document.getElementById('clienteNuevoModal');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+        let resuelto = false;
+        function elegir(guardar) {
+            resuelto = true;
+            guardarClienteInput.value = guardar ? '1' : '0';
+            modal.hide();
         }
+
+        const siBtn = document.getElementById('clienteNuevoSi');
+        const noBtn = document.getElementById('clienteNuevoNo');
+        const freshSi = siBtn.cloneNode(true);
+        siBtn.replaceWith(freshSi);
+        const freshNo = noBtn.cloneNode(true);
+        noBtn.replaceWith(freshNo);
+        freshSi.addEventListener('click', function () { elegir(true); }, { once: true });
+        freshNo.addEventListener('click', function () { elegir(false); }, { once: true });
+
+        // Cerrar el modal sin elegir (X, backdrop, Escape) equivale a "No",
+        // mismo criterio que Escape en el confirm() nativo - pero en los
+        // dos casos el submit sigue adelante, la pregunta nunca lo bloquea.
+        modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+            modalEl.removeEventListener('hidden.bs.modal', onHidden);
+            if (!resuelto) guardarClienteInput.value = '0';
+            form.dataset.clienteResuelto = 'true';
+            form.requestSubmit();
+        }, { once: true });
+
+        modal.show();
     });
 </script>
 {% endblock %}

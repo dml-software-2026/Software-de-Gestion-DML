@@ -315,7 +315,7 @@ Ordenar los archivos de la raíz que no usan `import sqlite3` (los sqlite3 los m
 
 - [x] `.env.production`: eliminar la línea `DATABASE_URL=sqlite:////var/data/dml.db`. Es residuo de la era SQLite y confunde. La var se define recién en Fase 2.
 
-**Ordenamiento del PR:** hacer estos cambios en tu misma rama del rebase de #64 (o sea, el PR del rebase incluye también esta reestructura no-DB). Si preferís separar en dos PRs porque temés que se choquen, dale.
+**Ordenamiento del PR:** hacer estos cambios en tu misma rama del rebase de #64 (o sea, el PR del rebase incluye también esta reestructura no-DB). Si preferís separar en dos PRs porque temés que se choquen, dale.       Preguntar si el push forzado va con esto o sin esto Q1
 
 - [x] Ivo: `test_email.py` movido a `scripts/`
 - [x] Ivo: `launcher.py` (raíz) borrado

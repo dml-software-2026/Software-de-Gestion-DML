@@ -8,10 +8,6 @@ line-length = 120  # relajado vs default 88, la app tiene muchas queries largas
 
 # Archivos y carpetas que ruff IGNORA completamente
 exclude = [
-    # Archivo muerto – reemplazado por services/pdf.py en el refactor #75.
-    # Pendiente de borrar en issue #85 (unificar los 3 generadores de PDF).
-    "CODIGO_FUENTE/pdf_generator_new.py",
-
     # Scripts auxiliares – no son código de producción. Se corren manualmente.
     # Cuando alguno se estabilice y quiera lint estricto, sacarlo de esta lista.
     "CODIGO_FUENTE/scripts/",

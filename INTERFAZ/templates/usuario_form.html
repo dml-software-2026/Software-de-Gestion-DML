@@ -19,10 +19,10 @@
                 
                 <div class="form-group">
                     <label for="role">Rol:</label>
-                    <select class="form-select" id="role" name="role" required style="color: black;">
-                        <option value="" style="color: black;">Seleccionar rol...</option>
+                    <select class="form-select js-select-enhance" id="role" name="role" required>
+                        <option value="">Seleccionar rol...</option>
                         {% for r in roles %}
-                        <option value="{{ r }}" style="color: black;">{{ r }}</option>
+                        <option value="{{ r }}">{{ r }}</option>
                         {% endfor %}
                     </select>
                 </div>
