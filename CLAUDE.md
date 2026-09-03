@@ -18,7 +18,9 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-- **Última actualización:** 2026-09-03, sesión en curso.
+- **Última actualización:** 2026-09-03, cierre de sesión (Facu cambia de
+  máquina para la próxima sesión — por eso este checkpoint se pushea hoy,
+  a diferencia de otros días que queda solo en commits locales).
 - **Los 4 PRs de la sesión del 2026-08-31 que en el checkpoint anterior
   figuraban "sin mergear" ya están mergeados a `dev`** (confirmado al
   arrancar hoy: `fix/132-reemplazar-confirm-nativos` #163,
@@ -144,7 +146,9 @@ asumir contexto de nada más.
   checklist del issue quedan completos en código. **Decisión de Facu:
   no cerrar el issue todavía** - queda abierto por ahora, sin fecha
   concreta para revisarlo (el 4to ítem del checklist, "revisar si
-  aparecen más inconsistencias", es abierto por naturaleza).
+  aparecen más inconsistencias", es abierto por naturaleza). **Kanban
+  movido a Done** (decisión de Facu: el trabajo concreto está terminado,
+  aunque el issue en GitHub se deje abierto).
 - **Encargo aparte de Facu: recorrida guiada de diseño para armar un
   issue nuevo de rediseño UX/UI** (la intención original al pedir el
   #132 era más amplia que la lista puntual que terminó siendo - "que la
@@ -167,20 +171,94 @@ asumir contexto de nada más.
   de browser usada, no del código - queda pendiente de revisión
   dedicada). Referencia cruzada con el **#158** (jerarquía de botones,
   se solapa) para no duplicar trabajo cuando se aborden.
-- **Hallazgo de seguridad, encontrado en la misma recorrida: comentario
-  agregado al #133 (sin tocar código).** Además del problema ya conocido
-  (`"ADMIN2024"` hardcodeado y repetido), **el frontend expone la
-  contraseña real como `placeholder`** en 3 formularios
-  (`stock_new.html`, `stock_edit.html`, `raypac_form.html`) - cualquiera
-  con acceso a esas pantallas la ve sin leer el código fuente. **Facu
-  pidió no tocarlo todavía:** un compañero ya está cambiando las
-  contraseñas del sistema (todavía sin mergear a este repo, confirmado
-  con `git fetch` que no hay nada nuevo en `origin/dev` al respecto), y
-  se está evaluando que la contraseña de confirmación de ADMIN sea
-  directamente la misma que la del login (en vez de un código
-  separado) - si se resuelve por ese camino, el problema del
-  `placeholder` se soluciona de raíz. Evaluar todo junto cuando se tome
-  la tarea del #133, no como fix aislado.
+- **#134 (botón "Generar Ficha" nunca conectado) — ✅ CERRADO en código,
+  PR #182 mergeado.** Se investigó bien antes de decidir: la unificación
+  de generadores de PDF del #85 (de un compañero, ya mergeada) resolvió
+  un problema distinto - había 3 *funciones* que generaban el PDF, quedó
+  1 sola (`generar_pdf_ficha`) - pero eso no tocó el problema real del
+  #134, que son las *rutas*: seguía habiendo 2 endpoints que la llaman,
+  uno conectado (`descargar_ficha_pdf`, el botón real "Descargar PDF")
+  y otro huérfano (`generar_ficha`, sin ningún botón). Se confirmó que
+  lo que hacía la ruta huérfana (generar PDF + mail "máquina lista" al
+  comercial + marcar un flag) ya estaba 100% cubierto por
+  `descargar_ficha_pdf()` y por `dml_close()` (el botón real "Cerrar
+  Ficha", que manda ese mismo mail) - **se eliminó la ruta** en vez de
+  conectarla. Probado en local: `/dml/4/generar-ficha` ahora da 404,
+  `/dml/4/pdf` (el botón real) sigue funcionando igual (200).
+- **#135 (borrar templates backup muertos) — ✅ CERRADO, PR #183
+  mergeado.** El más chico y directo del día: `dml_view_OLD.html`,
+  `dml_edit_FIXED.html`, `dml_edit_BACKUP.html` - confirmado con `grep`
+  que ningún `render_template()` ni `{% include %}`/`{% extends %}` los
+  referenciaba, se borraron los 3 sin necesidad de probar en navegador.
+- **Limpieza de ramas locales (pedido de Facu).** Se revisaron las ~24
+  ramas locales acumuladas de sesiones anteriores, cruzando cada una
+  contra su PR en GitHub (`gh pr list --state all`) y si la rama remota
+  seguía existiendo. Se borraron 22 (`git branch -D`) - 20 ya mergeadas
+  con su copia remota ya borrada por GitHub al mergear, más
+  `docs/agregar-log-ia` (mergeada a `main` hace mucho) y
+  `test/integracion-local-2026-08-27` (rama de prueba local vieja, nunca
+  pusheada, olvidada de una sesión anterior). **Se dejaron sin tocar:**
+  `docs/checkpoint-sesion-2026-09-02` (esta misma, con commits sin
+  pushear) y `docs/closes-no-autocierra-issues-en-dev` (hallazgo
+  importante: **nunca se había mergeado a `dev`** - no tiene PR abierto,
+  y `dev` seguía con el checkpoint viejo sin ese hallazgo. Es la base
+  sobre la que está construida la rama de checkpoint de hoy - por eso el
+  PR de hoy va a incluir esos commits también, no hace falta un PR
+  aparte para esa rama).
+  - **De paso, se encontró un PR ajeno:** **#180** (issue #154,
+    `fix/154-eliminar-exposición-de-datos-de-prueba-en-la-vista-de-inicio-de-sesión`),
+    abierto por un compañero, todavía sin mergear. Cambia de dónde
+    salen las contraseñas de los 4 usuarios de prueba (ahora se leen de
+    variables de entorno `SEED_ADMIN_PASSWORD` etc., con fallo explícito
+    si faltan, en vez de estar hardcodeadas) y saca el cartel "Usuarios
+    de prueba" de `login.html`. No se tocó, es de otra persona - **cuando
+    se mergee, hace falta configurar esas 4 variables de entorno en el
+    `.env` local de cada máquina** (y en Render) o el seed va a fallar al
+    arrancar la app en una base nueva.
+- **#133 (ADMIN2024 hardcodeado) — arrancado y con PR pusheado, sin
+  mergear.** Facu decidió el enfoque: en vez de centralizar
+  `"ADMIN2024"` en una variable de entorno (la propuesta original del
+  issue), usar **la contraseña del propio usuario logueado** para las
+  confirmaciones de ADMIN (editar/eliminar stock, desfreezar) - así no
+  hay una segunda contraseña que memorizar aparte de la del login. No
+  hacía falta esperar al PR #180 del compañero (son mecanismos
+  distintos: #180 cambia de dónde sale la contraseña *del login*, esto
+  valida contra la contraseña *que el usuario ya tiene guardada en la
+  tabla `users`*, funciona igual sin importar de dónde salió esa
+  contraseña).
+  - Implementado: `verify_admin_password()` nuevo en `decorators.py`
+    (usa `check_password_hash` contra `users.password_hash`, mismo
+    mecanismo que el login). Reemplazados los 5 usos de `!= "ADMIN2024"`
+    en `dml.py`, `raypac.py`, `stock.py` (x3). De paso se arreglaron los
+    3 `placeholder` que mostraban la contraseña real como pista visual
+    (`stock_new.html`, `stock_edit.html`, `raypac_form.html` - el
+    hallazgo de seguridad de la recorrida de ayer, ya comentado en el
+    #133) - ahora dicen "Tu contraseña" en vez del valor real, y el
+    campo de `raypac_form.html` pasó de `type="text"` a `type="password"`.
+  - Probado en vivo en los 3 casos alcanzables desde la UI real
+    (`stock_new`, `stock_edit`, `stock_delete`): rechaza con la
+    contraseña vieja `ADMIN2024` (ya no sirve) y con una incorrecta,
+    acepta con la contraseña real del usuario logueado (`admin`) - alta
+    y baja de un repuesto de prueba confirmados de punta a punta.
+  - **Hallazgo nuevo en el camino, sumado como 2do comentario al #133:
+    `dml_edit()` (reabrir una ficha DML cerrada) es código muerto,
+    igual que `raypac_edit()`.** No es solo que falte un botón - la
+    condición `if ficha['is_closed'] and not request.form.get(...)` se
+    evalúa también en el `GET` (no solo en el POST), y un `GET` nunca
+    trae `request.form`, así que cualquier intento de abrir
+    `/dml/<id>/edit` en una ficha cerrada rebota a la vista antes de
+    mostrar el formulario - sin importar nada. Confirmado con `grep` que
+    ningún template vivo tiene un `unfreeze_code` apuntando a
+    `dml.dml_edit`. El cambio de hoy se aplicó igual ahí (por
+    consistencia, sin queda ningún `"ADMIN2024"` hardcodeado en el
+    código), pero no se pudo probar en vivo por no haber forma de
+    llegar. **Decisión pendiente, sin resolver:** ¿construir el flujo
+    real de reabrir una ficha cerrada, o eliminar ese código muerto
+    igual que se hizo con `raypac_edit`/`generar_ficha`? Mismo criterio
+    que el resto de estos hallazgos - no se decide de rebote, queda
+    anotado para cuando se retome.
+  - Rama `fix/133-usar-password-login-en-vez-de-admin2024` →
+    **pusheada, PR todavía sin abrir en GitHub.**
 - **Hallazgo de infraestructura, no de código: el Render de "Dev" apunta a
   `main`, no a `dev`.** Facu estaba probando en el Render de `dev` y no
   aparecía el modal de "cliente nuevo" de RAYPAC (#165, mergeado el
@@ -191,23 +269,30 @@ asumir contexto de nada más.
   (PR #153). No es un bug de código ni de auto-deploy - simplemente sigue
   otra rama. **Facu avisó que un compañero lo va a corregir**, sin
   necesidad de acción de nuestro lado.
-- **Próximo paso concreto:** sin tarea propia en curso ahora mismo -
-  candidatos para retomar en la próxima sesión, todos en Backlog:
-  - **#181** (rediseño UX/UI, recién creado) - probablemente lo primero
-    a desglosar en sub-issues chicos si se retoma, mismo patrón que
-    funcionó con el #132.
-  - **#133** (ADMIN2024 hardcodeado + el hallazgo nuevo del `placeholder`)
-    - depende de que el compañero de Facu termine su cambio de
-    contraseñas y se decida el enfoque (código propio vs. misma
-    contraseña que el login).
-  - **#168** (`ficha_view.html`, template muerto) - decisión pendiente,
-    borrar o reconectar.
-  - Los 2 templates grandes del #132 (`raypac_form.html`,
-    `ticket_nuevo.html`) ya no son candidato - **quedaron resueltos
-    hoy**, ver arriba.
+- **Próximo paso concreto:**
+  1. **Facu tiene que abrir el PR de `fix/133-usar-password-login-en-vez-de-admin2024`**
+     contra `dev` (`Refs #133` - no `Closes`, porque quedan las 2
+     decisiones pendientes documentadas arriba: qué hacer con
+     `dml_edit`/`raypac_edit` como código muerto). Probarlo antes de
+     mergear no hace falta - ya se probó en vivo en esta sesión los 3
+     casos alcanzables.
+  2. **Facu tiene que abrir y mergear el PR de este mismo checkpoint**
+     (`docs/checkpoint-sesion-2026-09-02`, que incluye también los
+     commits de `docs/closes-no-autocierra-issues-en-dev`) contra `dev`
+     - importante hacerlo *antes* de arrancar la próxima sesión en la
+     otra máquina, para que esa sesión arranque con `dev` al día en vez
+     de perder todo este contexto.
+  3. Después de eso, candidatos para la próxima tarea, todos en
+     Backlog: **#181** (rediseño UX/UI, recién creado - probablemente lo
+     primero a desglosar en sub-issues chicos, mismo patrón que
+     funcionó con el #132), o **#168** (`ficha_view.html`, template
+     muerto - decisión pendiente, borrar o reconectar).
 - **Ambiente local de esta máquina:** usado activamente hoy (server
   levantado, testeado en el navegador vía Chrome + extensión de Claude in
-  Chrome). El server de pruebas se detuvo al cerrar la sesión.
+  Chrome). El server de pruebas se detuvo al cerrar la sesión. La
+  próxima sesión arranca en **otra máquina** - repetir el setup de
+  entorno local de cero ahí (ver sección "Setup de entorno local" más
+  abajo) si todavía no está armado.
 - **Bloqueos:** ninguno.
 
 <details>
