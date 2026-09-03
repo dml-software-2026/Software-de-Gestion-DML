@@ -13,10 +13,10 @@
                     
                     <form method="POST">
                         {% if user.role == 'ADMIN' %}
-                        <div class="alert alert-info">Solo ADMIN: ingresa la contraseña para editar stock.</div>
+                        <div class="alert alert-info">Solo ADMIN: confirmá con tu contraseña para editar stock.</div>
                         <div class="form-group">
-                            <label for="admin_password">Contraseña de administrador:</label>
-                            <input type="password" class="form-control" id="admin_password" name="admin_password" required placeholder="ADMIN2024">
+                            <label for="admin_password">Confirmá tu contraseña:</label>
+                            <input type="password" class="form-control" id="admin_password" name="admin_password" required placeholder="Tu contraseña">
                         </div>
                         {% else %}
                         <div class="alert alert-success">
