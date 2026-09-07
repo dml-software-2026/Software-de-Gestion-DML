@@ -36,7 +36,7 @@ if not DATABASE_URL:
 COLS = [
     "item", "ficha_n", "cliente", "serie", "ingreso", "mes_salida", "salida",
     "modelo", "observacion", "reparacion", "repuestos", "n_ciclos",
-    "facturar", "entregadas",
+    "facturar", "entregadas", "remito",
 ]
 
 REPUESTO_RE = re.compile(r"([A-Za-z0-9]+)\s*\((\d+)\)")
@@ -140,6 +140,12 @@ def validar_fila(row, matriz, fichas_vistas_csv):
     serie_raw = str(row.get("serie")).strip() if not pd.isna(row.get("serie")) else ""
     serie = serie_raw if serie_raw else f"HIST-{ficha_n}"
 
+    # CAMBIO: numero_remito se lee del CSV. Si esta vacio o dice "HISTORICO"
+    # (case-insensitive), se guarda como 'HISTORICO' -> en el webservice esas
+    # fichas dejan de contar como "Sin Remito" (auth.py filtra NULL/'').
+    remito_raw = str(row.get("remito")).strip() if not pd.isna(row.get("remito")) else ""
+    numero_remito = "HISTORICO" if (not remito_raw or remito_raw.upper() == "HISTORICO") else remito_raw
+
     repuestos = parse_repuestos(row.get("repuestos"))
     repuestos_resueltos = []
     for codigo, cantidad in repuestos:
@@ -166,7 +172,7 @@ def validar_fila(row, matriz, fichas_vistas_csv):
         "observacion": None if pd.isna(row.get("observacion")) else str(row.get("observacion")).strip(),
         "reparacion": None if pd.isna(row.get("reparacion")) else str(row.get("reparacion")).strip(),
         "estado_reparacion": estado_reparacion, "n_ciclos": n_ciclos,
-        "repuestos": repuestos_resueltos,
+        "repuestos": repuestos_resueltos, "numero_remito": numero_remito,
     }
     return True, [], data
 
@@ -186,11 +192,11 @@ def insertar_ficha(cur, data):
         """
         INSERT INTO raypac_entries
             (fecha_recepcion, tipo_solicitud, cliente, numero_serie,
-             modelo_maquina, tipo_maquina, comercial, mail_comercial)
-        VALUES (%s, 'HISTORICO', %s, %s, %s, 'HISTORICO', 'HISTORICO', 'historico@dml.local')
+             modelo_maquina, tipo_maquina, comercial, mail_comercial, numero_remito)
+        VALUES (%s, 'HISTORICO', %s, %s, %s, 'HISTORICO', 'HISTORICO', 'historico@dml.local', %s)
         RETURNING id
         """,
-        (data["fecha_ingreso"], data["cliente"], data["serie"], data["modelo"]),
+        (data["fecha_ingreso"], data["cliente"], data["serie"], data["modelo"], data["numero_remito"]),
     )
     raypac_id = cur.fetchone()["id"]
 

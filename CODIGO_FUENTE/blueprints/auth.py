@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
@@ -5,6 +7,7 @@ from CODIGO_FUENTE.decorators import get_current_user, login_required
 from CODIGO_FUENTE.extensions import get_db
 
 auth_bp = Blueprint("auth", __name__)
+logger = logging.getLogger(__name__)
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -13,7 +16,7 @@ def login():
         email = request.form.get("email", "").strip()
         password = request.form.get("password", "").strip()
 
-        print(f"[LOGIN] Intento - Email: {email}, Password: {'*' * len(password)}")
+        logger.debug("Intento de login para email: %s", email)
 
         if not email or not password:
             flash("Email y contraseña son requeridos.", "error")
@@ -22,12 +25,11 @@ def login():
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE email = %s", (email,)).fetchone()
 
-        print(f"[LOGIN] Usuario encontrado: {user is not None}")
+        logger.debug("Usuario encontrado: %s", user is not None)
 
         if user:
-            print(f"[LOGIN] Hash en BD: {user['password_hash'][:50]}...")
             pwd_match = check_password_hash(user["password_hash"], password)
-            print(f"[LOGIN] Contraseña coincide: {pwd_match}")
+            logger.debug("Contraseña coincide: %s", pwd_match)
 
             if pwd_match:
                 if not user["is_active"]:
@@ -37,11 +39,11 @@ def login():
                 session["role"] = user["role"]  # CRÍTICO: Guardar rol en sesión
                 session.modified = True
                 flash(f"Bienvenido {email}", "success")
-                print(f"[LOGIN] Sesion creada para user_id: {user['id']}, role: {user['role']}")
+                logger.info("Sesión creada para user_id=%s, role=%s", user["id"], user["role"])
                 return redirect(url_for("auth.index"))
 
         flash("Credenciales inválidas.", "error")
-        print(f"[LOGIN] Credenciales rechazadas para {email}")
+        logger.warning("Intento de login fallido para email: %s", email)
 
     return render_template("login.html")
 
@@ -168,3 +170,4 @@ def index():
         }
 
     return render_template("index.html", user=user, stats=stats)
+ 
