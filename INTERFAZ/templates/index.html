@@ -13,33 +13,55 @@
         <i class="bi bi-info-circle"></i> <strong>Dashboard RAYPAC:</strong> Gestión de ingresos desde casa matriz y envíos de repuestos a DML.
     </div>
 
-    {# #198: botones de acción grandes y explícitos - el feedback de un cliente en
-       una demo fue que no encontraba cómo hacer las acciones principales porque
-       vivían solo en la navbar de arriba, sin ningún botón equivalente acá. #}
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <a href="{{ url_for('raypac.raypac_new') }}" class="btn btn-primary btn-lg">
-            <i class="bi bi-plus-circle-fill"></i> Nuevo Ingreso RAYPAC
-        </a>
-        <a href="{{ url_for('envios.envios_new') }}" class="btn btn-outline-primary btn-lg">
-            <i class="bi bi-plus-circle"></i> Nuevo Envío de Repuestos
-        </a>
-        <a href="{{ url_for('stock.stock_new') }}" class="btn btn-outline-primary btn-lg">
-            <i class="bi bi-plus-circle"></i> Agregar Repuesto a Stock
-        </a>
+    {# #198: acciones rápidas como tarjetas grandes de color sólido - mismo peso
+       visual que las tarjetas de estadísticas de más abajo (antes eran solo
+       botones de texto y quedaban invisibles al lado de esas tarjetas). #}
+    <h4 class="mb-3 fw-bold text-primary"><i class="bi bi-lightning-charge-fill"></i> Acciones Rápidas</h4>
+    <div class="row mb-4 g-3">
+        <div class="col-md-4">
+            <a href="{{ url_for('raypac.raypac_new') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-plus-circle-fill d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Nuevo Ingreso RAYPAC</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('envios.envios_new') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-truck d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Nuevo Envío de Repuestos</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('stock.stock_new') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #198754, #146c43);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-box-seam-fill d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Agregar Repuesto a Stock</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
     </div>
 
     <h4 class="mb-3"><i class="bi bi-box-seam"></i> Control de Ingresos</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-3">
             <a href="{{ url_for('raypac.raypac_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative" style="border-left: 5px solid #007bff; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-box-seam" style="font-size: 2.5rem; color: #007bff;"></i>
+                            <i class="bi bi-box-seam" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Equipos Registrados</h5>
-                        <h1 class="display-4 fw-bold text-primary">{{ stats.equipos_registrados }}</h1>
-                        <p class="text-muted small mb-0">Total de equipos ingresados en el sistema</p>
+                        <h1 class="display-4 fw-bold">{{ stats.equipos_registrados }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Total de equipos ingresados en el sistema</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -47,14 +69,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('raypac.raypac_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.equipos_sin_remito > 0 %}border-warning{% endif %}" style="border-left: 5px solid #ffc107; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #fd7e14, #d96209);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-truck" style="font-size: 2.5rem; color: #ffc107;"></i>
+                            <i class="bi bi-truck" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Sin Remito</h5>
-                        <h1 class="display-4 fw-bold text-warning">{{ stats.equipos_sin_remito }}</h1>
-                        <p class="text-muted small mb-0">Equipos pendientes de documentación</p>
+                        <h1 class="display-4 fw-bold">{{ stats.equipos_sin_remito }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Equipos pendientes de documentación</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -62,14 +84,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('envios.envios_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.envios_pendientes > 0 %}border-warning{% endif %}" style="border-left: 5px solid #ffc107; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #fd7e14, #d96209);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-send-check" style="font-size: 2.5rem; color: #ffc107;"></i>
+                            <i class="bi bi-send-check" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Envíos Realizados</h5>
-                        <h1 class="display-4 fw-bold text-warning">{{ stats.envios_pendientes }}</h1>
-                        <p class="text-muted small mb-0">Envíos de repuestos a DML</p>
+                        <h1 class="display-4 fw-bold">{{ stats.envios_pendientes }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Envíos de repuestos a DML</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -77,14 +99,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('tickets.tickets_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.tickets_activos > 0 %}border-info{% endif %}" style="border-left: 5px solid #17a2b8; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-ticket-perforated" style="font-size: 2.5rem; color: #17a2b8;"></i>
+                            <i class="bi bi-ticket-perforated" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Tickets Activos</h5>
-                        <h1 class="display-4 fw-bold text-info">{{ stats.tickets_activos or 0 }}</h1>
-                        <p class="text-muted small mb-0">Tickets de seguimiento en proceso</p>
+                        <h1 class="display-4 fw-bold">{{ stats.tickets_activos or 0 }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Tickets de seguimiento en proceso</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -97,29 +119,44 @@
         <i class="bi bi-info-circle"></i> <strong>Dashboard Repuestos:</strong> Control de inventario DML y gestión de tickets de reparación.
     </div>
 
-    {# #198: sin botón de "crear/editar repuesto" - este rol no tiene acceso a
+    {# #198: sin tarjeta de "crear/editar repuesto" - este rol no tiene acceso a
        esas rutas (ver #203, hallazgo aparte). Solo accesos que sí puede usar. #}
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <a href="{{ url_for('stock.stock_list') }}" class="btn btn-primary btn-lg">
-            <i class="bi bi-box2-fill"></i> Ir a Stock
-        </a>
-        <a href="{{ url_for('envios.envios_list') }}" class="btn btn-outline-primary btn-lg">
-            <i class="bi bi-truck"></i> Ir a Envíos
-        </a>
+    <h4 class="mb-3 fw-bold text-primary"><i class="bi bi-lightning-charge-fill"></i> Acciones Rápidas</h4>
+    <div class="row mb-4 g-3">
+        <div class="col-md-6">
+            <a href="{{ url_for('stock.stock_list') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-box2-fill d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Ir a Stock</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="{{ url_for('envios.envios_list') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-truck d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Ir a Envíos</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
     </div>
 
     <h4 class="mb-3"><i class="bi bi-bag-check-fill"></i> Control de Inventario</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-3">
             <a href="{{ url_for('stock.stock_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.stock_bajo > 0 %}border-danger{% endif %}" style="border-left: 5px solid #dc3545; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #dc3545, #b02a37);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-exclamation-triangle" style="font-size: 2.5rem; color: #dc3545;"></i>
+                            <i class="bi bi-exclamation-triangle" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Stock DML ≤2</h5>
-                        <h1 class="display-4 fw-bold text-danger">{{ stats.stock_bajo }}</h1>
-                        <p class="text-muted small mb-0">Repuestos con inventario crítico</p>
+                        <h1 class="display-4 fw-bold">{{ stats.stock_bajo }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Repuestos con inventario crítico</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -127,14 +164,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('envios.envios_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.envios_pendientes > 0 %}border-warning{% endif %}" style="border-left: 5px solid #ffc107; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #fd7e14, #d96209);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-truck" style="font-size: 2.5rem; color: #ffc107;"></i>
+                            <i class="bi bi-truck" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Envíos Pendientes</h5>
-                        <h1 class="display-4 fw-bold text-warning">{{ stats.envios_pendientes }}</h1>
-                        <p class="text-muted small mb-0">Envíos de RAYPAC por recepcionar</p>
+                        <h1 class="display-4 fw-bold">{{ stats.envios_pendientes }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Envíos de RAYPAC por recepcionar</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -142,14 +179,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.fichas_espera_repuestos > 0 %}border-info{% endif %}" style="border-left: 5px solid #17a2b8; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-clock-history" style="font-size: 2.5rem; color: #17a2b8;"></i>
+                            <i class="bi bi-clock-history" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Espera Repuestos</h5>
-                        <h1 class="display-4 fw-bold text-info">{{ stats.fichas_espera_repuestos }}</h1>
-                        <p class="text-muted small mb-0">Fichas bloqueadas por falta de stock</p>
+                        <h1 class="display-4 fw-bold">{{ stats.fichas_espera_repuestos }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Fichas bloqueadas por falta de stock</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -157,14 +194,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('tickets.tickets_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative" style="border-left: 5px solid #007bff; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-ticket-detailed" style="font-size: 2.5rem; color: #007bff;"></i>
+                            <i class="bi bi-ticket-detailed" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Tickets Activos</h5>
-                        <h1 class="display-4 fw-bold text-primary">{{ stats.tickets_activos }}</h1>
-                        <p class="text-muted small mb-0">Tickets en seguimiento</p>
+                        <h1 class="display-4 fw-bold">{{ stats.tickets_activos }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Tickets en seguimiento</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -180,30 +217,52 @@
     {# #198: DML_ST no tiene una acción de "crear desde cero" (las fichas nacen
        de un ticket, los tickets de un ingreso RAYPAC) - los accesos rápidos acá
        son de navegación directa a donde arranca/sigue el trabajo. #}
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <a href="{{ url_for('tickets.tickets_list') }}" class="btn btn-primary btn-lg">
-            <i class="bi bi-ticket-perforated-fill"></i> Ir a Tickets
-        </a>
-        <a href="{{ url_for('dml.dml_list') }}" class="btn btn-outline-primary btn-lg">
-            <i class="bi bi-wrench-adjustable"></i> Ir a Fichas
-        </a>
-        <a href="{{ url_for('stock.stock_list') }}" class="btn btn-outline-primary btn-lg">
-            <i class="bi bi-box2-fill"></i> Ir a Stock
-        </a>
+    <h4 class="mb-3 fw-bold text-primary"><i class="bi bi-lightning-charge-fill"></i> Acciones Rápidas</h4>
+    <div class="row mb-4 g-3">
+        <div class="col-md-4">
+            <a href="{{ url_for('tickets.tickets_list') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-ticket-perforated-fill d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Ir a Tickets</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-wrench-adjustable d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Ir a Fichas</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('stock.stock_list') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #198754, #146c43);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-box2-fill d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Ir a Stock</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
     </div>
 
     <h4 class="mb-3"><i class="bi bi-gear-fill"></i> Flujo de Reparación</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-3">
             <a href="{{ url_for('tickets.tickets_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.tickets_revision_inicial > 0 %}border-warning{% endif %}" style="border-left: 5px solid #ffc107; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #fd7e14, #d96209);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-ticket-perforated" style="font-size: 2.5rem; color: #ffc107;"></i>
+                            <i class="bi bi-ticket-perforated" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Tickets sin Ficha</h5>
-                        <h1 class="display-4 fw-bold text-warning">{{ stats.tickets_revision_inicial }}</h1>
-                        <p class="text-muted small mb-0">Equipos con ticket pendientes de crear ficha</p>
+                        <h1 class="display-4 fw-bold">{{ stats.tickets_revision_inicial }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Equipos con ticket pendientes de crear ficha</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -211,14 +270,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative" style="border-left: 5px solid #17a2b8; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-search" style="font-size: 2.5rem; color: #17a2b8;"></i>
+                            <i class="bi bi-search" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Revisión Inicial (Fichas)</h5>
-                        <h1 class="display-4 fw-bold text-info">{{ stats.fichas_revision_inicial }}</h1>
-                        <p class="text-muted small mb-0">Fichas pendientes de diagnóstico</p>
+                        <h1 class="display-4 fw-bold">{{ stats.fichas_revision_inicial }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Fichas pendientes de diagnóstico</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -226,14 +285,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative" style="border-left: 5px solid #007bff; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-tools" style="font-size: 2.5rem; color: #007bff;"></i>
+                            <i class="bi bi-tools" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">En Reparación</h5>
-                        <h1 class="display-4 fw-bold text-primary">{{ stats.fichas_en_reparacion }}</h1>
-                        <p class="text-muted small mb-0">Máquinas en proceso de reparación activa</p>
+                        <h1 class="display-4 fw-bold">{{ stats.fichas_en_reparacion }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Máquinas en proceso de reparación activa</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -241,14 +300,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative" style="border-left: 5px solid #ffc107; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #fd7e14, #d96209);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-clock-history" style="font-size: 2.5rem; color: #ffc107;"></i>
+                            <i class="bi bi-clock-history" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Esperando Repuestos</h5>
-                        <h1 class="display-4 fw-bold text-warning">{{ stats.fichas_espera_repuestos }}</h1>
-                        <p class="text-muted small mb-0">Pausadas hasta recibir componentes</p>
+                        <h1 class="display-4 fw-bold">{{ stats.fichas_espera_repuestos }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Pausadas hasta recibir componentes</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -256,35 +315,33 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative" style="border-left: 5px solid #28a745; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #198754, #146c43);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-check-circle-fill" style="font-size: 2.5rem; color: #28a745;"></i>
+                            <i class="bi bi-check-circle-fill" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Listas para Retirar</h5>
-                        <h1 class="display-4 fw-bold text-success">{{ stats.fichas_listas }}</h1>
-                        <p class="text-muted small mb-0">Reparadas y listas para entrega</p>
+                        <h1 class="display-4 fw-bold">{{ stats.fichas_listas }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Reparadas y listas para entrega</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
             </a>
         </div>
     </div>
-    
+
     <h4 class="mb-3 mt-4"><i class="bi bi-bell-fill"></i> Alertas y Pendientes</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-4">
             <a href="{{ url_for('envios.envios_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.envios_repuestos_pendientes > 0 %}border-danger{% endif %}" style="transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #dc3545, #b02a37);">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div>
-                                <i class="bi bi-truck" style="font-size: 2rem; color: #dc3545;"></i>
-                            </div>
-                            <h2 class="display-6 fw-bold text-danger mb-0">{{ stats.envios_repuestos_pendientes }}</h2>
+                            <i class="bi bi-truck" style="font-size: 2rem;"></i>
+                            <h2 class="display-6 fw-bold mb-0">{{ stats.envios_repuestos_pendientes }}</h2>
                         </div>
                         <h6 class="fw-bold">Envíos de Repuestos Pendientes</h6>
-                        <p class="text-muted small mb-0"><i class="bi bi-box-arrow-in-down"></i> Repuestos enviados por RAYPAC para dar de alta</p>
+                        <p class="mb-0 small" style="opacity: .85;"><i class="bi bi-box-arrow-in-down"></i> Repuestos enviados por RAYPAC para dar de alta</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -292,16 +349,14 @@
         </div>
         <div class="col-md-4">
             <a href="{{ url_for('raypac.raypac_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.equipos_raypac_pendientes > 0 %}border-warning{% endif %}" style="transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #fd7e14, #d96209);">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div>
-                                <i class="bi bi-box-seam" style="font-size: 2rem; color: #ff9800;"></i>
-                            </div>
-                            <h2 class="display-6 fw-bold text-warning mb-0">{{ stats.equipos_raypac_pendientes }}</h2>
+                            <i class="bi bi-box-seam" style="font-size: 2rem;"></i>
+                            <h2 class="display-6 fw-bold mb-0">{{ stats.equipos_raypac_pendientes }}</h2>
                         </div>
                         <h6 class="fw-bold">Equipos RAYPAC Pendientes</h6>
-                        <p class="text-muted small mb-0"><i class="bi bi-arrow-right-circle"></i> Envíos de casa matriz para recepcionar y crear fichas</p>
+                        <p class="mb-0 small" style="opacity: .85;"><i class="bi bi-arrow-right-circle"></i> Envíos de casa matriz para recepcionar y crear fichas</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -309,16 +364,14 @@
         </div>
         <div class="col-md-4">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.repuestos_disponibles > 0 %}border-success{% endif %}" style="transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #198754, #146c43);">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div>
-                                <i class="bi bi-bag-check-fill" style="font-size: 2rem; color: #28a745;"></i>
-                            </div>
-                            <h2 class="display-6 fw-bold text-success mb-0">{{ stats.repuestos_disponibles }}</h2>
+                            <i class="bi bi-bag-check-fill" style="font-size: 2rem;"></i>
+                            <h2 class="display-6 fw-bold mb-0">{{ stats.repuestos_disponibles }}</h2>
                         </div>
                         <h6 class="fw-bold">Repuestos Disponibles</h6>
-                        <p class="text-muted small mb-0"><i class="bi bi-arrow-right-circle"></i> Componentes que estaban agotados ahora en stock</p>
+                        <p class="mb-0 small" style="opacity: .85;"><i class="bi bi-arrow-right-circle"></i> Componentes que estaban agotados ahora en stock</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -326,16 +379,14 @@
         </div>
         <div class="col-md-4">
             <a href="{{ url_for('tickets.tickets_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative" style="transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #6c757d, #495057);">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div>
-                                <i class="bi bi-ticket-perforated-fill" style="font-size: 2rem; color: #6c757d;"></i>
-                            </div>
-                            <h2 class="display-6 fw-bold text-dark mb-0">{{ stats.tickets_activos }}</h2>
+                            <i class="bi bi-ticket-perforated-fill" style="font-size: 2rem;"></i>
+                            <h2 class="display-6 fw-bold mb-0">{{ stats.tickets_activos }}</h2>
                         </div>
                         <h6 class="fw-bold">Tickets Activos</h6>
-                        <p class="text-muted small mb-0"><i class="bi bi-arrow-right-circle"></i> Tickets de seguimiento para clientes</p>
+                        <p class="mb-0 small" style="opacity: .85;"><i class="bi bi-arrow-right-circle"></i> Tickets de seguimiento para clientes</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -351,27 +402,42 @@
     {# #198: ADMIN ve todo el sistema en la navbar, pero las dos acciones de
        "crear algo nuevo" que solo este rol tiene (usuario, repuesto) tampoco
        tenían ningún botón explícito en Home. #}
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <a href="{{ url_for('admin.usuario_new') }}" class="btn btn-primary btn-lg">
-            <i class="bi bi-person-plus-fill"></i> Nuevo Usuario
-        </a>
-        <a href="{{ url_for('stock.stock_new') }}" class="btn btn-outline-primary btn-lg">
-            <i class="bi bi-plus-circle"></i> Nuevo Repuesto
-        </a>
+    <h4 class="mb-3 fw-bold text-primary"><i class="bi bi-lightning-charge-fill"></i> Acciones Rápidas</h4>
+    <div class="row mb-4 g-3">
+        <div class="col-md-6">
+            <a href="{{ url_for('admin.usuario_new') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-person-plus-fill d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Nuevo Usuario</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="{{ url_for('stock.stock_new') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #198754, #146c43);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-box-seam-fill d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Nuevo Repuesto</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
     </div>
 
     <h4 class="mb-3"><i class="bi bi-speedometer2"></i> Estado General del Sistema</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-3">
             <a href="{{ url_for('raypac.raypac_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative" style="border-left: 5px solid #007bff; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-box-seam" style="font-size: 2.5rem; color: #007bff;"></i>
+                            <i class="bi bi-box-seam" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Equipos RAYPAC</h5>
-                        <h1 class="display-4 fw-bold text-primary">{{ stats.equipos_raypac }}</h1>
-                        <p class="text-muted small mb-0">Total de ingresos desde casa matriz</p>
+                        <h1 class="display-4 fw-bold">{{ stats.equipos_raypac }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Total de ingresos desde casa matriz</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -379,14 +445,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.fichas_abiertas > 0 %}border-warning{% endif %}" style="border-left: 5px solid #ffc107; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #fd7e14, #d96209);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-wrench" style="font-size: 2.5rem; color: #ffc107;"></i>
+                            <i class="bi bi-wrench" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Fichas Abiertas</h5>
-                        <h1 class="display-4 fw-bold text-warning">{{ stats.fichas_abiertas }}</h1>
-                        <p class="text-muted small mb-0">Reparaciones en curso sin cerrar</p>
+                        <h1 class="display-4 fw-bold">{{ stats.fichas_abiertas }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Reparaciones en curso sin cerrar</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -394,14 +460,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('envios.envios_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.envios_pendientes > 0 %}border-info{% endif %}" style="border-left: 5px solid #17a2b8; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-truck" style="font-size: 2.5rem; color: #17a2b8;"></i>
+                            <i class="bi bi-truck" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Envíos Pendientes</h5>
-                        <h1 class="display-4 fw-bold text-info">{{ stats.envios_pendientes }}</h1>
-                        <p class="text-muted small mb-0">Transferencias entre ubicaciones</p>
+                        <h1 class="display-4 fw-bold">{{ stats.envios_pendientes }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Transferencias entre ubicaciones</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
@@ -409,14 +475,14 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('stock.stock_list') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 position-relative {% if stats.stock_bajo_total > 0 %}border-danger{% endif %}" style="border-left: 5px solid #dc3545; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #dc3545, #b02a37);">
                     <div class="card-body text-center">
                         <div class="mb-2">
-                            <i class="bi bi-exclamation-triangle" style="font-size: 2.5rem; color: #dc3545;"></i>
+                            <i class="bi bi-exclamation-triangle" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 class="card-title fw-bold">Stock Crítico ≤2</h5>
-                        <h1 class="display-4 fw-bold text-danger">{{ stats.stock_bajo_total }}</h1>
-                        <p class="text-muted small mb-0">Repuestos en todas las ubicaciones</p>
+                        <h1 class="display-4 fw-bold">{{ stats.stock_bajo_total }}</h1>
+                        <p class="mb-0 small" style="opacity: .85;">Repuestos en todas las ubicaciones</p>
                         <span class="stretched-link"></span>
                     </div>
                 </div>
