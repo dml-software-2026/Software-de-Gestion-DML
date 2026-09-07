@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -21,6 +22,13 @@ from CODIGO_FUENTE.services.stock import get_alert_badge
 
 load_dotenv()
 
+# Nivel configurable por entorno: en Render se puede setear LOG_LEVEL=DEBUG
+# para desarrollo sin tocar código; por defecto INFO en producción.
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 app = Flask(
     __name__,
     template_folder=os.path.join(BASE_DIR, "INTERFAZ", "templates"),
@@ -28,6 +36,8 @@ app = Flask(
     static_url_path="/static"
 )
 app.config.from_object(Config)
+ 
+logger = logging.getLogger(__name__)
 
 # Hacer funciones de negocio disponibles en todos los templates Jinja2
 app.jinja_env.globals.update(
@@ -58,7 +68,7 @@ def apply_migrations():
             # Si la BD no existe, crearla (init_db incluye seed automático)
             db_path = app.config["DATABASE"]
             if not os.path.exists(db_path):
-                print("📁 Base de datos no encontrada. Inicializando...")
+                logger.info("Base de datos no encontrada. Inicializando...")
                 init_db()
             else:
                 # Si existe, aplicar migraciones
@@ -69,10 +79,8 @@ def apply_migrations():
             from CODIGO_FUENTE.services.seed import load_seed_data
             load_seed_data(get_db())
 
-        except Exception as e:
-            print(f"Error en migraciones: {e}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
+            logger.exception("Error en migraciones")
         app._migrations_applied = True
 
 
@@ -81,9 +89,9 @@ if __name__ == "__main__":
     with app.app_context():
         db_path = app.config["DATABASE"]
         if not os.path.exists(db_path):
-            print("[DB] Creando base de datos...")
+            logger.info("Creando base de datos...")
             init_db()
-            print("[DB] Base de datos creada exitosamente")
+            logger.info("Base de datos creada exitosamente")
         else:
             # Aplicar migraciones a BD existente
             migrate_db()
@@ -91,6 +99,12 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "init-db":
         with app.app_context():
             init_db()
-        print("Base de datos inicializada.")
+        logger.info("Base de datos inicializada.")
     else:
-        app.run(debug=True)
+        # debug=True nunca debe quedar hardcodeado: expone un traceback
+        # interactivo con ejecución de código si esto llegara a correr en
+        # producción por error. Por defecto False; se habilita solo si se
+        # setea explícitamente FLASK_DEBUG=1 en el entorno (uso local).
+        debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
+        app.run(debug=debug_mode)
+ 
