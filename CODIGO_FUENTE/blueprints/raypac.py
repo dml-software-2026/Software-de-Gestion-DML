@@ -9,7 +9,6 @@ from CODIGO_FUENTE.decorators import (
     login_required,
     permission_required,
     role_required,
-    verify_admin_password,
 )
 from CODIGO_FUENTE.extensions import get_db
 
@@ -172,21 +171,18 @@ def raypac_edit(id):
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
-    if entry['is_frozen'] and not request.form.get("unfreeze_code"):
-        flash("Este registro está freezado. Requiere código de desbloqueo.", "error")
-        return render_template("raypac_view.html", entry=entry)
+    # #133: un registro freezado es inmutable por esta vía. El único camino
+    # real para volver a editar es desfrezarlo antes con raypac_unfreeze()
+    # (últimos 4 dígitos del remito, botón "Desfreezar Definitivamente"). El
+    # mecanismo viejo de aceptar un unfreeze_code acá adentro era código
+    # muerto: ningún template lo alcanzaba (raypac_view.html ya oculta el
+    # botón "Editar" para todos los roles mientras is_frozen sea true).
+    if entry['is_frozen']:
+        flash("Este registro está freezado. Desfreezalo antes de editar.", "error")
+        return redirect(url_for("raypac.raypac_view", id=id))
 
     if request.method == "POST":
         try:
-            unfreeze_code = request.form.get("unfreeze_code")
-            # #133: se confirma contra la contraseña del propio usuario
-            # logueado, mismo mecanismo que el resto de estas confirmaciones.
-            # (Nota: este bloque es inalcanzable desde la UI real - ver #133 -
-            # se deja consistente igual en vez de tocar esa decisión aparte.)
-            if entry['is_frozen'] and not verify_admin_password(unfreeze_code):
-                flash("Código de desbloqueo incorrecto.", "error")
-                return render_template("raypac_view.html", entry=entry)
-
             fecha = request.form.get("fecha_recepcion")
             tipo_solicitud = request.form.get("tipo_solicitud")
             cliente = request.form.get("cliente")
