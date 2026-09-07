@@ -12,7 +12,22 @@
     <div class="alert alert-info mb-4">
         <i class="bi bi-info-circle"></i> <strong>Dashboard RAYPAC:</strong> Gestión de ingresos desde casa matriz y envíos de repuestos a DML.
     </div>
-    
+
+    {# #198: botones de acción grandes y explícitos - el feedback de un cliente en
+       una demo fue que no encontraba cómo hacer las acciones principales porque
+       vivían solo en la navbar de arriba, sin ningún botón equivalente acá. #}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{{ url_for('raypac.raypac_new') }}" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-circle-fill"></i> Nuevo Ingreso RAYPAC
+        </a>
+        <a href="{{ url_for('envios.envios_new') }}" class="btn btn-outline-primary btn-lg">
+            <i class="bi bi-plus-circle"></i> Nuevo Envío de Repuestos
+        </a>
+        <a href="{{ url_for('stock.stock_new') }}" class="btn btn-outline-primary btn-lg">
+            <i class="bi bi-plus-circle"></i> Agregar Repuesto a Stock
+        </a>
+    </div>
+
     <h4 class="mb-3"><i class="bi bi-box-seam"></i> Control de Ingresos</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-3">
@@ -81,7 +96,18 @@
     <div class="alert alert-info mb-4">
         <i class="bi bi-info-circle"></i> <strong>Dashboard Repuestos:</strong> Control de inventario DML y gestión de tickets de reparación.
     </div>
-    
+
+    {# #198: sin botón de "crear/editar repuesto" - este rol no tiene acceso a
+       esas rutas (ver #203, hallazgo aparte). Solo accesos que sí puede usar. #}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{{ url_for('stock.stock_list') }}" class="btn btn-primary btn-lg">
+            <i class="bi bi-box2-fill"></i> Ir a Stock
+        </a>
+        <a href="{{ url_for('envios.envios_list') }}" class="btn btn-outline-primary btn-lg">
+            <i class="bi bi-truck"></i> Ir a Envíos
+        </a>
+    </div>
+
     <h4 class="mb-3"><i class="bi bi-bag-check-fill"></i> Control de Inventario</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-3">
@@ -150,7 +176,22 @@
     <div class="alert alert-info mb-4">
         <i class="bi bi-info-circle"></i> <strong>Dashboard del Técnico:</strong> Vista general del flujo de reparaciones. Haz clic en cada tarjeta para ver el detalle.
     </div>
-    
+
+    {# #198: DML_ST no tiene una acción de "crear desde cero" (las fichas nacen
+       de un ticket, los tickets de un ingreso RAYPAC) - los accesos rápidos acá
+       son de navegación directa a donde arranca/sigue el trabajo. #}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{{ url_for('tickets.tickets_list') }}" class="btn btn-primary btn-lg">
+            <i class="bi bi-ticket-perforated-fill"></i> Ir a Tickets
+        </a>
+        <a href="{{ url_for('dml.dml_list') }}" class="btn btn-outline-primary btn-lg">
+            <i class="bi bi-wrench-adjustable"></i> Ir a Fichas
+        </a>
+        <a href="{{ url_for('stock.stock_list') }}" class="btn btn-outline-primary btn-lg">
+            <i class="bi bi-box2-fill"></i> Ir a Stock
+        </a>
+    </div>
+
     <h4 class="mb-3"><i class="bi bi-gear-fill"></i> Flujo de Reparación</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-3">
@@ -306,7 +347,19 @@
     <div class="alert alert-info mb-4">
         <i class="bi bi-info-circle"></i> <strong>Dashboard Administrador:</strong> Vista completa del sistema con acceso a todas las secciones y estadísticas.
     </div>
-    
+
+    {# #198: ADMIN ve todo el sistema en la navbar, pero las dos acciones de
+       "crear algo nuevo" que solo este rol tiene (usuario, repuesto) tampoco
+       tenían ningún botón explícito en Home. #}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{{ url_for('admin.usuario_new') }}" class="btn btn-primary btn-lg">
+            <i class="bi bi-person-plus-fill"></i> Nuevo Usuario
+        </a>
+        <a href="{{ url_for('stock.stock_new') }}" class="btn btn-outline-primary btn-lg">
+            <i class="bi bi-plus-circle"></i> Nuevo Repuesto
+        </a>
+    </div>
+
     <h4 class="mb-3"><i class="bi bi-speedometer2"></i> Estado General del Sistema</h4>
     <div class="row mb-4 g-3">
         <div class="col-md-3">
