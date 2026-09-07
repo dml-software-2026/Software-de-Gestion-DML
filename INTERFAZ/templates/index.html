@@ -290,7 +290,8 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #6610f2, #520dc2);">
+                {# Color oficial de "A LA ESPERA DE REVISIÓN" (estado_config, raypac.py - acordado con David, issue #44): blanco/#000. Con borde para que se distinga como tarjeta sobre el fondo blanco de la página. #}
+                <div class="card shadow-lg h-100 text-dark" style="background: #ffffff; border: 2px solid #adb5bd !important;">
                     <div class="card-body text-center">
                         <div class="mb-2">
                             <i class="bi bi-search" style="font-size: 2.5rem;"></i>
@@ -305,7 +306,8 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #d63384, #ad2670);">
+                {# Color oficial de "EN REPARACIÓN" (estado_config, raypac.py - issue #44): #0dcaf0 / texto oscuro. #}
+                <div class="card shadow-lg h-100 border-0 text-dark" style="background: linear-gradient(135deg, #0dcaf0, #0aa2c0);">
                     <div class="card-body text-center">
                         <div class="mb-2">
                             <i class="bi bi-tools" style="font-size: 2.5rem;"></i>
@@ -320,7 +322,8 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #6c757d, #495057);">
+                {# Color oficial de "A LA ESPERA DE REPUESTOS" (estado_config, raypac.py - issue #44): #fd7e14 / texto oscuro. #}
+                <div class="card shadow-lg h-100 border-0 text-dark" style="background: linear-gradient(135deg, #fd7e14, #e06a00);">
                     <div class="card-body text-center">
                         <div class="mb-2">
                             <i class="bi bi-clock-history" style="font-size: 2.5rem;"></i>
@@ -335,7 +338,8 @@
         </div>
         <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
-                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #198754, #146c43);">
+                {# Color oficial de "MÁQUINA LISTA PARA RETIRAR" (estado_config, raypac.py - issue #44): #ffc107 / texto oscuro. #}
+                <div class="card shadow-lg h-100 border-0 text-dark" style="background: linear-gradient(135deg, #ffc107, #d39e00);">
                     <div class="card-body text-center">
                         <div class="mb-2">
                             <i class="bi bi-check-circle-fill" style="font-size: 2.5rem;"></i>
