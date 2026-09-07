@@ -324,10 +324,12 @@
             👁️ Modo Solo Lectura
         </span>
         {% else %}
+        {% if not ficha.is_closed %}
         <a href="{{ url_for('dml.dml_edit', id=ficha.id) }}" class="btn btn-primary btn-lg" style="margin-right: 10px;">
             ✏️ Editar Ficha
         </a>
-        
+        {% endif %}
+
         {% if not ficha.numero_ticket %}
         <form method="POST" action="{{ url_for('dml.crear_ticket_endpoint', id=ficha.id) }}" style="display: inline;">
             <button type="submit" class="btn btn-warning btn-lg" style="margin-right: 10px;">
