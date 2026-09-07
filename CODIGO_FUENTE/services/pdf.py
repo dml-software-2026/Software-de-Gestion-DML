@@ -122,20 +122,6 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     story.append(combo_table)
     story.append(Spacer(1, 0.15*inch))
 
-    # DIAGNÓSTICO INICIAL
-    story.append(Paragraph("DIAGNÓSTICO DEL DEPARTAMENTO TÉCNICO", heading_style))
-    diag_data = [[ficha['diagnostico_inicial'] or "Pendida de potencia, cuchilla gastada"]]
-    diag_table = Table(diag_data, colWidths=[6*inch])
-    diag_table.setStyle(TableStyle([
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('MINHEIGHT', (0, 0), (-1, -1), 0.5*inch),
-    ]))
-    story.append(diag_table)
-    story.append(Spacer(1, 0.15*inch))
-
     # OBSERVACIONES
     story.append(Paragraph("OBSERVACIONES", heading_style))
     obs_data = [[ficha['observaciones'] or "Ingreso reciente, pendiente inspección inicial"]]
