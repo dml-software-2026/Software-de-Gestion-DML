@@ -123,7 +123,7 @@
        esas rutas (ver #203, hallazgo aparte). Solo accesos que sí puede usar. #}
     <h4 class="mb-3 fw-bold text-primary"><i class="bi bi-lightning-charge-fill"></i> Acciones Rápidas</h4>
     <div class="row mb-4 g-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <a href="{{ url_for('stock.stock_list') }}" class="text-decoration-none">
                 <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
                     <div class="card-body text-center py-4">
@@ -133,12 +133,22 @@
                 </div>
             </a>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <a href="{{ url_for('envios.envios_list') }}" class="text-decoration-none">
                 <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
                     <div class="card-body text-center py-4">
                         <i class="bi bi-truck d-block mb-2" style="font-size: 2.8rem;"></i>
                         <h5 class="fw-bold mb-0">Ir a Envíos</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('tickets.tickets_list') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #198754, #146c43);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-ticket-perforated-fill d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Ir a Tickets</h5>
                     </div>
                 </div>
             </a>
@@ -219,7 +229,17 @@
        son de navegación directa a donde arranca/sigue el trabajo. #}
     <h4 class="mb-3 fw-bold text-primary"><i class="bi bi-lightning-charge-fill"></i> Acciones Rápidas</h4>
     <div class="row mb-4 g-3">
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <a href="{{ url_for('raypac.raypac_list') }}" class="text-decoration-none">
+                <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #fd7e14, #d96209);">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-box-seam-fill d-block mb-2" style="font-size: 2.8rem;"></i>
+                        <h5 class="fw-bold mb-0">Ir a RAYPAC</h5>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
             <a href="{{ url_for('tickets.tickets_list') }}" class="text-decoration-none">
                 <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #0d6efd, #0a58ca);">
                     <div class="card-body text-center py-4">
@@ -229,7 +249,7 @@
                 </div>
             </a>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <a href="{{ url_for('dml.dml_list') }}" class="text-decoration-none">
                 <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #17a2b8, #117a8b);">
                     <div class="card-body text-center py-4">
@@ -239,7 +259,7 @@
                 </div>
             </a>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <a href="{{ url_for('stock.stock_list') }}" class="text-decoration-none">
                 <div class="card shadow-lg h-100 border-0 text-white" style="background: linear-gradient(135deg, #198754, #146c43);">
                     <div class="card-body text-center py-4">
