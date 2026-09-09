@@ -1,7 +1,7 @@
 # CODIGO_FUENTE/blueprints/notificaciones.py
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from CODIGO_FUENTE.decorators import login_required, role_required
+from CODIGO_FUENTE.decorators import get_current_user, log_action, login_required, role_required
 from CODIGO_FUENTE.extensions import get_db
 
 notificaciones_bp = Blueprint('notificaciones', __name__, url_prefix='/admin')
@@ -36,6 +36,8 @@ def agregar_notificacion():
     db.commit()
 
     if row:
+        user = get_current_user()
+        log_action(user['id'], "CREATE", "usuarios_notificaciones", row['id'], None, email)
         flash(f"Destinatario {email} agregado.", "success")
     else:
         flash(f"{email} ya estaba en la lista.", "info")
@@ -54,6 +56,11 @@ def toggle_notificacion(id):
     db.commit()
 
     if row:
+        user = get_current_user()
+        log_action(
+            user['id'], "TOGGLE", "usuarios_notificaciones", id,
+            str(not row['activo']), str(row['activo'])
+        )
         estado = "activado" if row['activo'] else "desactivado"
         flash(f"{row['email']} {estado}.", "success")
     return redirect(url_for('notificaciones.listar_notificaciones'))
@@ -68,5 +75,7 @@ def eliminar_notificacion(id):
     db.commit()
 
     if row:
+        user = get_current_user()
+        log_action(user['id'], "DELETE", "usuarios_notificaciones", id, row['email'], None)
         flash(f"Destinatario {row['email']} eliminado.", "success")
     return redirect(url_for('notificaciones.listar_notificaciones'))
