@@ -16,6 +16,14 @@ body {
 
 .page-content {
     flex: 1 0 auto;
+    /* Columna, no fila: apila los mensajes flasheados + el contenido de
+       cada página igual que el <div> normal de antes. La diferencia es
+       que ahora un hijo puede pedir flex-grow-1 (como el login) para
+       ocupar justo el espacio libre entre navbar y footer, en vez de
+       calcular contra el 100% de la ventana e ignorar que hay navbar y
+       footer ocupando lugar arriba y abajo. */
+    display: flex;
+    flex-direction: column;
 }
 
 .app-footer {
@@ -75,6 +83,20 @@ body {
     color: rgba(255, 255, 255, 0.65);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+}
+
+/* Mismo tratamiento de "placa blanca" para el logo en la tarjeta de
+   login, un poco más grande al ser la pieza central de la pantalla. */
+.login-logo-badge {
+    display: inline-flex;
+    background-color: #fff;
+    border-radius: 10px;
+    padding: 6px 14px;
+}
+
+.login-logo-img {
+    height: 42px;
+    display: block;
 }
 
 /* Navegación Mejorada */
