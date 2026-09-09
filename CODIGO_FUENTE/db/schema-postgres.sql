@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS matriz_repuestos (
 
 CREATE TABLE IF NOT EXISTS raypac_entries (
     id SERIAL,
-    numero_correlativo INTEGER,
+    numero_correlatico INTEGER,
     fecha_recepcion DATE NOT NULL,
     tipo_solicitud TEXT NOT NULL,
     cliente TEXT NOT NULL,
@@ -211,16 +211,17 @@ CREATE TABLE IF NOT EXISTS raypac_entries (
     diagnostico_ingreso TEXT,
     comercial TEXT NOT NULL,
     mail_comercial TEXT NOT NULL,
-    contacto_cliente TEXT,
-    email_cliente TEXT,
     numero_remito TEXT,
     is_frozen BOOLEAN DEFAULT false,
     frozen_at DATE,
     unfrozen_by TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    contacto_cliente TEXT,
+    email_cliente TEXT,
     estado_envio_equipos TEXT DEFAULT 'PENDIENTE'::text,
     fecha_envio_equipos TIMESTAMP,
+    numero_correlativo INTEGER,
     PRIMARY KEY (id)
 );
 

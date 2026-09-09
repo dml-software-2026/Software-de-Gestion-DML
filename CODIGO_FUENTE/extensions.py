@@ -344,20 +344,6 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error agregando campos de envío de equipos: {e}")
         db.rollback()
 
-    try: 
-        raypac_col_names = _columnas_de(db, "raypac_entries")
-
-        if "nueva_columna" not in raypac_col_names:
-            db.execute("ALTER TABLE raypac_entries ADD COLUMN IF NOT EXISTS nueva_columna TEXT DEFAULT 'valor_por_defecto'")
-            print("[MIGRATION] ✅ Columna nueva_columna agregada a raypac_entries")
-
-        db.commit()
-        print("[MIGRATION] ✅ Nueva columna verificada")
-
-    except Exception as e:
-        print(f"[MIGRATION] ⚠️  Error agregando nueva columna: {e}")
-        db.rollback()
-
     # TODO SEGURIDAD (Épica 2): acá el app.py original tiene un bloque
     # "Migración de hashes de contraseñas" que re-escribe el password_hash de
     # 4 usuarios con valores hardcodeados en el código (dict CORRECT_HASHES),

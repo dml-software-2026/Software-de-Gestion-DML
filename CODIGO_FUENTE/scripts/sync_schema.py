@@ -54,8 +54,8 @@ def get_connection():
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         print("❌ ERROR: no se encontró DATABASE_URL en el entorno.")
-        print("   Seteala en tu .env local (apuntando a Dev/staging) antes de correr este script.")
         sys.exit(1)
+    print(f"🔌 Conectando a: {database_url.split('@')[-1]}")  # host/dbname, sin password
     return psycopg2.connect(database_url)
  
  
