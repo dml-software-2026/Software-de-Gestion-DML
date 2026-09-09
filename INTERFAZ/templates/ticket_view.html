@@ -33,6 +33,12 @@
     <div class="row">
         <div class="col-md-12">
             <!-- BOTONES DE ACCIÓN (NO IMPRIMIR) -->
+            {% if get_current_user() %}
+            {# #181: esta vista es pública (sin login) para que un cliente final
+               haga seguimiento de su equipo. Estos botones son de uso interno
+               (navegación del staff, impresión de etiqueta) - para un cliente sin
+               sesión "Volver a Fichas" termina en un login del que no puede
+               volver, callejón sin salida. Solo se muestran con sesión activa. #}
             <div class="no-print" style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
                 <a href="{{ url_for('dml.dml_list') }}" class="btn btn-secondary">
                     ⬅️ Volver a Fichas
@@ -41,6 +47,7 @@
                     🖨️ Imprimir Solapa/Etiqueta
                 </a>
             </div>
+            {% endif %}
 
             <!-- ÁREA DE IMPRESIÓN (SOLO ESTO SE IMPRIME) -->
             <div class="print-area">
@@ -160,6 +167,9 @@
             </div><!-- Fin print-area -->
 
             <!-- BOTONES DE ACCIÓN (NO IMPRIMIR) -->
+            {% if get_current_user() %}
+            {# #181: mismo criterio que el bloque de arriba - botones internos,
+               ocultos para un cliente sin sesión. #}
             <div class="no-print mt-4 mb-4">
                 {% if ticket.numero_ficha %}
                 <a href="{{ url_for('dml.dml_view', id=ticket.ficha_id) }}" class="btn btn-primary">
@@ -169,8 +179,9 @@
                 <a href="{{ url_for('tickets.tickets_list') }}" class="btn btn-secondary">
                     🔙 Volver a Tickets
                 </a>
-                
+
             </div>
+            {% endif %}
 
             <!-- NOTA DE PIE (NO IMPRIMIR) -->
             <div class="alert alert-light border text-center mt-4 no-print">
