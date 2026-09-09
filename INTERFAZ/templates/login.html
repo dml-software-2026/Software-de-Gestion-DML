@@ -3,11 +3,14 @@
 {% block title %}Login - DML ST{% endblock %}
 
 {% block content %}
-<div class="container d-flex justify-content-center align-items-center min-vh-100">
+<div class="container d-flex justify-content-center align-items-center flex-grow-1 py-4">
   <div class="col-md-5">
     <div class="card shadow-lg border-0">
       <div class="card-header bg-primary text-white text-center py-4">
-        <h2 class="mb-0">🔧 DML Servicios Técnicos</h2>
+        <span class="login-logo-badge">
+          <img src="{{ url_for('static', filename='logo.png') }}" alt="DML Logo" class="login-logo-img">
+        </span>
+        <h2 class="mb-0 mt-3">DML Servicios Técnicos</h2>
         <small>Sistema de Gestión ST & Repuestos</small>
       </div>
       <div class="card-body p-5">
@@ -28,9 +31,6 @@
             Ingresar al Sistema
           </button>
         </form>
-
-        <hr class="my-4">
-        
       </div>
     </div>
   </div>

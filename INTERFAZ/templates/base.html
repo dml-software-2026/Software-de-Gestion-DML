@@ -11,9 +11,14 @@
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="{{ url_for('auth.index') }}">
-      <img src="{{ url_for('static', filename='logo.png') }}" alt="DML Logo" height="35" class="me-2">
-      DML Servicios Tecnicos
+    <a class="navbar-brand d-flex align-items-center" href="{{ url_for('auth.index') }}">
+      <span class="brand-logo-badge">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="DML Logo" class="brand-logo-img">
+      </span>
+      <span class="brand-text">
+        <span class="brand-main">DML</span>
+        <span class="brand-sub">Servicios Técnicos</span>
+      </span>
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
       <span class="navbar-toggler-icon"></span>
@@ -22,54 +27,54 @@
       <ul class="navbar-nav me-auto nav-pills-custom">
         {% if session.get('user_id') %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('auth.index') }}">
+          <a class="nav-link nav-link-enhanced{{ ' active' if request.endpoint == 'auth.index' else '' }}" href="{{ url_for('auth.index') }}">
             <i class="bi bi-house-fill"></i>
             <span class="nav-text">Inicio</span>
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('raypac.raypac_list') }}">
+          <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'raypac' else '' }}" href="{{ url_for('raypac.raypac_list') }}">
             <i class="bi bi-box-seam-fill"></i>
             <span class="nav-text">RAYPAC</span>
           </a>
         </li>
         {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'RAYPAC', 'DML_REPUESTOS', 'DML_ST'] %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('envios.envios_list') }}">
+          <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'envios' else '' }}" href="{{ url_for('envios.envios_list') }}">
             <i class="bi bi-truck"></i>
             <span class="nav-text">Envíos</span>
           </a>
         </li>
         {% endif %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('dml.dml_list') }}">
+          <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'dml' and request.endpoint != 'dml.dml_entregadas' else '' }}" href="{{ url_for('dml.dml_list') }}">
             <i class="bi bi-wrench-adjustable"></i>
             <span class="nav-text">Fichas ST</span>
           </a>
         </li>
         {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'RAYPAC'] %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('dml.dml_entregadas') }}">
+          <a class="nav-link nav-link-enhanced{{ ' active' if request.endpoint == 'dml.dml_entregadas' else '' }}" href="{{ url_for('dml.dml_entregadas') }}">
             <i class="bi bi-clipboard-check-fill"></i>
             <span class="nav-text">Entregadas</span>
           </a>
         </li>
         {% endif %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('tickets.tickets_list') }}">
+          <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'tickets' else '' }}" href="{{ url_for('tickets.tickets_list') }}">
             <i class="bi bi-ticket-perforated-fill"></i>
             <span class="nav-text">Tickets</span>
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('stock.stock_list') }}">
+          <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'stock' else '' }}" href="{{ url_for('stock.stock_list') }}">
             <i class="bi bi-box2-fill"></i>
             <span class="nav-text">Stock</span>
           </a>
         </li>
         {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'DML_REPUESTOS'] %}
         <li class="nav-item">
-          <a class="nav-link nav-link-enhanced" href="{{ url_for('estadisticas.estadisticas') }}">
+          <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'estadisticas' else '' }}" href="{{ url_for('estadisticas.estadisticas') }}">
             <i class="bi bi-graph-up-arrow"></i>
             <span class="nav-text">Estadísticas</span>
           </a>
@@ -77,8 +82,9 @@
         {% endif %}
         {% if session.get('user_id') and get_current_user() and get_current_user()['role'] == 'ADMIN' %}
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-            <i class="bi bi-gear"></i> Admin
+          <a class="nav-link nav-link-enhanced dropdown-toggle{{ ' active' if request.blueprint in ['admin', 'notificaciones'] else '' }}" href="#" role="button" data-bs-toggle="dropdown">
+            <i class="bi bi-gear-fill"></i>
+            <span class="nav-text">Admin</span>
           </a>
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="{{ url_for('admin.usuarios_list') }}">👥 Usuarios</a></li>
@@ -93,14 +99,24 @@
       </ul>
       <ul class="navbar-nav ms-auto">
         {% if session.get('user_id') and get_current_user() %}
+        {% set current_user = get_current_user() %}
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-            <i class="bi bi-person-circle"></i> {{ get_current_user()['email'] }}
+          <a class="nav-link nav-link-enhanced dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+            <i class="bi bi-person-circle"></i>
+            <span class="nav-text">{{ current_user['nombre'] }}</span>
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" href="{{ url_for('auth.index') }}">Mi Perfil</a></li>
+            <li class="dropdown-header">
+              <span class="badge" style="background-color:
+                {% if current_user['role'] == 'ADMIN' %}#dc3545
+                {% elif current_user['role'] == 'RAYPAC' %}#0066cc
+                {% elif current_user['role'] == 'DML_ST' %}#28a745
+                {% else %}#6c757d
+                {% endif %}">{{ current_user['role'] }}</span>
+              <div class="text-muted small mt-1">{{ current_user['email'] }}</div>
+            </li>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">🚪 Cerrar Sesión</a></li>
+            <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión</a></li>
           </ul>
         </li>
         {% endif %}
@@ -109,7 +125,7 @@
   </div>
 </nav>
 
-<div class="container-fluid">
+<div class="container-fluid page-content">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
@@ -125,9 +141,10 @@
   {% block content %}{% endblock %}
 </div>
 
-<footer class="bg-dark text-white text-center py-3 mt-5">
+<footer class="app-footer bg-dark text-white text-center py-4 mt-5">
   <div class="container-fluid">
-    <small>&copy; 2025 DML Electricidad Industrial SRL | Sistema de Gestión de Servicio Técnico</small>
+    <div class="footer-brand">DML Electricidad Industrial SRL</div>
+    <div class="footer-sub">Sistema de Gestión de Servicio Técnico &middot; &copy; {{ current_year() }}</div>
   </div>
 </footer>
 
