@@ -1,4 +1,81 @@
-body { padding-bottom: 40px; }
+/* Footer siempre pegado al piso de la ventana, sin importar cuán corto
+   sea el contenido de la página (si no, en pantallas grandes con poco
+   contenido queda un hueco blanco del navegador debajo del footer, que
+   no es parte del layout). */
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    /* Gris muy claro en vez de blanco puro: las tarjetas y tablas (blancas,
+       con sombra) se despegan un poco de la página en vez de fundirse. */
+    background-color: #f4f6f9;
+}
+
+.page-content {
+    flex: 1 0 auto;
+}
+
+.app-footer {
+    flex-shrink: 0;
+}
+
+/* Footer: hace pareja con el navbar (mismo bg-dark) en vez de ser una
+   franja negra plana sin relación con el resto del layout. Sin borde de
+   acento — el propio bg-dark ya lo distingue del resto de la página, no
+   hace falta una línea de color arriba. */
+.app-footer .footer-brand {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.app-footer .footer-sub {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+}
+
+/* Marca (logo + nombre) en el navbar. logo.png tiene fondo blanco sólido
+   (no transparente) - puesto directo sobre la barra oscura se ve como un
+   rectángulo blanco pegado ahí. La "placa" blanca redondeada de abajo lo
+   convierte en un elemento intencional (como una credencial), en vez de
+   un recorte accidental. */
+.brand-logo-badge {
+    background-color: #fff;
+    border-radius: 6px;
+    padding: 3px 8px;
+    display: inline-flex;
+    align-items: center;
+    margin-right: 0.65rem;
+}
+
+.brand-logo-img {
+    height: 30px;
+    display: block;
+}
+
+.navbar-brand .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.navbar-brand .brand-main {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff;
+}
+
+.navbar-brand .brand-sub {
+    font-size: 0.68rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.65);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
 
 /* Navegación Mejorada */
 .nav-link-enhanced {
@@ -11,6 +88,11 @@ body { padding-bottom: 40px; }
     align-items: center;
     text-align: center;
     min-width: 90px;
+    /* Fondo sutil en reposo (no solo al pasar el mouse) para que se lean
+       como botones desde el primer vistazo, no como texto plano sobre la
+       barra oscura. */
+    background-color: rgba(255, 255, 255, 0.06);
+    border-bottom: 3px solid transparent;
 }
 
 .nav-link-enhanced i {
@@ -36,7 +118,8 @@ body { padding-bottom: 40px; }
 }
 
 .nav-link-enhanced.active {
-    background-color: rgba(255, 255, 255, 0.25);
+    background-color: rgba(255, 255, 255, 0.16);
+    border-bottom-color: #0d6efd;
     font-weight: 600;
 }
 
