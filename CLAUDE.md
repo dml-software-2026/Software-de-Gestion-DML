@@ -18,6 +18,128 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+- **Última actualización:** 2026-09-10, cierre de sesión (Facu cambia de
+  máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
+- **Los 3 pendientes del checkpoint anterior (07/09→09/09) ya están
+  mergeados, confirmado al arrancar hoy:** `#193` (buscador/filtro en
+  `/dml` y `/raypac`) vía los PRs #211 y #212, y `#133`
+  (`fix/133-usar-password-login-en-vez-de-admin2024`) vía el PR #184
+  - los 3 issues (#193, #133) ya estaban `CLOSED` en GitHub.
+- **Tarea de la sesión: `#200` (rediseño visual: vistas de detalle
+  RAYPAC/envíos) - ✅ COMPLETA, PR #216 mergeado, issue cerrado.**
+  `raypac_view.html` y `envios_view.html` unificados al mismo patrón de
+  encabezado (título + estado a simple vista + acciones a la derecha),
+  badges migrados de estilos Bootstrap 4 sin color real a clases `bg-*`
+  de BS5, íconos `bi-*` agregados. De paso, 2 arreglos de mobile
+  (encontrados al revisar el CSS a mano, sin poder probar visualmente -
+  ver más abajo): un `input-group` con `width: auto` que podía
+  desbordar en pantallas de ~320-375px pasó a `max-width`, y la tabla
+  de repuestos de envíos ganó su `.table-responsive` (no lo tenía ni
+  antes de este PR).
+- **Segunda tarea de la sesión: `#201` (rediseño visual: formularios de
+  edición) - código completo y probado por Facu, repartido en 3 PRs
+  chicos, los 3 pusheados y confirmados en local, ninguno abierto en
+  GitHub todavía:**
+  1. `feature/201-rediseno-formularios-edicion` (`usuario_edit.html` +
+     `stock_edit.html` - los 2 de menor riesgo, ninguno tenía
+     tratamiento Bootstrap completo) → título sugerido `feat: rediseño
+     visual de usuario_edit.html y stock_edit.html`, `Refs #201`.
+  2. `chore/206-eliminar-change-password-codigo-muerto` (ver hallazgo
+     de código muerto más abajo) → `Refs #206`.
+  3. `feature/201-rediseno-dml-edit` (el grande - 529 líneas, CSS 100%
+     propio sin nada de Bootstrap, la única excepción del resto de la
+     app; reemplazado por card + barras de sección + grid responsive
+     `row`/`col-md-*`, sin tocar en nada el `<script>` de verificación
+     de stock en vivo - probado con un round-trip real de POST contra
+     la base, revertido después) → **esta es la que cierra el issue
+     completo**, `Closes #201`. Incluye un 2do commit con un ajuste de
+     diseño pedido por Facu después de probar el primero: el
+     `list-group` de Bootstrap le sacaba el relleno de color que tenían
+     las tarjetas de repuestos (rojo/verde/amarillo pastel según
+     en falta/en stock/indefinido) y dejaba esquinas cuadradas - se
+     volvió a un fondo de color relleno con clases `bg-*-subtle` de
+     Bootstrap 5.3 + `rounded-3`, mismo criterio de color que el
+     original pero sin CSS a mano.
+  - `envios_edit.html` (el 5to template del alcance del issue) **no se
+    tocó** - ya tenía card, header de color y clases BS5, evaluado como
+    "ya en buen estado" antes de arrancar el resto.
+- **Hallazgo en el camino: `change_password.html` es código muerto.**
+  Ninguna ruta de ningún blueprint lo renderiza ni hay ningún link a él
+  en la app (confirmado con grep exhaustivo en todo `.py`/`.html`) -
+  viene así desde el commit inicial del repo, intacto incluso después
+  del refactor grande (#94). Documentado como comentario en el issue
+  **#206** (que ya venía preguntando por esto exactamente - "no existe
+  una página de perfil real"). **Decisión de Facu: como no lo usa nada,
+  se elimina directamente** (no se construye la ruta real de "cambiar
+  mi propia contraseña" por ahora) - hecho en
+  `chore/206-eliminar-change-password-codigo-muerto`. El #206 queda
+  abierto igual, por el resto de su alcance (evaluar página de perfil
+  real más adelante).
+- **2 correcciones de proceso al propio `CLAUDE.md` esta sesión, en la
+  rama `docs/hallazgos-chicos-preguntar-no-crear-issue` (pusheada, PR
+  pendiente de abrir):**
+  1. **Hallazgos chicos ya no generan un issue automático.** La regla
+     vieja ("crear issue siempre, aunque sea XS") generaba fricción
+     para cosas chicas - corrección de Facu: si es chico, preguntar
+     directo en el chat qué hacer: la creación de issue queda reservada
+     para hallazgos grandes. Ver la sección "Bug o inconsistencia que
+     no generamos nosotros" más abajo, ya actualizada con el criterio
+     nuevo.
+  2. **Nueva regla de mobile-safety liviana**, pedido de Facu: todo
+     cambio de template debe revisarse también en mobile (que no quede
+     roto, no necesariamente perfecto) antes de darlo por terminado -
+     ver la sección de flujo de trabajo más abajo. No reemplaza la
+     auditoría dedicada de responsive/mobile de toda la app (**#195**,
+     Backlog, sin arrancar).
+- **Sin acceso a la extensión de Claude in Chrome en esta sesión**
+  (`Browser extension is not connected` - Facu usa Brave, no Chrome).
+  Todo el testing visual de esta sesión lo hizo Facu a mano en su
+  propio navegador contra el server local; del lado de Claude Code el
+  testing fue con `curl` (smoke tests de cada ruta en los 3 roles
+  relevantes, un round-trip real de POST en `dml_edit`) y revisión de
+  CSS a mano para mobile, sin poder confirmar visualmente ninguno de
+  los dos.
+- **Truco usado para que Facu revise 3 ramas del #201/#206 en un solo
+  server** (mismo patrón que la rama de integración del #54, sesión
+  vieja): rama local `test/201-integracion-local`, cortada de `dev` con
+  las 3 ramas mergeadas adentro, **nunca pusheada a GitHub** - se borra
+  al cerrar la sesión, no reemplaza los PRs reales.
+- **3 ramas remotas sueltas del `#133`, señaladas a Facu, sin
+  confirmación todavía de si borrarlas:** `fix/133-eliminar-codigo-muerto-raypac_edit`
+  (PR #190, MERGED), `fix/133-fichas-dml-cerradas-inmutables` (PR #207,
+  MERGED), `133-centralizar-código-admin2024-hardcodeado-5-ocurrencias-una-inalcanzable`
+  (sin PR nunca, rama automática de GitHub sin usar). Las 3 son
+  borrables sin riesgo (issue #133 ya `CLOSED`, las 2 primeras
+  confirmadas ya mergeadas a `dev`) - Facu no llegó a responder si
+  quiere que se borren o prefiere hacerlo él mismo.
+- **Próximo paso concreto:**
+  1. **Facu tiene que abrir y mergear 4 PRs** (los 3 del #201/#206 de
+     arriba, más `docs/hallazgos-chicos-preguntar-no-crear-issue`) y
+     **este mismo checkpoint** (`docs/checkpoint-sesion-2026-09-10`) -
+     importante hacerlo *antes* de arrancar la próxima sesión en la
+     otra máquina, para que esa sesión arranque con `dev` al día en vez
+     de perder este contexto. Después de mergear, cerrar el `#201` a
+     mano (`Closes` no lo hace solo en este repo).
+  2. Decidir sobre las 3 ramas sueltas del #133 (borrar o dejar).
+  3. Candidatos para la próxima tarea, todos en Backlog: **#170**
+     (resaltado de pendientes RAYPAC→DML al recibir envío - Size M,
+     depende de un "Issue 1" externo sin identificar todavía, aclarar
+     antes de arrancar), o **#195** (auditoría dedicada de
+     responsive/mobile, con la sospecha ya anotada de que la tabla de
+     Stock y la vista de Ficha DML necesitan scroll horizontal en
+     mobile).
+- **Ambiente local de esta máquina:** usado activamente hoy, sin
+  necesidad de setup (mismo equipo de siempre). El server de pruebas se
+  detuvo al cerrar la sesión. La próxima sesión arranca en **otra
+  máquina** - repetir el setup de entorno local de cero ahí (ver
+  sección "Setup de entorno local" más abajo) si todavía no está
+  armado.
+- **Bloqueos:** ninguno.
+
+<details>
+<summary>Checkpoint anterior (2026-09-03) — histórico, dejado sin borrar por
+referencia</summary>
+
 - **Última actualización:** 2026-09-03, cierre de sesión (Facu cambia de
   máquina para la próxima sesión — por eso este checkpoint se pushea hoy,
   a diferencia de otros días que queda solo en commits locales).
@@ -294,6 +416,8 @@ asumir contexto de nada más.
   entorno local de cero ahí (ver sección "Setup de entorno local" más
   abajo) si todavía no está armado.
 - **Bloqueos:** ninguno.
+
+</details>
 
 <details>
 <summary>Checkpoint anterior (2026-08-31) — histórico, dejado sin borrar por
