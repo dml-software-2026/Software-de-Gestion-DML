@@ -39,15 +39,40 @@ dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
 def dml_list(readonly=False):
     user = get_current_user()
     db = get_db()
-    fichas = db.execute("""
+
+    buscar = request.args.get("buscar", "")
+    estado = request.args.get("estado", "")
+
+    # Mismo patrón de búsqueda/filtro que tickets_list (#193) - las fichas
+    # cerradas no entran acá a propósito, ya tienen su propia pantalla en
+    # /dml/entregadas, no hace falta un toggle "mostrar cerrados" como en
+    # tickets.
+    query = """
         SELECT f.*, r.cliente, r.numero_serie
         FROM dml_fichas f
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
         WHERE f.is_closed = FALSE
-        ORDER BY f.created_at DESC
-    """).fetchall()
+    """
+    params = []
 
-    return render_template("dml_list.html", fichas=fichas, user_role=user['role'], readonly=readonly)
+    if buscar:
+        query += """ AND (CAST(f.numero_ficha AS TEXT) LIKE %s
+                       OR r.cliente ILIKE %s
+                       OR r.numero_serie ILIKE %s
+                       OR f.numero_ticket ILIKE %s)"""
+        comodin = f"%{buscar}%"
+        params.extend([comodin, comodin, comodin, comodin])
+
+    if estado:
+        query += " AND f.estado_reparacion = %s"
+        params.append(estado)
+
+    query += " ORDER BY f.created_at DESC"
+
+    fichas = db.execute(query, params).fetchall()
+
+    return render_template("dml_list.html", fichas=fichas, user_role=user['role'], readonly=readonly,
+                            buscar=buscar, estado=estado)
 
 
 @dml_bp.route("/entregadas")

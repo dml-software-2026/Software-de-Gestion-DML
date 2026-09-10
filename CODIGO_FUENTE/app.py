@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from datetime import datetime
 
 from dotenv import load_dotenv
 from flask import Flask
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 app.jinja_env.globals.update(
     get_current_user=get_current_user_jinja,
     get_alert_badge=get_alert_badge,
+    current_year=lambda: datetime.now().year,
 )
 
 # Cerrar la conexión a la BD al final de cada request

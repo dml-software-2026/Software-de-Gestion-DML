@@ -9,7 +9,6 @@ from CODIGO_FUENTE.decorators import (
     login_required,
     permission_required,
     role_required,
-    verify_admin_password,
 )
 from CODIGO_FUENTE.extensions import get_db
 
@@ -40,8 +39,14 @@ def raypac_list(readonly=False):
     user = get_current_user()
     db = get_db()
 
-    try:
-        entries = db.execute("""
+    buscar = request.args.get("buscar", "")
+    estado = request.args.get("estado", "")
+
+    # Mismo patrón de búsqueda/filtro que tickets_list (#193). "Estado" acá
+    # filtra por freeze (lo que ya muestra la columna "Estado" de la tabla),
+    # no por el estado de la ficha DML asociada - ese es un dato de otra
+    # tabla y ya tiene su propio filtro en /dml.
+    query = """
             SELECT r.*,
                    (SELECT COUNT(*) FROM dml_fichas f WHERE f.raypac_id = r.id) AS fichas_count,
                    (SELECT f.id FROM dml_fichas f WHERE f.raypac_id = r.id ORDER BY f.created_at DESC LIMIT 1) AS ficha_id,
@@ -49,8 +54,28 @@ def raypac_list(readonly=False):
                    (SELECT t.id FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_id,
                    (SELECT t.numero_ticket FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_numero
             FROM raypac_entries r
-            ORDER BY r.created_at DESC
-        """).fetchall()
+            WHERE 1=1
+    """
+    params = []
+
+    if buscar:
+        query += """ AND (r.cliente ILIKE %s
+                       OR r.numero_serie ILIKE %s
+                       OR r.modelo_maquina ILIKE %s
+                       OR r.comercial ILIKE %s
+                       OR r.numero_remito ILIKE %s)"""
+        comodin = f"%{buscar}%"
+        params.extend([comodin, comodin, comodin, comodin, comodin])
+
+    if estado == "FREEZADO":
+        query += " AND r.is_frozen = TRUE"
+    elif estado == "EDITABLE":
+        query += " AND r.is_frozen = FALSE"
+
+    query += " ORDER BY r.created_at DESC"
+
+    try:
+        entries = db.execute(query, params).fetchall()
     except Exception as e:
         db.rollback()  # En caso de error, revertir la transacción
         # Si hay error en la query, mostrar mensaje y retornar lista vacía
@@ -71,7 +96,8 @@ def raypac_list(readonly=False):
         "MÁQUINA ENTREGADA": {"color": "#28a745", "texto_color": "#ffffff", "texto": "Máquina Entregada"}
     }
 
-    return render_template("raypac_list.html", entries=entries, user_role=user['role'], readonly=readonly, estado_config=estado_config)
+    return render_template("raypac_list.html", entries=entries, user_role=user['role'], readonly=readonly,
+                            estado_config=estado_config, buscar=buscar, estado=estado)
 
 
 @raypac_bp.route("/new", methods=["GET", "POST"])
@@ -172,21 +198,18 @@ def raypac_edit(id):
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
-    if entry['is_frozen'] and not request.form.get("unfreeze_code"):
-        flash("Este registro está freezado. Requiere código de desbloqueo.", "error")
-        return render_template("raypac_view.html", entry=entry)
+    # #133: un registro freezado es inmutable por esta vía. El único camino
+    # real para volver a editar es desfrezarlo antes con raypac_unfreeze()
+    # (últimos 4 dígitos del remito, botón "Desfreezar Definitivamente"). El
+    # mecanismo viejo de aceptar un unfreeze_code acá adentro era código
+    # muerto: ningún template lo alcanzaba (raypac_view.html ya oculta el
+    # botón "Editar" para todos los roles mientras is_frozen sea true).
+    if entry['is_frozen']:
+        flash("Este registro está freezado. Desfreezalo antes de editar.", "error")
+        return redirect(url_for("raypac.raypac_view", id=id))
 
     if request.method == "POST":
         try:
-            unfreeze_code = request.form.get("unfreeze_code")
-            # #133: se confirma contra la contraseña del propio usuario
-            # logueado, mismo mecanismo que el resto de estas confirmaciones.
-            # (Nota: este bloque es inalcanzable desde la UI real - ver #133 -
-            # se deja consistente igual en vez de tocar esa decisión aparte.)
-            if entry['is_frozen'] and not verify_admin_password(unfreeze_code):
-                flash("Código de desbloqueo incorrecto.", "error")
-                return render_template("raypac_view.html", entry=entry)
-
             fecha = request.form.get("fecha_recepcion")
             tipo_solicitud = request.form.get("tipo_solicitud")
             cliente = request.form.get("cliente")

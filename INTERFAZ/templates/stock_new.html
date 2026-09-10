@@ -1,49 +1,56 @@
 {% extends "base.html" %}
 
+{% block title %}Nuevo Repuesto{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-6 offset-md-3">
-            <h2>Nuevo Repuesto - {{ ubicacion }}</h2>
-            
-            <form method="POST">
-                {% if user.role == 'ADMIN' %}
-                <div class="alert alert-info">Solo ADMIN: confirmá con tu contraseña para agregar códigos nuevos.</div>
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="bi bi-box-seam-fill"></i> Nuevo Repuesto - {{ ubicacion }}</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% if user.role == 'ADMIN' %}
+                        <div class="alert alert-info">Solo ADMIN: confirmá con tu contraseña para agregar códigos nuevos.</div>
 
-                <div class="form-group">
-                    <label for="admin_password">Confirmá tu contraseña:</label>
-                    <input type="password" class="form-control" id="admin_password" name="admin_password" required placeholder="Tu contraseña">
-                </div>
-                {% else %}
-                <div class="alert alert-success">
-                    <strong>✅ Autorizado:</strong> Puedes agregar repuestos al stock de {{ ubicacion }}.
-                </div>
-                {% endif %}
+                        <div class="form-group">
+                            <label for="admin_password">Confirmá tu contraseña:</label>
+                            <input type="password" class="form-control" id="admin_password" name="admin_password" required placeholder="Tu contraseña">
+                        </div>
+                        {% else %}
+                        <div class="alert alert-success">
+                            <strong>✅ Autorizado:</strong> Puedes agregar repuestos al stock de {{ ubicacion }}.
+                        </div>
+                        {% endif %}
 
-                <div class="form-group">
-                    <label for="codigo_repuesto">Código (SKU):</label>
-                    <input type="text" class="form-control" id="codigo_repuesto" name="codigo_repuesto" required placeholder="ej. A000006">
+                        <div class="form-group">
+                            <label for="codigo_repuesto">Código (SKU):</label>
+                            <input type="text" class="form-control" id="codigo_repuesto" name="codigo_repuesto" required placeholder="ej. A000006">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="item">Descripción:</label>
+                            <input type="text" class="form-control" id="item" name="item" required
+                                   placeholder="ej. HT TENSION MOTOR GROUP">
+                        </div>
+
+                        {% if ubicacion != 'RAYPAC' %}
+                        <div class="form-group">
+                            <label for="cantidad">Cantidad Inicial:</label>
+                            <input type="number" class="form-control" id="cantidad" name="cantidad"
+                                   value="0" required min="0">
+                        </div>
+                        {% else %}
+                        <input type="hidden" name="cantidad" value="999999">
+                        {% endif %}
+
+                        <button type="submit" class="btn btn-success">Crear Repuesto</button>
+                        <a href="{{ url_for('stock.stock_list') }}" class="btn btn-secondary">Cancelar</a>
+                    </form>
                 </div>
-                
-                <div class="form-group">
-                    <label for="item">Descripción:</label>
-                    <input type="text" class="form-control" id="item" name="item" required 
-                           placeholder="ej. HT TENSION MOTOR GROUP">
-                </div>
-                
-                {% if ubicacion != 'RAYPAC' %}
-                <div class="form-group">
-                    <label for="cantidad">Cantidad Inicial:</label>
-                    <input type="number" class="form-control" id="cantidad" name="cantidad" 
-                           value="0" required min="0">
-                </div>
-                {% else %}
-                <input type="hidden" name="cantidad" value="999999">
-                {% endif %}
-                
-                <button type="submit" class="btn btn-success">Crear Repuesto</button>
-                <a href="{{ url_for('stock.stock_list') }}" class="btn btn-secondary">Cancelar</a>
-            </form>
+            </div>
         </div>
     </div>
 </div>
