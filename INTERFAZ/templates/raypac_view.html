@@ -151,12 +151,12 @@
                 <i class="bi bi-pencil"></i> Editar
             </a>
 
-            <form method="POST" action="{{ url_for('raypac.raypac_freeze', id=entry.id) }}" class="d-flex align-items-center gap-2 flex-wrap">
-                <div class="input-group" style="width: auto;">
+            <form method="POST" action="{{ url_for('raypac.raypac_freeze', id=entry.id) }}" class="flex-grow-1" style="min-width: 260px;">
+                <div class="input-group" style="max-width: 360px;">
                     <input type="text" name="numero_remito" class="form-control" placeholder="Ej: 4222" pattern="[0-9]{1,5}" maxlength="5" required title="Ingresa solo los últimos 4 dígitos (Ej: 4222). El sistema lo convertirá a formato 00001-04222">
                     <button type="submit" class="btn btn-success"><i class="bi bi-lock"></i> Freezar y Enviar a ST</button>
                 </div>
-                <small class="text-muted">💡 Solo los últimos 4 dígitos del remito (Ej: 4222 → 00001-04222)</small>
+                <small class="text-muted d-block mt-1">💡 Solo los últimos 4 dígitos del remito (Ej: 4222 → 00001-04222)</small>
             </form>
         </div>
     </div>
