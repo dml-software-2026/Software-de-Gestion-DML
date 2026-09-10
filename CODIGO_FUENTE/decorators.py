@@ -60,6 +60,7 @@ def log_action(user_id, action, table_name, record_id=None, old_value=None, new_
         "UNFREEZE": "UPDATE",
         "CLOSE": "UPDATE",
         "CONFIRM": "UPDATE",
+        "CARGA_CSV": "INSERT",  # carga masiva de stock por CSV (deuda de #87)
     }
     tipo_accion = mapa_tipo_accion.get(action, "INSERT")
 

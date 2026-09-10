@@ -34,6 +34,7 @@ def usuarios_list():
 @role_required("ADMIN")
 def cargar_stock_desde_web():
     """Endpoint para cargar stock desde el CSV en producción"""
+    user = get_current_user()
     output = []
     try:
         # Ruta al CSV
@@ -43,6 +44,14 @@ def cargar_stock_desde_web():
 
         if not os.path.exists(csv_path):
             output.append("[STOCK] ❌ Archivo CSV no encontrado")
+            log_action(
+                user['id'],
+                "CARGA_CSV",
+                "matriz_repuestos",
+                None,
+                None,
+                f"resultado=error, motivo=csv_no_encontrado, path={csv_path}"
+            )
             return "<br>".join(output), 404
 
         output.append("[STOCK] ✅ CSV encontrado, iniciando carga...")
@@ -130,6 +139,16 @@ def cargar_stock_desde_web():
 
         db.commit()
 
+        log_action(
+            user['id'],
+            "CARGA_CSV",
+            "matriz_repuestos",
+            None,
+            None,
+            f"resultado=exito, nuevos={repuestos_cargados}, "
+            f"actualizados={repuestos_actualizados}, errores_fila={errores}"
+        )
+
         output.append("[STOCK] ✅ Carga completada!")
         output.append(f"[STOCK] 📦 Repuestos nuevos: {repuestos_cargados}")
         output.append(f"[STOCK] 🔄 Repuestos actualizados: {repuestos_actualizados}")
@@ -149,6 +168,15 @@ def cargar_stock_desde_web():
         output.append(f"[STOCK] ❌ Error: {error_msg}")
         print(f"[STOCK] ❌ Error: {error_msg}", file=sys.stderr, flush=True)
         print(trace, file=sys.stderr, flush=True)
+
+        log_action(
+            user['id'],
+            "CARGA_CSV",
+            "matriz_repuestos",
+            None,
+            None,
+            f"resultado=error, motivo=excepcion, detalle={error_msg}"
+        )
 
         result = "<br>".join(output)
         result += f"<br><br><pre>{trace}</pre>"
