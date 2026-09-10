@@ -18,6 +18,7 @@ from CODIGO_FUENTE.decorators import (
     login_required,
     permission_required,
     role_required,
+    verify_admin_password,
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.mail import send_mail
@@ -38,15 +39,40 @@ dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
 def dml_list(readonly=False):
     user = get_current_user()
     db = get_db()
-    fichas = db.execute("""
+
+    buscar = request.args.get("buscar", "")
+    estado = request.args.get("estado", "")
+
+    # Mismo patrón de búsqueda/filtro que tickets_list (#193) - las fichas
+    # cerradas no entran acá a propósito, ya tienen su propia pantalla en
+    # /dml/entregadas, no hace falta un toggle "mostrar cerrados" como en
+    # tickets.
+    query = """
         SELECT f.*, r.cliente, r.numero_serie
         FROM dml_fichas f
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
         WHERE f.is_closed = FALSE
-        ORDER BY f.created_at DESC
-    """).fetchall()
+    """
+    params = []
 
-    return render_template("dml_list.html", fichas=fichas, user_role=user['role'], readonly=readonly)
+    if buscar:
+        query += """ AND (CAST(f.numero_ficha AS TEXT) LIKE %s
+                       OR r.cliente ILIKE %s
+                       OR r.numero_serie ILIKE %s
+                       OR f.numero_ticket ILIKE %s)"""
+        comodin = f"%{buscar}%"
+        params.extend([comodin, comodin, comodin, comodin])
+
+    if estado:
+        query += " AND f.estado_reparacion = %s"
+        params.append(estado)
+
+    query += " ORDER BY f.created_at DESC"
+
+    fichas = db.execute(query, params).fetchall()
+
+    return render_template("dml_list.html", fichas=fichas, user_role=user['role'], readonly=readonly,
+                            buscar=buscar, estado=estado)
 
 
 @dml_bp.route("/entregadas")
@@ -230,21 +256,20 @@ def dml_edit(id):
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_list"))
 
-    # #133: una ficha cerrada es inmutable por esta vía, sin excepción -
-    # decisión de Facu (2026-09-07): no existe (ni existía) un flujo real
-    # para reabrir una ficha cerrada, a diferencia de RAYPAC que sí tiene
-    # uno (raypac_unfreeze). El código viejo que aceptaba un unfreeze_code
-    # acá adentro era código muerto: ningún template tenía ese campo, y la
-    # condición se evaluaba también en el GET (que nunca trae request.form),
-    # así que nunca se llegó a mostrar el formulario para una ficha cerrada.
-    # Se deja documentado en el issue #133 por si en el futuro hace falta
-    # un flujo real de reapertura (mismo criterio: no se decide de rebote).
-    if ficha['is_closed']:
-        flash("Esta ficha está cerrada y no se puede editar.", "error")
+    if ficha['is_closed'] and not request.form.get("unfreeze_code"):
+        flash("Esta ficha está cerrada. Requiere código para editar.", "error")
         return redirect(url_for("dml.dml_view", id=id))
 
     if request.method == "POST":
         try:
+            unfreeze_code = request.form.get("unfreeze_code")
+            # #133: se confirma contra la contraseña del propio usuario
+            # logueado (mismo mecanismo que el login), no un código fijo
+            # separado que había que memorizar aparte.
+            if ficha['is_closed'] and not verify_admin_password(unfreeze_code):
+                flash("Código incorrecto.", "error")
+                return redirect(url_for("dml.dml_view", id=id))
+
             # Capturar SOLO los campos editables (no los de RAYPAC)
             fecha_ingreso = request.form.get("fecha_ingreso")
             # #176: "Fecha de Egreso" no es required (recién se completa al
