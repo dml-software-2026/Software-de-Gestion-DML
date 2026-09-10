@@ -4,21 +4,50 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2>Ingreso RAYPAC #{{ entry.id }}</h2>
-    
+    {# #200: encabezado con el mismo patrón que envios_view.html - título +
+       metadatos a la izquierda, acciones de navegación a la derecha, en vez
+       del <h2> suelto seguido de botones al fondo de la página que tenía
+       antes. #}
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-box-seam"></i> Ingreso RAYPAC #{{ entry.id }}</h2>
+            <p class="text-muted mb-1">Fecha recepción: {{ entry.fecha_recepcion }}</p>
+            <p class="text-muted mb-0">
+                Estado de envío:
+                {% if entry.estado_envio_equipos == 'RECIBIDO' %}
+                <span class="badge bg-success">Recibido en DML</span>
+                {% elif entry.estado_envio_equipos == 'ENVIADO' %}
+                <span class="badge bg-warning text-dark">Enviado desde RAYPAC</span>
+                {% else %}
+                <span class="badge bg-secondary">Pendiente de Envío</span>
+                {% endif %}
+            </p>
+            {% if entry.is_frozen %}
+            <p class="text-muted mb-0">
+                <i class="bi bi-lock-fill"></i> <strong>Freezado</strong> el {{ entry.frozen_at }} - Remito {{ entry.numero_remito }}
+            </p>
+            {% endif %}
+        </div>
+        <div class="text-end">
+            <a class="btn btn-outline-secondary" href="{{ url_for('raypac.raypac_list') }}">Volver al listado</a>
+            {% if readonly %}
+            <span class="badge bg-info text-dark ms-1">Modo Solo Lectura</span>
+            {% endif %}
+        </div>
+    </div>
+
     <div class="card shadow-sm mb-4">
-        <div class="card-header bg-info text-white">
-            <h5>Información General</h5>
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-info-circle-fill"></i> Información General</h5>
         </div>
         <div class="card-body">
             <div class="row mb-3">
                 <div class="col-md-6">
-                    <strong>Fecha Recepción:</strong> {{ entry.fecha_recepcion }}<br>
                     <strong>Cliente:</strong> {{ entry.cliente }}<br>
                     <strong>Número Serie:</strong> {{ entry.numero_serie }}
                 </div>
                 <div class="col-md-6">
-                    <strong>Tipo Solicitud:</strong> <span class="badge" style="background-color: #17a2b8; color: black; font-size: 14px;">{{ entry.tipo_solicitud }}</span><br>
+                    <strong>Tipo Solicitud:</strong> <span class="badge bg-info text-dark">{{ entry.tipo_solicitud }}</span><br>
                     <strong>Modelo:</strong> {{ entry.modelo_maquina }}<br>
                     <strong>Tipo Máquina:</strong> {{ entry.tipo_maquina }}
                 </div>
@@ -54,94 +83,99 @@
             <div class="row">
                 <div class="col-md-12">
                     <strong>Diagnóstico Ingreso:</strong>
-                    <p>{{ entry.diagnostico_ingreso or 'Sin diagnóstico' }}</p>
+                    <p class="mb-0">{{ entry.diagnostico_ingreso or 'Sin diagnóstico' }}</p>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div class="row mb-3">
-                <div class="col-md-12">
-                    <strong>Estado de Envío del Equipo:</strong>
-                    {% if entry.estado_envio_equipos == 'RECIBIDO' %}
-                    <span class="badge bg-success">Recibido en DML</span>
-                    <br><small class="text-muted">Recepcionado por DML</small>
-                    {% elif entry.estado_envio_equipos == 'ENVIADO' %}
-                    <span class="badge bg-warning text-dark">Enviado desde RAYPAC</span>
-                    {% if entry.fecha_envio_equipos %}
-                    <br><small class="text-muted">Enviado: {{ entry.fecha_envio_equipos }}</small>
-                    {% endif %}
-                    {% if user_role in ['ADMIN', 'DML_ST'] and entry.is_frozen %}
-                    <br><br>
-                    <form method="POST" action="{{ url_for('raypac.raypac_recepcionar_dml', id=entry.id) }}" class="d-inline">
-                        <button type="submit" class="btn btn-success btn-sm" onclick="return confirmarAccion(event, '¿Confirmar recepción del equipo en DML?')">
-                            <i class="bi bi-check-circle"></i> Dar de Alta en DML
-                        </button>
-                    </form>
-                    {% endif %}
-                    {% else %}
-                    <span class="badge bg-secondary">Pendiente de Envío</span>
-                    {% endif %}
+    {# #200: "Estado de Envío del Equipo" y el bloque de freeze/unfreeze pasan
+       a su propia tarjeta - antes vivían adentro de la tarjeta de
+       Información General (uno como fila suelta, el otro como un
+       alert-warning fijo aunque el equipo ya estuviera freezado), mezclando
+       datos del equipo con el estado operativo del ingreso. #}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="bi bi-truck"></i> Envío y Congelamiento</h5>
+        </div>
+        <div class="card-body">
+            {% if entry.estado_envio_equipos == 'RECIBIDO' %}
+            <p class="mb-1"><span class="badge bg-success">Recibido en DML</span> Recepcionado por DML</p>
+            {% elif entry.estado_envio_equipos == 'ENVIADO' %}
+            <p class="mb-1">
+                <span class="badge bg-warning text-dark">Enviado desde RAYPAC</span>
+                {% if entry.fecha_envio_equipos %}
+                <span class="text-muted small">Enviado: {{ entry.fecha_envio_equipos }}</span>
+                {% endif %}
+            </p>
+            {% if user_role in ['ADMIN', 'DML_ST'] and entry.is_frozen %}
+            <form method="POST" action="{{ url_for('raypac.raypac_recepcionar_dml', id=entry.id) }}" class="d-inline">
+                <button type="submit" class="btn btn-success btn-sm" onclick="return confirmarAccion(event, '¿Confirmar recepción del equipo en DML?')">
+                    <i class="bi bi-check-circle"></i> Dar de Alta en DML
+                </button>
+            </form>
+            {% endif %}
+            {% else %}
+            <p class="mb-0"><span class="badge bg-secondary">Pendiente de Envío</span></p>
+            {% endif %}
+
+            <hr>
+
+            {% if entry.is_frozen %}
+            <p class="mb-2">
+                <i class="bi bi-lock-fill text-success"></i> <strong>Freezado</strong> el {{ entry.frozen_at }}<br>
+                <strong>Remito de Envío:</strong> {{ entry.numero_remito }}
+            </p>
+            {% if user_role == 'ADMIN' %}
+            <form method="POST" action="{{ url_for('raypac.raypac_unfreeze', id=entry.id) }}" class="d-inline">
+                <div class="input-group input-group-sm" style="max-width: 420px;">
+                    <input type="text" name="unfreeze_code" class="form-control" placeholder="Últimos 4 dígitos del remito" maxlength="4" pattern="\d{4}" required>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-unlock"></i> Desfreezar Definitivamente</button>
                 </div>
-            </div>
-
-            <div class="alert alert-warning">
-                {% if entry.is_frozen %}
-                <strong>✓ Freezado:</strong> {{ entry.frozen_at }}<br>
-                <strong>Remito de Envío:</strong> {{ entry.numero_remito }}<br><br>
-                {% if user_role == 'ADMIN' %}
-                <form method="POST" action="{{ url_for('raypac.raypac_unfreeze', id=entry.id) }}" class="d-inline">
-                    <input type="text" name="unfreeze_code" class="form-control d-inline-block" style="width: auto;" placeholder="Últimos 4 dígitos del remito" maxlength="4" pattern="\d{4}" required>
-                    <button type="submit" class="btn btn-warning btn-sm">🔓 Desfreezar Definitivamente</button>
-                    <small class="text-muted d-block mt-1">⚠️ Solo para cambios importantes (requiere validación)</small>
-                </form>
-                {% else %}
-                <small class="text-muted"><em>Solo ADMIN puede desfreezar definitivamente</em></small>
-                {% endif %}
-                {% else %}
-                <strong>Pendiente de Freezar</strong> - Requiere N° de Remito para envío a ST
-                {% endif %}
-            </div>
+                <small class="text-muted d-block mt-1"><i class="bi bi-exclamation-triangle"></i> Solo para cambios importantes (requiere validación)</small>
+            </form>
+            {% else %}
+            <small class="text-muted"><em>Solo ADMIN puede desfreezar definitivamente</em></small>
+            {% endif %}
+            {% else %}
+            <p class="mb-0"><i class="bi bi-unlock text-warning"></i> <strong>Pendiente de Freezar</strong> - Requiere N° de Remito para envío a ST</p>
+            {% endif %}
         </div>
     </div>
 
     <!-- ACCIONES -->
-    <div class="row mb-3">
-        <div class="col-md-12">
-            {% if not readonly and user_role in ['ADMIN', 'RAYPAC'] %}
-            
-            {% if not entry.is_frozen %}
-            <!-- Modo editable: botón editar normal y opción de freezar -->
+    {% if not readonly and user_role in ['ADMIN', 'RAYPAC'] and not entry.is_frozen %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
             <a href="{{ url_for('raypac.raypac_edit', id=entry.id) }}" class="btn btn-primary">
-                <i class="fas fa-edit"></i> Editar
+                <i class="bi bi-pencil"></i> Editar
             </a>
-            
-            <form method="POST" action="{{ url_for('raypac.raypac_freeze', id=entry.id) }}" class="d-inline">
-                <input type="text" name="numero_remito" class="form-control d-inline-block" style="width: auto;" placeholder="Ej: 4222" pattern="[0-9]{1,5}" maxlength="5" required title="Ingresa solo los últimos 4 dígitos (Ej: 4222). El sistema lo convertirá a formato 00001-04222">
-                <button type="submit" class="btn btn-success">Freezar y Enviar a ST</button>
-                <small class="text-muted d-block mt-1">💡 Ingresa solo los últimos 4 dígitos del remito (Ej: 4222 → se guarda como 00001-04222)</small>
+
+            <form method="POST" action="{{ url_for('raypac.raypac_freeze', id=entry.id) }}" class="flex-grow-1" style="min-width: 260px;">
+                <div class="input-group" style="max-width: 360px;">
+                    <input type="text" name="numero_remito" class="form-control" placeholder="Ej: 4222" pattern="[0-9]{1,5}" maxlength="5" required title="Ingresa solo los últimos 4 dígitos (Ej: 4222). El sistema lo convertirá a formato 00001-04222">
+                    <button type="submit" class="btn btn-success"><i class="bi bi-lock"></i> Freezar y Enviar a ST</button>
+                </div>
+                <small class="text-muted d-block mt-1">💡 Solo los últimos 4 dígitos del remito (Ej: 4222 → 00001-04222)</small>
             </form>
-            {% endif %}
-            {% elif readonly %}
-            <span class="badge badge-info" style="font-size: 16px;">Modo Solo Lectura</span>
-            {% endif %}
-            
-            <a href="{{ url_for('raypac.raypac_list') }}" class="btn btn-secondary">Volver</a>
         </div>
     </div>
+    {% endif %}
 
     <!-- CREAR FICHA DML (solo para DML_ST y ADMIN, y solo si ya existe ticket) -->
     {% if entry.is_frozen and user_role in ['ADMIN', 'DML_ST'] %}
     <div class="card shadow-sm">
         <div class="card-header bg-success text-white">
-            <h5>Crear Ficha de Servicio Técnico en DML</h5>
+            <h5 class="mb-0"><i class="bi bi-clipboard2-plus-fill"></i> Crear Ficha de Servicio Técnico en DML</h5>
         </div>
         <div class="card-body">
             {% if ticket %}
             <p>La máquina ya fue enviada a ST y tiene ticket asociado: <strong>{{ ticket.numero_ticket }}</strong></p>
             <a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-lg btn-success">
-                Crear Ficha DML
+                <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML
             </a>
             {% else %}
-            <div class="alert alert-warning">
+            <div class="alert alert-warning mb-0">
                 <i class="bi bi-exclamation-triangle"></i> <strong>Debe crear un ticket primero</strong>
                 <p class="mb-2 mt-2">Antes de crear la ficha, es necesario generar un ticket de seguimiento para el cliente.</p>
                 <a href="{{ url_for('raypac.raypac_list') }}" class="btn btn-primary">
