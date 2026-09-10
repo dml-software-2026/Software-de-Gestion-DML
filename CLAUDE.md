@@ -568,13 +568,20 @@ principio de este archivo con el estado real y el próximo paso concreto. Sigue 
 mismo flujo que cualquier cambio: rama chica (`docs/checkpoint-...`), commit, push,
 avisarle a Facu para que abra y mergee el PR contra `dev`.
 
-**Bug o inconsistencia que no generamos nosotros: primero kanban, después código.**
-Cuando aparece algo roto/feo que no es parte de la tarea en curso (encontrado
-mientras se prueba otra cosa), chequear primero si ya tiene issue en GitHub
-(`gh issue list --search ...` o revisar el board). Si no la tiene, crearla —
-por más que sea Size XS, para que quede documentado y no se pierda — y recién
-ahí preguntarle a Facu si conviene resolverla en el momento (si es chica) o
-dejarla para después. No arreglar directamente sin este paso primero.
+**Bug o inconsistencia que no generamos nosotros: depende de qué tan grande sea**
+(criterio corregido por Facu el 2026-09-10 - la versión anterior de esta regla
+pedía crear issue siempre, "aunque sea XS", y en la práctica generaba fricción
+para hallazgos chicos sin necesidad).
+- **Chico** (un template sin usar, un detalle visual, algo acotado a un
+  archivo): no crear issue todavía, ni comentar uno existente. Preguntarle
+  directamente a Facu en el chat qué quiere hacer - él dice si se resuelve
+  en el momento, se documenta, o se deja pasar.
+- **Grande** (afecta varias partes, alcance ambiguo, o Facu pide que quede
+  documentado): ahí sí, chequear primero si ya tiene issue en GitHub
+  (`gh issue list --search ...` o revisar el board) y crearla si no la tiene,
+  antes de decidir cómo seguir.
+En cualquiera de los dos casos: no arreglar nada por cuenta propia sin
+preguntar primero.
 
 **Cuidado al abrir un PR desde GitHub: confirmar la base branch.** El dropdown
 de base del PR puede quedar en el default del repo si no se lo cambia a mano
