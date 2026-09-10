@@ -3,527 +3,471 @@
 {% block title %}Editar Ficha DML #{{ ficha.numero_ficha }}{% endblock %}
 
 {% block content %}
-<style>
-    .edit-container {
-        max-width: 1000px;
-        margin: 0 auto;
-        background: white;
-        padding: 20px;
-        border: 1px solid #ddd;
-    }
-    .section-title {
-        background-color: #003366;
-        color: white;
-        padding: 10px 12px;
-        margin-top: 20px;
-        margin-bottom: 15px;
-        border-radius: 3px;
-        font-weight: bold;
-    }
-    .form-group {
-        margin-bottom: 12px;
-    }
-    .form-group label {
-        font-weight: bold;
-        font-size: 13px;
-        margin-bottom: 5px;
-        display: block;
-    }
-    .form-group input[type="text"],
-    .form-group input[type="date"],
-    .form-group input[type="number"],
-    .form-group textarea,
-    .form-group select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 3px;
-        font-size: 12px;
-    }
-    .form-group textarea {
-        min-height: 80px;
-        family: Arial, sans-serif;
-        resize: vertical;
-    }
-    .two-col {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 15px;
-    }
-    .three-col {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 15px;
-    }
-    .repuestos-list {
-        background-color: #f5f5f5;
-        padding: 10px;
-        margin-bottom: 15px;
-        border-radius: 3px;
-    }
-    .repuesto-item {
-        background: white;
-        padding: 10px;
-        margin-bottom: 8px;
-        border: 1px solid #ddd;
-        border-radius: 3px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .btn-group {
-        margin-top: 20px;
-        border-top: 1px solid #ddd;
-        padding-top: 15px;
-    }
-    .parts-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 15px;
-    }
-</style>
+<div class="container mt-4" style="max-width: 1000px;">
+    {# #201: rediseño visual - antes este template tenía CSS 100% propio
+       (.edit-container, .section-title, .form-group a mano) sin nada de
+       Bootstrap, la excepción del resto de la app. Se reemplaza por
+       card/card-header + grid responsive (row/col-md-*) + mb-3/form-label
+       de BS5 - mismo lenguaje visual que el resto de las vistas de edición.
+       Los grids fijos (.two-col/.three-col/.parts-grid) tampoco colapsaban
+       en mobile (sin media query) - row/col-md-* lo resuelve solo.
+       El <script> de más abajo (verificación de stock, modales de
+       confirmación) no se tocó: todos los id= que usa (codigo_repuesto,
+       cantidad_utilizada, stock_alert, btn_agregar_repuesto,
+       form_agregar_repuesto, form-mover-stock-<id>, form-eliminar-<id>)
+       y los name= que lee el backend (parte_<idx>, estado_reparacion, etc.)
+       quedan exactamente iguales. #}
+    <h2 class="mb-4"><i class="bi bi-wrench-adjustable"></i> Editar Ficha DML #{{ ficha.numero_ficha }}</h2>
 
-<div class="edit-container">
-    <h2>Editar Ficha DML #{{ ficha.numero_ficha }}</h2>
-    
     <!-- FORM PRINCIPAL: DATOS DE LA FICHA -->
-    <form method="POST" action="{{ url_for('dml.dml_edit', id=ficha.id) }}">
-        <!-- SECCIÓN 1: DATOS BÁSICOS -->
-        <div class="section-title">DATOS BÁSICOS</div>
-        
-        <div class="two-col">
-            <div class="form-group">
-                <label>Fecha de Ingreso DML:</label>
-                <input type="date" name="fecha_ingreso" value="{{ ficha.fecha_ingreso }}" required>
-            </div>
-            <div class="form-group">
-                <label>Fecha de Egreso DML:</label>
-                <input type="date" name="fecha_egreso" value="{{ ficha.fecha_egreso or '' }}">
-            </div>
-        </div>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('dml.dml_edit', id=ficha.id) }}">
+                <!-- SECCIÓN 1: DATOS BÁSICOS -->
+                <div class="bg-primary text-white fw-bold p-2 rounded mb-3">DATOS BÁSICOS</div>
 
-        <!-- SECCIÓN 2: DIAGNÓSTICO DE REPARACIÓN -->
-        <div class="section-title">DIAGNÓSTICO DE REPARACIÓN</div>
-        
-        <div class="form-group">
-            <label>Diagnóstico de Reparación (después de reparar):</label>
-            <textarea name="diagnostico_reparacion" placeholder="Describa el diagnóstico después de la reparación...">{{ ficha.diagnostico_reparacion or '' }}</textarea>
-        </div>
-
-        <!-- SECCIÓN 3: OBSERVACIONES -->
-        <div class="section-title">OBSERVACIONES</div>
-        
-        <div class="form-group">
-            <label>Observaciones:</label>
-            <textarea name="observaciones" placeholder="Describa las observaciones finales...">{{ ficha.observaciones or '' }}</textarea>
-        </div>
-
-        <!-- SECCIÓN 5: ESTADO DEL EQUIPO (PARTES) -->
-        <div class="section-title">ESTADO DEL EQUIPO</div>
-        
-        <div class="parts-grid">
-            {% for parte in partes %}
-                <div class="form-group">
-                    <label>{{ parte.nombre_parte }}:</label>
-                    <select name="parte_{{ loop.index0 }}" class="js-select-enhance">
-                        <option value="BUENO" {% if parte.estado == 'BUENO' or not parte.estado %}selected{% endif %}>BUENO</option>
-                        <option value="OK" {% if parte.estado == 'OK' %}selected{% endif %}>OK</option>
-                        <option value="A PROBAR" {% if parte.estado == 'A PROBAR' %}selected{% endif %}>A PROBAR</option>
-                        <option value="ROTO" {% if parte.estado == 'ROTO' %}selected{% endif %}>ROTO</option>
-                        <option value="CON TORNILLOS FALTANTES" {% if parte.estado == 'CON TORNILLOS FALTANTES' %}selected{% endif %}>CON TORNILLOS FALTANTES</option>
-                        <option value="FALTANTE" {% if parte.estado == 'FALTANTE' %}selected{% endif %}>FALTANTE</option>
-                        <option value="DESGASTADA" {% if parte.estado == 'DESGASTADA' %}selected{% endif %}>DESGASTADA</option>
-                    </select>
-                </div>
-            {% endfor %}
-        </div>
-
-        <!-- SECCIÓN 6: CICLOS Y MANO DE OBRA -->
-        <div class="section-title">CICLOS Y MANO DE OBRA</div>
-        
-        <div class="three-col">
-            <div class="form-group">
-                <label>Nº de Ciclos:</label>
-                <input type="number" name="n_ciclos" value="{{ ficha.n_ciclos or 0 }}" min="0">
-            </div>
-            <div class="form-group">
-                <label>Horas Adicionales de Trabajo:</label>
-                <input type="text" name="horas_adic" value="{{ ficha.horas_adic or 'NO APLICA' }}" placeholder="ej. 2, NO APLICA">
-            </div>
-            <div class="form-group">
-                <label>Mecanizado Adicional:</label>
-                <input type="text" name="mecanizado_adic" value="{{ ficha.mecanizado_adic or 'NO APLICA' }}" placeholder="ej. SI, NO APLICA">
-            </div>
-        </div>
-
-        <!-- SECCIÓN 7: TÉCNICO Y ESTADO -->
-        <div class="section-title">RESPONSABLE Y ESTADO</div>
-        
-        <div class="two-col">
-            <div class="form-group">
-                <label>Técnico Responsable del ST:</label>
-                <input type="text" name="tecnico_resp" value="{{ ficha.tecnico_resp or '' }}">
-            </div>
-            <div class="form-group">
-                <label>Estado de la Reparación:</label>
-                <select name="estado_reparacion" class="js-select-enhance" required>
-                    <option value="A LA ESPERA DE REVISIÓN" {% if ficha.estado_reparacion == 'A LA ESPERA DE REVISIÓN' %}selected{% endif %}>A LA ESPERA DE REVISIÓN</option>
-                    <option value="A LA ESPERA DE REPUESTOS" {% if ficha.estado_reparacion == 'A LA ESPERA DE REPUESTOS' %}selected{% endif %}>A LA ESPERA DE REPUESTOS</option>
-                    <option value="EN REPARACIÓN" {% if ficha.estado_reparacion in ('EN REPARACIÓN', 'EN REPARACION') %}selected{% endif %}>EN REPARACIÓN</option>
-                    <option value="REPARACIÓN COMPLETADA" {% if ficha.estado_reparacion == 'REPARACIÓN COMPLETADA' %}selected{% endif %}>REPARACIÓN COMPLETADA</option>
-                    <option value="MÁQUINA LISTA PARA RETIRAR" {% if ficha.estado_reparacion == 'MÁQUINA LISTA PARA RETIRAR' %}selected{% endif %}>MÁQUINA LISTA PARA RETIRAR</option>
-                    {# #157: "MÁQUINA ENTREGADA" sacada del desplegable a proposito - el unico
-                       camino a ese estado tiene que ser el boton "Cerrar Ficha" (dml_view.html),
-                       que corre el checklist completo (repuestos/partes, cierre de ticket, mail)
-                       y recien ahi marca is_closed=TRUE. Elegirlo desde aca dejaba la ficha
-                       "huerfana": estado terminal pero is_closed=FALSE y editable sin restriccion. #}
-                </select>
-            </div>
-        </div>
-
-        <div class="form-group" style="border: 2px solid #ffc107; padding: 15px; background-color: #fff3cd; border-radius: 5px;">
-            <label style="color: #856404; font-weight: bold;">⚠️ Número de Remito de Salida (DML→RAYPAC):</label>
-            <input type="text" name="numero_remito_salida" value="{{ ficha.numero_remito_salida or '' }}" 
-                   placeholder="Ej: 4222 (se convertirá a 00001-04222)" pattern="[0-9]{1,5}" maxlength="5" class="form-control">
-            <small style="color: #856404; display: block; margin-top: 5px;">
-                📋 <strong>Opcional durante edición. Requerido solo para CERRAR la ficha.</strong> Ingresa solo los últimos 4 dígitos del remito de salida (diferente al de entrada).
-            </small>
-        </div>
-
-        <!-- BOTONES PRINCIPALES DEL FORM -->
-        <div class="btn-group">
-            <button type="submit" class="btn btn-primary btn-lg" style="margin-right: 10px;">
-                💾 Guardar Cambios
-            </button>
-            <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-secondary btn-lg" style="margin-right: 10px;">
-                ❌ Cancelar
-            </a>
-        </div>
-    </form>
-
-    <!-- SECCIÓN DE REPUESTOS (FORMS SEPARADOS) -->
-    <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #003366;">
-        <div class="section-title">REPUESTOS UTILIZADOS</div>
-        
-        {% if repuestos %}
-        <div class="repuestos-list">
-            <h5 style="margin: 0 0 10px 0;">Repuestos Registrados ({{ repuestos|length }}/15):</h5>
-            {% for repuesto in repuestos %}
-            <div class="repuesto-item" style="background-color: {% if repuesto.en_falta %}#ffebee{% elif repuesto.en_stock %}#f1f8e9{% else %}#fff9c4{% endif %}; border-left: 4px solid {% if repuesto.en_falta %}#f44336{% elif repuesto.en_stock %}#4caf50{% else %}#fbc02d{% endif %};">
-                <div style="flex: 1;">
-                    <strong>{{ repuesto.codigo_repuesto }}</strong> - {{ repuesto.descripcion }} 
-                    <small>(Cantidad: {{ repuesto.cantidad_utilizada if repuesto.cantidad_utilizada else repuesto.cantidad }})</small>
-                    <br>
-                    {% if repuesto.en_stock %}
-                    <span style="color: #2e7d32; font-weight: bold;">✓ EN STOCK</span>
-                    {% elif repuesto.en_falta %}
-                    <span style="color: #c62828; font-weight: bold;">✗ EN FALTA</span>
-                    {% else %}
-                    <span style="color: #f57f17; font-weight: bold;">⚠️ ESTADO INDEFINIDO</span>
-                    {% endif %}
-                </div>
-                <div style="margin-left: 10px; display: flex; gap: 5px;">
-                    {% if repuesto.en_falta %}
-                    <form method="POST" action="{{ url_for('dml.mover_repuesto_a_stock', ficha_id=ficha.id, repuesto_id=repuesto.id) }}"
-                          id="form-mover-stock-{{ repuesto.id }}" style="display: inline;">
-                        <button type="button" class="btn btn-warning btn-sm"
-                                onclick="confirmarMoverAStock('{{ repuesto.codigo_repuesto }}', 'form-mover-stock-{{ repuesto.id }}')"
-                                title="Marcar como disponible cuando llegue el stock">
-                            🔄 Mover a Stock
-                        </button>
-                    </form>
-                    {% endif %}
-                    <form method="POST" action="{{ url_for('dml.eliminar_repuesto', ficha_id=ficha.id, repuesto_id=repuesto.id) }}"
-                          id="form-eliminar-{{ repuesto.id }}" style="display: inline;">
-                        <button type="button" class="btn btn-danger btn-sm"
-                                onclick="confirmarEliminarRepuesto('{{ repuesto.codigo_repuesto }}', 'form-eliminar-{{ repuesto.id }}')">
-                            🗑️ Eliminar
-                        </button>
-                    </form>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p style="color: #666; font-style: italic;">No hay repuestos registrados en esta ficha.</p>
-        {% endif %}
-
-        <!-- FORM PARA AGREGAR REPUESTO -->
-        <div style="background-color: #e8f5e9; padding: 15px; border: 2px solid #4caf50; border-radius: 6px; margin-bottom: 15px;">
-            <h6 style="margin: 0 0 8px 0; color: #2e7d32; font-weight: bold;">➕ Agregar Nuevo Repuesto</h6>
-            <p style="margin: 0 0 12px 0; font-size: 0.85em; color: #555;">
-                <strong>🔗 Conectado al stock:</strong> El sistema verifica automáticamente la disponibilidad y descuenta del inventario.
-            </p>
-            <form method="POST" action="{{ url_for('dml.agregar_repuesto', id=ficha.id) }}" id="form_agregar_repuesto">
-                <div style="display: grid; grid-template-columns: 2fr 1fr 100px; gap: 10px; align-items: end;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label><strong>Código del Repuesto:</strong></label>
-                        <input type="text" name="codigo_repuesto" id="codigo_repuesto" placeholder="Ej: A000006" 
-                               required style="text-transform: uppercase;">
-                        <div id="stock_alert" style="display: none; margin-top: 8px; padding: 10px; border-radius: 4px; font-size: 0.9em; font-weight: bold;">
-                        </div>
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label fw-bold">Fecha de Ingreso DML:</label>
+                        <input type="date" class="form-control" name="fecha_ingreso" value="{{ ficha.fecha_ingreso }}" required>
                     </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label><strong>Cantidad Utilizada:</strong></label>
-                        <input type="number" name="cantidad_utilizada" id="cantidad_utilizada" value="1" min="1" required>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Fecha de Egreso DML:</label>
+                        <input type="date" class="form-control" name="fecha_egreso" value="{{ ficha.fecha_egreso or '' }}">
                     </div>
-                    <button type="submit" class="btn btn-success" style="height: 38px; margin: 0;" id="btn_agregar_repuesto">
-                        ✓ Agregar
+                </div>
+
+                <!-- SECCIÓN 2: DIAGNÓSTICO DE REPARACIÓN -->
+                <div class="bg-primary text-white fw-bold p-2 rounded mb-3">DIAGNÓSTICO DE REPARACIÓN</div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Diagnóstico de Reparación (después de reparar):</label>
+                    <textarea class="form-control" name="diagnostico_reparacion" rows="3" placeholder="Describa el diagnóstico después de la reparación...">{{ ficha.diagnostico_reparacion or '' }}</textarea>
+                </div>
+
+                <!-- SECCIÓN 3: OBSERVACIONES -->
+                <div class="bg-primary text-white fw-bold p-2 rounded mb-3">OBSERVACIONES</div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Observaciones:</label>
+                    <textarea class="form-control" name="observaciones" rows="3" placeholder="Describa las observaciones finales...">{{ ficha.observaciones or '' }}</textarea>
+                </div>
+
+                <!-- SECCIÓN 5: ESTADO DEL EQUIPO (PARTES) -->
+                <div class="bg-primary text-white fw-bold p-2 rounded mb-3">ESTADO DEL EQUIPO</div>
+
+                <div class="row mb-4">
+                    {% for parte in partes %}
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">{{ parte.nombre_parte }}:</label>
+                        <select name="parte_{{ loop.index0 }}" class="js-select-enhance">
+                            <option value="BUENO" {% if parte.estado == 'BUENO' or not parte.estado %}selected{% endif %}>BUENO</option>
+                            <option value="OK" {% if parte.estado == 'OK' %}selected{% endif %}>OK</option>
+                            <option value="A PROBAR" {% if parte.estado == 'A PROBAR' %}selected{% endif %}>A PROBAR</option>
+                            <option value="ROTO" {% if parte.estado == 'ROTO' %}selected{% endif %}>ROTO</option>
+                            <option value="CON TORNILLOS FALTANTES" {% if parte.estado == 'CON TORNILLOS FALTANTES' %}selected{% endif %}>CON TORNILLOS FALTANTES</option>
+                            <option value="FALTANTE" {% if parte.estado == 'FALTANTE' %}selected{% endif %}>FALTANTE</option>
+                            <option value="DESGASTADA" {% if parte.estado == 'DESGASTADA' %}selected{% endif %}>DESGASTADA</option>
+                        </select>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- SECCIÓN 6: CICLOS Y MANO DE OBRA -->
+                <div class="bg-primary text-white fw-bold p-2 rounded mb-3">CICLOS Y MANO DE OBRA</div>
+
+                <div class="row mb-4">
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label fw-bold">Nº de Ciclos:</label>
+                        <input type="number" class="form-control" name="n_ciclos" value="{{ ficha.n_ciclos or 0 }}" min="0">
+                    </div>
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label fw-bold">Horas Adicionales de Trabajo:</label>
+                        <input type="text" class="form-control" name="horas_adic" value="{{ ficha.horas_adic or 'NO APLICA' }}" placeholder="ej. 2, NO APLICA">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Mecanizado Adicional:</label>
+                        <input type="text" class="form-control" name="mecanizado_adic" value="{{ ficha.mecanizado_adic or 'NO APLICA' }}" placeholder="ej. SI, NO APLICA">
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 7: TÉCNICO Y ESTADO -->
+                <div class="bg-primary text-white fw-bold p-2 rounded mb-3">RESPONSABLE Y ESTADO</div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label fw-bold">Técnico Responsable del ST:</label>
+                        <input type="text" class="form-control" name="tecnico_resp" value="{{ ficha.tecnico_resp or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Estado de la Reparación:</label>
+                        <select name="estado_reparacion" class="js-select-enhance" required>
+                            <option value="A LA ESPERA DE REVISIÓN" {% if ficha.estado_reparacion == 'A LA ESPERA DE REVISIÓN' %}selected{% endif %}>A LA ESPERA DE REVISIÓN</option>
+                            <option value="A LA ESPERA DE REPUESTOS" {% if ficha.estado_reparacion == 'A LA ESPERA DE REPUESTOS' %}selected{% endif %}>A LA ESPERA DE REPUESTOS</option>
+                            <option value="EN REPARACIÓN" {% if ficha.estado_reparacion in ('EN REPARACIÓN', 'EN REPARACION') %}selected{% endif %}>EN REPARACIÓN</option>
+                            <option value="REPARACIÓN COMPLETADA" {% if ficha.estado_reparacion == 'REPARACIÓN COMPLETADA' %}selected{% endif %}>REPARACIÓN COMPLETADA</option>
+                            <option value="MÁQUINA LISTA PARA RETIRAR" {% if ficha.estado_reparacion == 'MÁQUINA LISTA PARA RETIRAR' %}selected{% endif %}>MÁQUINA LISTA PARA RETIRAR</option>
+                            {# #157: "MÁQUINA ENTREGADA" sacada del desplegable a proposito - el unico
+                               camino a ese estado tiene que ser el boton "Cerrar Ficha" (dml_view.html),
+                               que corre el checklist completo (repuestos/partes, cierre de ticket, mail)
+                               y recien ahi marca is_closed=TRUE. Elegirlo desde aca dejaba la ficha
+                               "huerfana": estado terminal pero is_closed=FALSE y editable sin restriccion. #}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning">
+                    <label class="form-label fw-bold mb-1"><i class="bi bi-exclamation-triangle"></i> Número de Remito de Salida (DML→RAYPAC):</label>
+                    <input type="text" name="numero_remito_salida" value="{{ ficha.numero_remito_salida or '' }}"
+                           placeholder="Ej: 4222 (se convertirá a 00001-04222)" pattern="[0-9]{1,5}" maxlength="5" class="form-control">
+                    <small class="d-block mt-2">
+                        <i class="bi bi-info-circle"></i> <strong>Opcional durante edición. Requerido solo para CERRAR la ficha.</strong> Ingresa solo los últimos 4 dígitos del remito de salida (diferente al de entrada).
+                    </small>
+                </div>
+
+                <!-- BOTONES PRINCIPALES DEL FORM -->
+                <div class="d-flex flex-wrap gap-2 pt-3 border-top">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-save"></i> Guardar Cambios
                     </button>
+                    <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-secondary btn-lg">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </a>
                 </div>
-                <small style="display: block; margin-top: 8px; color: #1976d2;">
-                    ℹ️ El estado (EN STOCK / EN FALTA) se determina automáticamente según disponibilidad.
-                </small>
             </form>
         </div>
+    </div>
 
-        <script>
-        // Validación de stock en tiempo real. Antes había dos bloques de
-        // script separados (uno viejo con confirm() nativo, otro más nuevo
-        // con el modal de Bootstrap "ALERTA DE STOCK") enganchados a los
-        // mismos elementos - corrían los dos a la vez y se pisaban. Se
-        // unificó en uno solo: el submit siempre espera a que termine la
-        // verificación real contra /api/verificar-stock/<codigo> antes de
-        // decidir si deja pasar el form o muestra el modal de confirmación
-        // (así tampoco importa si el usuario tabuló o apretó Enter directo).
-        let stockSuficiente = true;
-        let bloqueoDuro = false; // ya está en la ficha, o código inexistente
-        let ultimoCodigoVerificado = null;
+    <!-- SECCIÓN DE REPUESTOS (FORMS SEPARADOS) -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-gear-wide-connected"></i> Repuestos Utilizados</h5>
+        </div>
+        <div class="card-body">
+            {% if repuestos %}
+            <h6 class="mb-3">Repuestos Registrados ({{ repuestos|length }}/15):</h6>
+            <div class="d-flex flex-column gap-2 mb-3">
+                {% for repuesto in repuestos %}
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 rounded-3 border-start border-4
+                            {% if repuesto.en_falta %}bg-danger-subtle border-danger
+                            {% elif repuesto.en_stock %}bg-success-subtle border-success
+                            {% else %}bg-warning-subtle border-warning{% endif %}">
+                    <div>
+                        <strong>{{ repuesto.codigo_repuesto }}</strong> - {{ repuesto.descripcion }}
+                        <small class="text-muted">(Cantidad: {{ repuesto.cantidad_utilizada if repuesto.cantidad_utilizada else repuesto.cantidad }})</small>
+                        <br>
+                        {% if repuesto.en_stock %}
+                        <span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> EN STOCK</span>
+                        {% elif repuesto.en_falta %}
+                        <span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> EN FALTA</span>
+                        {% else %}
+                        <span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> ESTADO INDEFINIDO</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex gap-2">
+                        {% if repuesto.en_falta %}
+                        <form method="POST" action="{{ url_for('dml.mover_repuesto_a_stock', ficha_id=ficha.id, repuesto_id=repuesto.id) }}"
+                              id="form-mover-stock-{{ repuesto.id }}" class="d-inline">
+                            <button type="button" class="btn btn-warning btn-sm"
+                                    onclick="confirmarMoverAStock('{{ repuesto.codigo_repuesto }}', 'form-mover-stock-{{ repuesto.id }}')"
+                                    title="Marcar como disponible cuando llegue el stock">
+                                <i class="bi bi-arrow-repeat"></i> Mover a Stock
+                            </button>
+                        </form>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('dml.eliminar_repuesto', ficha_id=ficha.id, repuesto_id=repuesto.id) }}"
+                              id="form-eliminar-{{ repuesto.id }}" class="d-inline">
+                            <button type="button" class="btn btn-danger btn-sm"
+                                    onclick="confirmarEliminarRepuesto('{{ repuesto.codigo_repuesto }}', 'form-eliminar-{{ repuesto.id }}')">
+                                <i class="bi bi-trash"></i> Eliminar
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted fst-italic">No hay repuestos registrados en esta ficha.</p>
+            {% endif %}
 
-        const codigoInput = document.getElementById('codigo_repuesto');
-        const cantidadInput = document.getElementById('cantidad_utilizada');
-        const alertDiv = document.getElementById('stock_alert');
-        const btnAgregar = document.getElementById('btn_agregar_repuesto');
-        const formAgregar = document.getElementById('form_agregar_repuesto');
-        const repuestosFicha = {{ repuestos|tojson }};
+            <!-- FORM PARA AGREGAR REPUESTO -->
+            <div class="card border-success mb-0">
+                <div class="card-body">
+                    <h6 class="text-success fw-bold"><i class="bi bi-plus-circle"></i> Agregar Nuevo Repuesto</h6>
+                    <p class="small text-muted mb-3">
+                        <i class="bi bi-link-45deg"></i> <strong>Conectado al stock:</strong> el sistema verifica automáticamente la disponibilidad y descuenta del inventario.
+                    </p>
+                    <form method="POST" action="{{ url_for('dml.agregar_repuesto', id=ficha.id) }}" id="form_agregar_repuesto">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Código del Repuesto:</label>
+                                <input type="text" class="form-control text-uppercase" name="codigo_repuesto" id="codigo_repuesto" placeholder="Ej: A000006" required>
+                                <div id="stock_alert" style="display: none;" class="mt-2 p-2 rounded small fw-bold"></div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Cantidad Utilizada:</label>
+                                <input type="number" class="form-control" name="cantidad_utilizada" id="cantidad_utilizada" value="1" min="1" required>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-success w-100" id="btn_agregar_repuesto">
+                                    <i class="bi bi-check-circle"></i> Agregar
+                                </button>
+                            </div>
+                        </div>
+                        <small class="d-block mt-2 text-primary">
+                            <i class="bi bi-info-circle"></i> El estado (EN STOCK / EN FALTA) se determina automáticamente según disponibilidad.
+                        </small>
+                    </form>
+                </div>
+            </div>
 
-        function mostrarAlerta(texto, bg, color, border) {
-            alertDiv.style.display = 'block';
-            alertDiv.style.backgroundColor = bg;
-            alertDiv.style.color = color;
-            alertDiv.style.border = border;
-            alertDiv.innerHTML = texto;
-        }
+            <script>
+            // Validación de stock en tiempo real. Antes había dos bloques de
+            // script separados (uno viejo con confirm() nativo, otro más nuevo
+            // con el modal de Bootstrap "ALERTA DE STOCK") enganchados a los
+            // mismos elementos - corrían los dos a la vez y se pisaban. Se
+            // unificó en uno solo: el submit siempre espera a que termine la
+            // verificación real contra /api/verificar-stock/<codigo> antes de
+            // decidir si deja pasar el form o muestra el modal de confirmación
+            // (así tampoco importa si el usuario tabuló o apretó Enter directo).
+            let stockSuficiente = true;
+            let bloqueoDuro = false; // ya está en la ficha, o código inexistente
+            let ultimoCodigoVerificado = null;
 
-        function verificarStock() {
-            const codigo = codigoInput.value.trim().toUpperCase();
-            const cantidad = parseInt(cantidadInput.value) || 1;
-            ultimoCodigoVerificado = codigo;
+            const codigoInput = document.getElementById('codigo_repuesto');
+            const cantidadInput = document.getElementById('cantidad_utilizada');
+            const alertDiv = document.getElementById('stock_alert');
+            const btnAgregar = document.getElementById('btn_agregar_repuesto');
+            const formAgregar = document.getElementById('form_agregar_repuesto');
+            const repuestosFicha = {{ repuestos|tojson }};
 
-            if (!codigo) {
-                alertDiv.style.display = 'none';
-                btnAgregar.disabled = false;
-                stockSuficiente = true;
-                bloqueoDuro = false;
-                return Promise.resolve();
+            function mostrarAlerta(texto, bg, color, border) {
+                alertDiv.style.display = 'block';
+                alertDiv.style.backgroundColor = bg;
+                alertDiv.style.color = color;
+                alertDiv.style.border = border;
+                alertDiv.innerHTML = texto;
             }
 
-            if (repuestosFicha.some(r => r.codigo_repuesto === codigo)) {
-                mostrarAlerta('⚠️ Este repuesto ya está agregado a la ficha.', '#fff3cd', '#856404', '2px solid #ffc107');
-                btnAgregar.disabled = true;
-                stockSuficiente = false;
-                bloqueoDuro = true;
-                return Promise.resolve();
-            }
+            function verificarStock() {
+                const codigo = codigoInput.value.trim().toUpperCase();
+                const cantidad = parseInt(cantidadInput.value) || 1;
+                ultimoCodigoVerificado = codigo;
 
-            return fetch(`/api/verificar-stock/${codigo}`)
-                .then(response => response.json())
-                .then(data => {
-                    const stockDisponible = data.stock || 0;
-                    stockSuficiente = data.existe && stockDisponible >= cantidad;
-                    bloqueoDuro = !data.existe;
+                if (!codigo) {
+                    alertDiv.style.display = 'none';
                     btnAgregar.disabled = false;
-
-                    if (!data.existe) {
-                        mostrarAlerta('❌ REPUESTO NO EXISTE en el catálogo. Verifique el código.', '#f8d7da', '#721c24', '2px solid #f44336');
-                    } else if (stockDisponible === 0) {
-                        mostrarAlerta(`🛑 <strong>SIN STOCK</strong> - El repuesto se marcará como EN FALTA. Disponible: ${stockDisponible} unidades.`, '#f8d7da', '#721c24', '3px solid #f44336');
-                    } else if (stockDisponible === 1) {
-                        mostrarAlerta(`⚠️ <strong>ÚLTIMO REPUESTO</strong> - Disponible: ${stockDisponible} unidad. Será marcado EN STOCK y descontado.`, '#fff3cd', '#856404', '2px solid #ffc107');
-                    } else if (stockDisponible === 2) {
-                        mostrarAlerta(`🟠 <strong>STOCK BAJO</strong> - Disponible: ${stockDisponible} unidades. Considere solicitar más.`, '#ffe5cc', '#663300', '2px solid #ff6600');
-                    } else if (stockDisponible < cantidad) {
-                        mostrarAlerta(`⚠️ <strong>STOCK INSUFICIENTE</strong> - Necesita: ${cantidad}, Disponible: ${stockDisponible}. Se marcará EN FALTA.`, '#ffe5cc', '#663300', '2px solid #ff6600');
-                    } else {
-                        mostrarAlerta(`✅ <strong>DISPONIBLE</strong> - Stock: ${stockDisponible} unidades. Se descontará automáticamente.`, '#d4edda', '#155724', '2px solid #4caf50');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error verificando stock:', error);
-                    // Si falla la verificación en sí, no bloqueamos el
-                    // submit: agregar_repuesto() en el backend valida el
-                    // stock real de todas formas antes de guardar.
                     stockSuficiente = true;
                     bloqueoDuro = false;
-                    alertDiv.style.display = 'none';
-                });
-        }
-
-        codigoInput.addEventListener('blur', verificarStock);
-        cantidadInput.addEventListener('change', function() {
-            if (codigoInput.value.trim()) verificarStock();
-        });
-
-        function mostrarModalConfirmacion() {
-            const alertText = alertDiv.textContent.trim();
-            if (!document.getElementById('stockAlertModal')) {
-                const modalHtml = `
-                    <div class="modal fade" id="stockAlertModal" tabindex="-1" aria-labelledby="stockAlertModalLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header bg-danger text-white">
-                                    <h5 class="modal-title" id="stockAlertModalLabel">
-                                        <i class="bi bi-exclamation-triangle-fill"></i> ALERTA DE STOCK
-                                    </h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body" id="stockAlertModalBody"></div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                        <i class="bi bi-x-circle"></i> Cancelar
-                                    </button>
-                                    <button type="button" class="btn btn-danger" id="confirmAddRepuesto">
-                                        <i class="bi bi-check-circle"></i> Agregar de todas formas
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
-            }
-
-            document.getElementById('stockAlertModalBody').innerHTML = `
-                <div class="alert alert-danger mb-3">
-                    <h5><i class="bi bi-x-circle"></i> ${alertText}</h5>
-                </div>
-                <p class="fw-bold">¿Está seguro que desea agregar este repuesto sin stock disponible?</p>
-                <p class="text-muted mb-0">El repuesto quedará marcado como "EN FALTA" y deberá ser gestionado posteriormente.</p>
-            `;
-
-            const modal = new bootstrap.Modal(document.getElementById('stockAlertModal'));
-            modal.show();
-
-            document.getElementById('confirmAddRepuesto').addEventListener('click', function() {
-                modal.hide();
-                const newForm = formAgregar.cloneNode(true);
-                formAgregar.parentNode.replaceChild(newForm, formAgregar);
-                newForm.submit();
-            }, { once: true });
-        }
-
-        formAgregar.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const codigo = codigoInput.value.trim().toUpperCase();
-            const chequeoPendiente = codigo !== ultimoCodigoVerificado
-                ? verificarStock() : Promise.resolve();
-
-            chequeoPendiente.then(() => {
-                if (stockSuficiente) {
-                    formAgregar.submit();
-                } else if (!bloqueoDuro) {
-                    mostrarModalConfirmacion();
+                    return Promise.resolve();
                 }
-                // bloqueoDuro (duplicado o código inexistente): no se
-                // ofrece "agregar de todas formas", el usuario tiene que
-                // corregir el código primero.
+
+                if (repuestosFicha.some(r => r.codigo_repuesto === codigo)) {
+                    mostrarAlerta('⚠️ Este repuesto ya está agregado a la ficha.', '#fff3cd', '#856404', '2px solid #ffc107');
+                    btnAgregar.disabled = true;
+                    stockSuficiente = false;
+                    bloqueoDuro = true;
+                    return Promise.resolve();
+                }
+
+                return fetch(`/api/verificar-stock/${codigo}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const stockDisponible = data.stock || 0;
+                        stockSuficiente = data.existe && stockDisponible >= cantidad;
+                        bloqueoDuro = !data.existe;
+                        btnAgregar.disabled = false;
+
+                        if (!data.existe) {
+                            mostrarAlerta('❌ REPUESTO NO EXISTE en el catálogo. Verifique el código.', '#f8d7da', '#721c24', '2px solid #f44336');
+                        } else if (stockDisponible === 0) {
+                            mostrarAlerta(`🛑 <strong>SIN STOCK</strong> - El repuesto se marcará como EN FALTA. Disponible: ${stockDisponible} unidades.`, '#f8d7da', '#721c24', '3px solid #f44336');
+                        } else if (stockDisponible === 1) {
+                            mostrarAlerta(`⚠️ <strong>ÚLTIMO REPUESTO</strong> - Disponible: ${stockDisponible} unidad. Será marcado EN STOCK y descontado.`, '#fff3cd', '#856404', '2px solid #ffc107');
+                        } else if (stockDisponible === 2) {
+                            mostrarAlerta(`🟠 <strong>STOCK BAJO</strong> - Disponible: ${stockDisponible} unidades. Considere solicitar más.`, '#ffe5cc', '#663300', '2px solid #ff6600');
+                        } else if (stockDisponible < cantidad) {
+                            mostrarAlerta(`⚠️ <strong>STOCK INSUFICIENTE</strong> - Necesita: ${cantidad}, Disponible: ${stockDisponible}. Se marcará EN FALTA.`, '#ffe5cc', '#663300', '2px solid #ff6600');
+                        } else {
+                            mostrarAlerta(`✅ <strong>DISPONIBLE</strong> - Stock: ${stockDisponible} unidades. Se descontará automáticamente.`, '#d4edda', '#155724', '2px solid #4caf50');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error verificando stock:', error);
+                        // Si falla la verificación en sí, no bloqueamos el
+                        // submit: agregar_repuesto() en el backend valida el
+                        // stock real de todas formas antes de guardar.
+                        stockSuficiente = true;
+                        bloqueoDuro = false;
+                        alertDiv.style.display = 'none';
+                    });
+            }
+
+            codigoInput.addEventListener('blur', verificarStock);
+            cantidadInput.addEventListener('change', function() {
+                if (codigoInput.value.trim()) verificarStock();
             });
-        });
 
-        // Confirmación de eliminación de repuesto (reemplaza el confirm()
-        // nativo del navegador por un modal de Bootstrap, mismo estilo que
-        // el de verificación de stock más arriba).
-        function confirmarEliminarRepuesto(codigo, formId) {
-            if (!document.getElementById('deleteRepuestoModal')) {
-                const modalHtml = `
-                    <div class="modal fade" id="deleteRepuestoModal" tabindex="-1" aria-labelledby="deleteRepuestoModalLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header bg-danger text-white">
-                                    <h5 class="modal-title" id="deleteRepuestoModalLabel">
-                                        <i class="bi bi-trash-fill"></i> CONFIRMAR ELIMINACIÓN
-                                    </h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body" id="deleteRepuestoModalBody"></div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                        <i class="bi bi-x-circle"></i> Cancelar
-                                    </button>
-                                    <button type="button" class="btn btn-danger" id="confirmDeleteRepuesto">
-                                        <i class="bi bi-trash"></i> Eliminar
-                                    </button>
+            function mostrarModalConfirmacion() {
+                const alertText = alertDiv.textContent.trim();
+                if (!document.getElementById('stockAlertModal')) {
+                    const modalHtml = `
+                        <div class="modal fade" id="stockAlertModal" tabindex="-1" aria-labelledby="stockAlertModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-danger text-white">
+                                        <h5 class="modal-title" id="stockAlertModalLabel">
+                                            <i class="bi bi-exclamation-triangle-fill"></i> ALERTA DE STOCK
+                                        </h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body" id="stockAlertModalBody"></div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <i class="bi bi-x-circle"></i> Cancelar
+                                        </button>
+                                        <button type="button" class="btn btn-danger" id="confirmAddRepuesto">
+                                            <i class="bi bi-check-circle"></i> Agregar de todas formas
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                    `;
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+                }
+
+                document.getElementById('stockAlertModalBody').innerHTML = `
+                    <div class="alert alert-danger mb-3">
+                        <h5><i class="bi bi-x-circle"></i> ${alertText}</h5>
                     </div>
+                    <p class="fw-bold">¿Está seguro que desea agregar este repuesto sin stock disponible?</p>
+                    <p class="text-muted mb-0">El repuesto quedará marcado como "EN FALTA" y deberá ser gestionado posteriormente.</p>
                 `;
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                const modal = new bootstrap.Modal(document.getElementById('stockAlertModal'));
+                modal.show();
+
+                document.getElementById('confirmAddRepuesto').addEventListener('click', function() {
+                    modal.hide();
+                    const newForm = formAgregar.cloneNode(true);
+                    formAgregar.parentNode.replaceChild(newForm, formAgregar);
+                    newForm.submit();
+                }, { once: true });
             }
 
-            document.getElementById('deleteRepuestoModalBody').innerHTML = `
-                <p class="fw-bold mb-0">¿Eliminar el repuesto <strong>${codigo}</strong> de esta ficha?</p>
-                <p class="text-muted mb-0">Si estaba descontado del stock, se le devuelve automáticamente.</p>
-            `;
+            formAgregar.addEventListener('submit', function(e) {
+                e.preventDefault();
 
-            const modal = new bootstrap.Modal(document.getElementById('deleteRepuestoModal'));
-            modal.show();
+                const codigo = codigoInput.value.trim().toUpperCase();
+                const chequeoPendiente = codigo !== ultimoCodigoVerificado
+                    ? verificarStock() : Promise.resolve();
 
-            const confirmBtn = document.getElementById('confirmDeleteRepuesto');
-            confirmBtn.replaceWith(confirmBtn.cloneNode(true)); // limpia listeners de aperturas anteriores
-            document.getElementById('confirmDeleteRepuesto').addEventListener('click', function() {
-                modal.hide();
-                document.getElementById(formId).submit();
-            }, { once: true });
-        }
+                chequeoPendiente.then(() => {
+                    if (stockSuficiente) {
+                        formAgregar.submit();
+                    } else if (!bloqueoDuro) {
+                        mostrarModalConfirmacion();
+                    }
+                    // bloqueoDuro (duplicado o código inexistente): no se
+                    // ofrece "agregar de todas formas", el usuario tiene que
+                    // corregir el código primero.
+                });
+            });
 
-        // Confirmación de "Mover a Stock" (mismo patrón que eliminar).
-        function confirmarMoverAStock(codigo, formId) {
-            if (!document.getElementById('moveStockModal')) {
-                const modalHtml = `
-                    <div class="modal fade" id="moveStockModal" tabindex="-1" aria-labelledby="moveStockModalLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header bg-warning text-dark">
-                                    <h5 class="modal-title" id="moveStockModalLabel">
-                                        <i class="bi bi-arrow-repeat"></i> CONFIRMAR DISPONIBILIDAD
-                                    </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body" id="moveStockModalBody"></div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                        <i class="bi bi-x-circle"></i> Cancelar
-                                    </button>
-                                    <button type="button" class="btn btn-warning" id="confirmMoveStock">
-                                        <i class="bi bi-check-circle"></i> Confirmar
-                                    </button>
+            // Confirmación de eliminación de repuesto (reemplaza el confirm()
+            // nativo del navegador por un modal de Bootstrap, mismo estilo que
+            // el de verificación de stock más arriba).
+            function confirmarEliminarRepuesto(codigo, formId) {
+                if (!document.getElementById('deleteRepuestoModal')) {
+                    const modalHtml = `
+                        <div class="modal fade" id="deleteRepuestoModal" tabindex="-1" aria-labelledby="deleteRepuestoModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-danger text-white">
+                                        <h5 class="modal-title" id="deleteRepuestoModalLabel">
+                                            <i class="bi bi-trash-fill"></i> CONFIRMAR ELIMINACIÓN
+                                        </h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body" id="deleteRepuestoModalBody"></div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <i class="bi bi-x-circle"></i> Cancelar
+                                        </button>
+                                        <button type="button" class="btn btn-danger" id="confirmDeleteRepuesto">
+                                            <i class="bi bi-trash"></i> Eliminar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    `;
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+                }
+
+                document.getElementById('deleteRepuestoModalBody').innerHTML = `
+                    <p class="fw-bold mb-0">¿Eliminar el repuesto <strong>${codigo}</strong> de esta ficha?</p>
+                    <p class="text-muted mb-0">Si estaba descontado del stock, se le devuelve automáticamente.</p>
                 `;
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                const modal = new bootstrap.Modal(document.getElementById('deleteRepuestoModal'));
+                modal.show();
+
+                const confirmBtn = document.getElementById('confirmDeleteRepuesto');
+                confirmBtn.replaceWith(confirmBtn.cloneNode(true)); // limpia listeners de aperturas anteriores
+                document.getElementById('confirmDeleteRepuesto').addEventListener('click', function() {
+                    modal.hide();
+                    document.getElementById(formId).submit();
+                }, { once: true });
             }
 
-            document.getElementById('moveStockModalBody').innerHTML = `
-                <p class="fw-bold mb-0">¿Confirmar que el repuesto <strong>${codigo}</strong> ya está disponible?</p>
-                <p class="text-muted mb-0">Se descontará del stock actual en DML y quedará marcado como EN STOCK.</p>
-            `;
+            // Confirmación de "Mover a Stock" (mismo patrón que eliminar).
+            function confirmarMoverAStock(codigo, formId) {
+                if (!document.getElementById('moveStockModal')) {
+                    const modalHtml = `
+                        <div class="modal fade" id="moveStockModal" tabindex="-1" aria-labelledby="moveStockModalLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-warning text-dark">
+                                        <h5 class="modal-title" id="moveStockModalLabel">
+                                            <i class="bi bi-arrow-repeat"></i> CONFIRMAR DISPONIBILIDAD
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body" id="moveStockModalBody"></div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <i class="bi bi-x-circle"></i> Cancelar
+                                        </button>
+                                        <button type="button" class="btn btn-warning" id="confirmMoveStock">
+                                            <i class="bi bi-check-circle"></i> Confirmar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+                }
 
-            const modal = new bootstrap.Modal(document.getElementById('moveStockModal'));
-            modal.show();
+                document.getElementById('moveStockModalBody').innerHTML = `
+                    <p class="fw-bold mb-0">¿Confirmar que el repuesto <strong>${codigo}</strong> ya está disponible?</p>
+                    <p class="text-muted mb-0">Se descontará del stock actual en DML y quedará marcado como EN STOCK.</p>
+                `;
 
-            const confirmBtn = document.getElementById('confirmMoveStock');
-            confirmBtn.replaceWith(confirmBtn.cloneNode(true)); // limpia listeners de aperturas anteriores
-            document.getElementById('confirmMoveStock').addEventListener('click', function() {
-                modal.hide();
-                document.getElementById(formId).submit();
-            }, { once: true });
-        }
-        </script>
+                const modal = new bootstrap.Modal(document.getElementById('moveStockModal'));
+                modal.show();
+
+                const confirmBtn = document.getElementById('confirmMoveStock');
+                confirmBtn.replaceWith(confirmBtn.cloneNode(true)); // limpia listeners de aperturas anteriores
+                document.getElementById('confirmMoveStock').addEventListener('click', function() {
+                    modal.hide();
+                    document.getElementById(formId).submit();
+                }, { once: true });
+            }
+            </script>
+        </div>
     </div>
 </div>
-
 {% endblock %}
