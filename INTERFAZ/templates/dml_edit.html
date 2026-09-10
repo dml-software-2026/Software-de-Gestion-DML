@@ -146,12 +146,12 @@
         <div class="card-body">
             {% if repuestos %}
             <h6 class="mb-3">Repuestos Registrados ({{ repuestos|length }}/15):</h6>
-            <div class="list-group mb-3">
+            <div class="d-flex flex-column gap-2 mb-3">
                 {% for repuesto in repuestos %}
-                <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2
-                            {% if repuesto.en_falta %}border-start border-4 border-danger
-                            {% elif repuesto.en_stock %}border-start border-4 border-success
-                            {% else %}border-start border-4 border-warning{% endif %}">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 rounded-3 border-start border-4
+                            {% if repuesto.en_falta %}bg-danger-subtle border-danger
+                            {% elif repuesto.en_stock %}bg-success-subtle border-success
+                            {% else %}bg-warning-subtle border-warning{% endif %}">
                     <div>
                         <strong>{{ repuesto.codigo_repuesto }}</strong> - {{ repuesto.descripcion }}
                         <small class="text-muted">(Cantidad: {{ repuesto.cantidad_utilizada if repuesto.cantidad_utilizada else repuesto.cantidad }})</small>
