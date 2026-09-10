@@ -583,6 +583,22 @@ para hallazgos chicos sin necesidad).
 En cualquiera de los dos casos: no arreglar nada por cuenta propia sin
 preguntar primero.
 
+**Cambios visuales/templates: revisar mobile, sin que sea perfecto.**
+Pedido de Facu (2026-09-10). Cada vez que se toque un template, además de
+probarlo en desktop, chequear que no quede roto/feo en una pantalla chica
+(~320-375px) - no hace falta que sea mobile-first ni pixel-perfect, alcanza
+con que nada se desborde, se corte, o fuerce scroll horizontal de toda la
+página. En la práctica: evitar anchos fijos en px que no entren en ~320px
+(usar `max-width` en vez de `width` fijo, `flex-wrap`, `gap`, el grid
+`row`/`col-md-*` de Bootstrap en vez de columnas fijas), y envolver toda
+tabla nueva o tocada en `.table-responsive` (patrón que ya usan
+`raypac_list.html`, `dml_list.html`, etc.). Cuando sea posible, pedirle a
+Facu que confirme con el emulador de mobile del navegador (F12 →
+Ctrl+Shift+M) antes de pushear - no asumir que "se ve bien" solo por revisar
+el CSS a mano. Esto es una revisión liviana por archivo tocado, **no**
+reemplaza la auditoría dedicada de responsive/mobile de toda la app, que ya
+tiene su propio issue: **#195**, pendiente y sin arrancar.
+
 **Cuidado al abrir un PR desde GitHub: confirmar la base branch.** El dropdown
 de base del PR puede quedar en el default del repo si no se lo cambia a mano
 - pasó en esta sesión con dos PRs que se abrieron contra `main` en vez de
