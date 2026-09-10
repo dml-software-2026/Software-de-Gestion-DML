@@ -692,13 +692,36 @@ principio de este archivo con el estado real y el próximo paso concreto. Sigue 
 mismo flujo que cualquier cambio: rama chica (`docs/checkpoint-...`), commit, push,
 avisarle a Facu para que abra y mergee el PR contra `dev`.
 
-**Bug o inconsistencia que no generamos nosotros: primero kanban, después código.**
-Cuando aparece algo roto/feo que no es parte de la tarea en curso (encontrado
-mientras se prueba otra cosa), chequear primero si ya tiene issue en GitHub
-(`gh issue list --search ...` o revisar el board). Si no la tiene, crearla —
-por más que sea Size XS, para que quede documentado y no se pierda — y recién
-ahí preguntarle a Facu si conviene resolverla en el momento (si es chica) o
-dejarla para después. No arreglar directamente sin este paso primero.
+**Bug o inconsistencia que no generamos nosotros: depende de qué tan grande sea**
+(criterio corregido por Facu el 2026-09-10 - la versión anterior de esta regla
+pedía crear issue siempre, "aunque sea XS", y en la práctica generaba fricción
+para hallazgos chicos sin necesidad).
+- **Chico** (un template sin usar, un detalle visual, algo acotado a un
+  archivo): no crear issue todavía, ni comentar uno existente. Preguntarle
+  directamente a Facu en el chat qué quiere hacer - él dice si se resuelve
+  en el momento, se documenta, o se deja pasar.
+- **Grande** (afecta varias partes, alcance ambiguo, o Facu pide que quede
+  documentado): ahí sí, chequear primero si ya tiene issue en GitHub
+  (`gh issue list --search ...` o revisar el board) y crearla si no la tiene,
+  antes de decidir cómo seguir.
+En cualquiera de los dos casos: no arreglar nada por cuenta propia sin
+preguntar primero.
+
+**Cambios visuales/templates: revisar mobile, sin que sea perfecto.**
+Pedido de Facu (2026-09-10). Cada vez que se toque un template, además de
+probarlo en desktop, chequear que no quede roto/feo en una pantalla chica
+(~320-375px) - no hace falta que sea mobile-first ni pixel-perfect, alcanza
+con que nada se desborde, se corte, o fuerce scroll horizontal de toda la
+página. En la práctica: evitar anchos fijos en px que no entren en ~320px
+(usar `max-width` en vez de `width` fijo, `flex-wrap`, `gap`, el grid
+`row`/`col-md-*` de Bootstrap en vez de columnas fijas), y envolver toda
+tabla nueva o tocada en `.table-responsive` (patrón que ya usan
+`raypac_list.html`, `dml_list.html`, etc.). Cuando sea posible, pedirle a
+Facu que confirme con el emulador de mobile del navegador (F12 →
+Ctrl+Shift+M) antes de pushear - no asumir que "se ve bien" solo por revisar
+el CSS a mano. Esto es una revisión liviana por archivo tocado, **no**
+reemplaza la auditoría dedicada de responsive/mobile de toda la app, que ya
+tiene su propio issue: **#195**, pendiente y sin arrancar.
 
 **Cuidado al abrir un PR desde GitHub: confirmar la base branch.** El dropdown
 de base del PR puede quedar en el default del repo si no se lo cambia a mano
