@@ -110,8 +110,16 @@
                                 <button type="submit" class="btn btn-sm btn-primary">Crear Ticket</button>
                             </form>
                         {% else %}
-                            {# No freezado → pendiente #}
-                            <span class="badge" style="background-color: #ffc107; color: black; font-size: 12px;">Pendiente Freeze</span>
+                            {# No freezado → pendiente. #194: antes usaba el mismo
+                               amarillo (#ffc107) que la columna "Estado" usa para
+                               "Editable" - dos badges amarillos en la misma fila
+                               (dependen del mismo is_frozen == False) que se leían
+                               como avisos distintos. Pasa a gris neutro, sin
+                               competir por el amarillo y sin chocar tampoco con el
+                               gris sólido de "FREEZADO" (nunca conviven en la
+                               misma fila: esta rama solo se pinta cuando NO está
+                               freezado). #}
+                            <span class="badge" style="background-color: #e9ecef; color: #495057; font-size: 12px; border: 1px solid #ced4da;">Pendiente Freeze</span>
                         {% endif %}
                     </td>
                     {% endif %}
