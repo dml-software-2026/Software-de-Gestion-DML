@@ -65,4 +65,5 @@ jobs:
         env:
           TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pytest tests/
