@@ -63,6 +63,12 @@
             </form>
             
             {% if rows %}
+            {# #195: sin este wrapper, la fila de Acciones (botón Editar +
+               form de Eliminar con ancho fijo de 180px) desbordaba la
+               tabla en mobile y se llevaba puesta a toda la página - mismo
+               patrón ya usado en dml_list.html/raypac_list.html/envios_view.html,
+               el scroll queda contenido en la tabla. #}
+            <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
@@ -115,6 +121,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% else %}
             <div class="alert alert-info">No hay repuestos en stock.</div>
             {% endif %}

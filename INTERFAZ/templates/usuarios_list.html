@@ -8,6 +8,10 @@
             <a href="{{ url_for('admin.usuario_new') }}" class="btn btn-primary mb-3">Nuevo Usuario</a>
             
             {% if usuarios %}
+            {# #195: sin este wrapper, la columna Email (puede ser largo) +
+               Rol/Estado/Creado/Acciones desbordaban en mobile - mismo
+               patrón que dml_list.html/raypac_list.html/envios_view.html. #}
+            <div class="table-responsive">
             <table class="table table-striped">
                 <thead>
                     <tr>
@@ -49,6 +53,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% else %}
             <div class="alert alert-info">No hay usuarios registrados.</div>
             {% endif %}
