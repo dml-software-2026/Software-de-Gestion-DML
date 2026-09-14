@@ -76,8 +76,12 @@ def parse_schema_file(path):
     text = path.read_text(encoding="utf-8")
  
     enums = parse_enums(text)
-    tables = parse_tables(text)
-    foreign_keys = parse_foreign_keys(text)
+    tables, inline_fks = parse_tables(text)
+    alter_fks = parse_foreign_keys(text)
+    # Une FKs inline (estilo prolijo, dentro del CREATE TABLE) con FKs
+    # sueltas (estilo viejo, ALTER TABLE ... ADD CONSTRAINT al final).
+    # Ambos formatos pueden convivir en el mismo archivo.
+    foreign_keys = inline_fks + alter_fks
     return enums, tables, foreign_keys
  
  
@@ -100,13 +104,15 @@ def parse_tables(text):
                  "primary_key": [...], "unique_groups": [[...], ...]}}
     """
     tables = {}
+    all_inline_fks = []
     pattern = re.compile(
-        r"CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\((.*?)\n\)\s*;", re.IGNORECASE | re.DOTALL
+        r"CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(\w+)\s*\((.*?)\n\)\s*;", re.IGNORECASE | re.DOTALL
     )
     for table_name, body in pattern.findall(text):
         columns = {}
         primary_key = []
         unique_groups = []
+        inline_fks = []
  
         # Separar por comas de nivel superior (no las que están dentro de
         # paréntesis de VARCHAR(255) o NUMERIC(10,2))
@@ -127,11 +133,42 @@ def parse_tables(text):
                 unique_groups.append([c.strip() for c in m_uq.group(1).split(",")])
                 continue
  
+            # FOREIGN KEY inline (estilo prolijo): FOREIGN KEY (col)
+            # REFERENCES tabla (col_ref) [ON DELETE regla]. Se captura acá
+            # y se descarta como columna -- se procesa como FK mas abajo.
+            m_fk = re.match(
+                r"FOREIGN KEY\s*\((\w+)\)\s+REFERENCES\s+(\w+)\s*\((\w+)\)"
+                r"(?:\s+ON DELETE\s+(\w+))?",
+                entry, re.IGNORECASE,
+            )
+            if m_fk:
+                local_col, foreign_table, foreign_col, on_delete = m_fk.groups()
+                inline_fks.append({
+                    "table": table_name,
+                    "constraint_name": f"fk_{table_name}_{local_col}",
+                    "local_column": local_col,
+                    "foreign_table": foreign_table,
+                    "foreign_column": foreign_col,
+                    "on_delete": on_delete.upper() if on_delete else None,
+                })
+                continue
+ 
             # Columna: primer token es el nombre, resto es la definición
             m_col = re.match(r"(\w+)\s+(.*)", entry)
             if not m_col:
                 continue
             col_name, rest = m_col.group(1), m_col.group(2)
+ 
+            # PRIMARY KEY / UNIQUE inline en la propia columna (estilo
+            # prolijo: "id SERIAL PRIMARY KEY", "email TEXT ... UNIQUE"),
+            # a diferencia del estilo viejo que los declara como linea
+            # aparte al final del CREATE TABLE.
+            if re.search(r"\bPRIMARY KEY\b", rest, re.IGNORECASE):
+                primary_key.append(col_name)
+                rest = re.sub(r"\s*\bPRIMARY KEY\b", "", rest, flags=re.IGNORECASE)
+            if re.search(r"\bUNIQUE\b", rest, re.IGNORECASE):
+                unique_groups.append([col_name])
+                rest = re.sub(r"\s*\bUNIQUE\b", "", rest, flags=re.IGNORECASE)
  
             nullable = "NOT NULL" not in rest.upper()
             default_match = re.search(r"DEFAULT\s+(.+?)(?:\s+NOT NULL|$)", rest, re.IGNORECASE)
@@ -154,7 +191,8 @@ def parse_tables(text):
             "primary_key": primary_key,
             "unique_groups": unique_groups,
         }
-    return tables
+        all_inline_fks.extend(inline_fks)
+    return tables, all_inline_fks
  
  
 def split_top_level_commas(body):
@@ -191,7 +229,7 @@ def parse_foreign_keys(text):
     """
     fks = []
     pattern = re.compile(
-        r"ALTER TABLE\s+(\w+)\s+ADD CONSTRAINT IF NOT EXISTS\s+(\w+)\s+"
+        r"ALTER TABLE\s+(\w+)\s+ADD CONSTRAINT\s+(?:IF NOT EXISTS\s+)?(\w+)\s+"
         r"FOREIGN KEY\s*\((\w+)\)\s+REFERENCES\s+(\w+)\s*\((\w+)\)"
         r"(?:\s+ON DELETE\s+(\w+))?\s*;",
         re.IGNORECASE,

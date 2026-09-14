@@ -6,6 +6,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from flask import Flask
 
+load_dotenv()
+
 from CODIGO_FUENTE.blueprints.admin import admin_bp
 from CODIGO_FUENTE.blueprints.api import api_bp
 from CODIGO_FUENTE.blueprints.auth import auth_bp
@@ -20,8 +22,6 @@ from CODIGO_FUENTE.config import BASE_DIR, Config
 from CODIGO_FUENTE.decorators import get_current_user_jinja
 from CODIGO_FUENTE.extensions import close_db, init_db, migrate_db
 from CODIGO_FUENTE.services.stock import get_alert_badge
-
-load_dotenv()
 
 # Nivel configurable por entorno: en Render se puede setear LOG_LEVEL=DEBUG
 # para desarrollo sin tocar código; por defecto INFO en producción.
