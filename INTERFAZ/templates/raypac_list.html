@@ -96,26 +96,41 @@
                         {% if entry.estado_envio_equipos == 'RECIBIDO' %}
                         <span class="badge bg-success">Recibido en DML</span>
                         {% elif entry.estado_envio_equipos == 'ENVIADO' %}
-                        <span class="badge bg-warning text-dark">Enviado desde RAYPAC</span>
+                        <span class="badge bg-info text-dark">Enviado desde RAYPAC</span>
                         {% else %}
-                        <span class="badge bg-secondary">Pendiente de Envío</span>
+                        <span class="badge bg-light text-muted border">Pendiente de Envío</span>
                         {% endif %}
                     </td>
                     {% if user_role in ['ADMIN', 'DML_ST'] %}
                     <td>
+                        {# #199: columna repensada además de recolor - antes mezclaba
+                           hasta 2 badges de colores fuertes sin relación entre sí
+                           (verde de "Ficha Creada" + celeste del número de ticket,
+                           que es solo una referencia, no un estado) en la misma
+                           celda. Ahora el único badge de color fuerte es "Ficha
+                           Creada" (el hito real que vale la pena resaltar); el
+                           ticket pasa a una etiqueta neutra con ícono, y
+                           "Pendiente Freeze" comparte la misma familia gris clara
+                           que "Pendiente de Envío" en la columna de al lado. El
+                           sub-badge de estado_ficha no se toca - paleta acordada
+                           con David en el #44, es información en sí, no ruido. #}
                         {% if entry.fichas_count and entry.fichas_count > 0 %}
                             {# Ya tiene ficha creada #}
                             {% if entry.ficha_id %}
-                                <a href="{{ url_for('dml.dml_view', id=entry.ficha_id) }}" class="badge" style="background-color: #28a745; color: white; font-size: 12px; text-decoration: none;">Ficha Creada</a>
+                                <a href="{{ url_for('dml.dml_view', id=entry.ficha_id) }}" class="badge bg-success text-decoration-none">
+                                    <i class="bi bi-file-earmark-check"></i> Ficha Creada
+                                </a>
                                 {% if entry.estado_ficha and entry.estado_ficha in estado_config %}
                                     <br><span class="badge mt-1" style="background-color: {{ estado_config[entry.estado_ficha]['color'] }}; border: 1px solid #adb5bd; color: {{ estado_config[entry.estado_ficha]['texto_color'] }}; font-size: 11px;">{{ estado_config[entry.estado_ficha]['texto'] }}</span>
                                 {% endif %}
                             {% else %}
-                                <span class="badge" style="background-color: #28a745; color: white; font-size: 12px;">Ficha Creada</span>
+                                <span class="badge bg-success">Ficha Creada</span>
                             {% endif %}
                         {% elif entry.ticket_id and entry.is_frozen %}
                             {# Tiene ticket pero no ficha → puede crear ficha #}
-                            <a href="{{ url_for('tickets.ticket_view', numero_ticket=entry.ticket_numero) }}" class="badge" style="background-color: #17a2b8; color: white; font-size: 12px; text-decoration: none; margin-bottom: 3px;">{{ entry.ticket_numero }}</a>
+                            <a href="{{ url_for('tickets.ticket_view', numero_ticket=entry.ticket_numero) }}" class="badge bg-light text-dark border text-decoration-none mb-1">
+                                <i class="bi bi-ticket-perforated"></i> {{ entry.ticket_numero }}
+                            </a>
                             <br><a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-sm btn-success">Crear Ficha</a>
                         {% elif entry.is_frozen and not entry.ticket_id %}
                             {# Freezado pero sin ticket → crear ticket primero #}
@@ -123,16 +138,10 @@
                                 <button type="submit" class="btn btn-sm btn-primary">Crear Ticket</button>
                             </form>
                         {% else %}
-                            {# No freezado → pendiente. #194: antes usaba el mismo
-                               amarillo (#ffc107) que la columna "Estado" usa para
-                               "Editable" - dos badges amarillos en la misma fila
-                               (dependen del mismo is_frozen == False) que se leían
-                               como avisos distintos. Pasa a gris neutro, sin
-                               competir por el amarillo y sin chocar tampoco con el
-                               gris sólido de "FREEZADO" (nunca conviven en la
-                               misma fila: esta rama solo se pinta cuando NO está
-                               freezado). #}
-                            <span class="badge" style="background-color: #e9ecef; color: #495057; font-size: 12px; border: 1px solid #ced4da;">Pendiente Freeze</span>
+                            {# No freezado → pendiente. Ver #194 en la columna
+                               "Estado" (freeze) sobre por qué no comparte
+                               amarillo/gris con esa columna. #}
+                            <span class="badge bg-light text-muted border">Pendiente Freeze</span>
                         {% endif %}
                     </td>
                     {% endif %}
