@@ -18,6 +18,114 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+- **Última actualización:** 2026-09-16, cierre de sesión (Facu sigue en la
+  misma máquina la próxima vez - por eso este checkpoint queda commiteado
+  local nada más, sin pushear todavía; se pushea recién cuando avise que
+  cambia de máquina).
+- **Al arrancar hoy, `dev` ya estaba mucho más adelantado que este mismo
+  checkpoint** (el `#199`/`#201`/`#206` de la sesión del 09-10 y varias
+  tareas más de sesiones intermedias ya estaban mergeadas - `#191`, `#194`,
+  `#195`, `#199`, `#202`, `#213`, entre otras). No hubo que resolver nada
+  ahí, solo confirmar el estado real con `git log`/`gh issue list` antes de
+  asumir contexto del checkpoint viejo.
+- **Tarea de la sesión: terminar el `#199` (quedaba un hallazgo sin
+  resolver: indicador de recepción DML en `/raypac`) y arrancar el `#158`
+  (flujo guiado - jerarquía de botones + botón al siguiente paso).**
+  - **`#199` - ✅ terminado y mergeado a `dev` durante la sesión (PR #237,
+    mergeado por Facu mientras se trabajaba en el `#158`).** Se agregó la
+    columna "Envío a DML" a `raypac_list.html` (mismos badges que
+    `raypac_view.html`). Iteración de colores con Facu: la paleta inicial
+    (amarillo/gris) repetía la de la columna "Estado" (freeze) en la misma
+    fila, dando sensación de que faltaba algo - se recolor a celeste/gris
+    clarito. De paso se repensó toda la columna "Ficha ST" (mezclaba
+    colores hex sueltos: verde+celeste+naranja+amarillo+blanco en una sola
+    celda) al mismo criterio: un solo badge de color fuerte por celda
+    (el hito real), referencias (número de ticket) a etiqueta neutra con
+    ícono. Se evaluó también poner "Freezado" en verde cuando no queda
+    nada pendiente - **Facu decidió que no, se queda como está**.
+  - **`#158` - relevamiento hecho (fork de solo lectura sobre los templates
+    de RAYPAC/tickets/DML/envíos/stock) + 4 candidatos implementados,
+    probados y pusheados, los 4 con PR abierto (por Facu) y CI en verde:**
+    1. **PR #239** (`feature/158-boton-crear-ficha-desde-ticket`) - botón
+       "Crear Ficha DML" en `ticket_view.html` cuando el ticket no tiene
+       ficha todavía (antes no había ningún botón - había que saber que el
+       flujo seguía en `/raypac`). `Refs #158`.
+    2. **PR #241** (`feature/158-jerarquia-botones-dml-view`) - botón
+       "Registrar Acuse" en `dml_view.html` cuando la ficha está cerrada
+       sin acuse (antes no quedaba ningún acceso a `/dml/entregadas` -
+       abre directo el modal de esa ficha vía `?open_acuse=<id>`);
+       "Ver Ticket"/"Descargar PDF" pasan a estilo outline para
+       diferenciarse de las acciones reales (antes los 6 botones eran
+       sólidos, sin jerarquía); de paso, el link "Ir a crear ticket" de
+       `raypac_view.html` pasa de apuntar al listado a ir directo al form
+       real. `Refs #158`.
+    3. **PR #242** (`fix/raypac-crear-ticket-post-vacio`) - hallazgo
+       aparte, no es del `#158`: el botón "Crear Ticket" de `/raypac` era
+       un `<form method="POST">` con un submit sin campos - no crea
+       tickets con datos falsos (la validación de "técnico responsable"
+       bloquea el INSERT), pero deja al usuario en una página
+       resultado-de-POST que el navegador puede querer reenviar al
+       refrescar. Pasa a ser un link `GET` normal (la ruta ya soporta GET
+       y muestra el form real).
+    4. **PR #240** (`fix/raypac-view-crear-ficha-ya-existente`) - hallazgo
+       de Facu haciendo el recorrido completo del flujo (pedido
+       explícitamente para probar el `#158` de punta a punta en vez de
+       por estados sueltos - encontró esto justo por eso): la tarjeta
+       "Crear Ficha de Servicio Técnico en DML" de `raypac_view.html`
+       solo chequeaba si existía un ticket (siempre verdadero una vez
+       creado), nunca si ya existía una ficha - seguía ofreciendo
+       "Crear Ficha DML" para siempre, con un error confuso al clickear
+       ("Debe crear un ticket primero") aunque el ticket sí existiera.
+       2 commits (Facu encontró en la revisión visual que el título de la
+       tarjeta también quedaba desactualizado, no solo el botón): ahora
+       tanto el título/color del header como el botón cambian a "Ver
+       Ficha DML" si la ficha ya existe.
+  - **Verificado que los 4 PRs mergean sin conflicto en cualquier orden**
+    (simulado localmente mergeando los 4 contra `dev` en una rama de
+    prueba, borrada después - los PRs #240 y #241 tocan la misma tarjeta
+    de `raypac_view.html` pero en líneas distintas, git las combina solo).
+  - **Quedan sin resolver del `#158`:** el ítem menor de `envios_view.html`
+    (3 botones para ADMIN sin mucha diferenciación, prioridad baja,
+    marcado como no bloqueante en el relevamiento) y la decisión sobre el
+    **`#205`** (orden invertido: la lista de RAYPAC ofrece "Crear Ticket"
+    antes que "Dar de Alta en DML", sin validación que dependa de uno del
+    otro) - Facu prefirió posponer esa charla para la próxima sesión, no
+    se tocó nada relacionado.
+- **Gotcha nuevo, agregado a "Setup de entorno local":** sin
+  `FLASK_DEBUG=1`, Jinja no re-lee templates modificados en caliente
+  (`auto_reload` sigue el valor de `debug`) - y si queda un server viejo
+  compitiendo por el puerto 5000 mientras se levanta uno nuevo, `curl`/el
+  navegador pueden seguir pegándole al viejo sin ningún error visible.
+  Pasó en esta sesión probando el botón nuevo de `ticket_view.html` - no
+  aparecía por ninguna de las dos razones combinadas, no por un bug real
+  del template. Antes de dar un cambio de template por "no funciona",
+  confirmar que no quede un proceso viejo en el puerto y reiniciar el
+  server después de cada cambio.
+- **Nueva sección agregada a este archivo: "Prioridades de Backlog"**
+  (después del checkpoint, antes de "Instrucciones de flujo de trabajo") -
+  pedido explícito de Facu: **`#57`, `#47`, `#52`** son las issues más
+  viejas que siguen abiertas en Backlog, marcadas como candidatas
+  preferentes para cuando se termine la tarea en curso.
+- **Próximo paso concreto:**
+  1. Facu tiene que mergear los 4 PRs de hoy (`#239`, `#240`, `#241`,
+     `#242`) - cualquier orden, ya verificado que no chocan entre sí.
+  2. Decidir si con esto el `#158` queda cerrado (el ítem de
+     `envios_view.html` es prioridad baja, no bloqueante) o si vale la
+     pena retomarlo por ese ítem menor.
+  3. Retomar la charla pendiente sobre el `#205` (orden Dar de Alta antes
+     de Crear Ticket) - Facu la dejó para la próxima sesión a propósito.
+  4. Después de eso, candidatos para la próxima tarea grande: los 3 de
+     "Prioridades de Backlog" arriba (`#57`, `#47`, `#52`), o **#170**/
+     **#195** ya mencionados en checkpoints anteriores.
+- **Ambiente local de esta máquina:** usado activamente hoy, sin necesidad
+  de setup (mismo equipo de siempre). El server de pruebas se detuvo al
+  cerrar la sesión. La próxima sesión sigue en esta misma máquina.
+- **Bloqueos:** ninguno.
+
+<details>
+<summary>Checkpoint anterior (2026-09-10) — histórico, dejado sin borrar por
+referencia</summary>
+
 - **Última actualización:** 2026-09-10, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
 - **Los 3 pendientes del checkpoint anterior (07/09→09/09) ya están
@@ -135,6 +243,8 @@ asumir contexto de nada más.
   sección "Setup de entorno local" más abajo) si todavía no está
   armado.
 - **Bloqueos:** ninguno.
+
+</details>
 
 <details>
 <summary>Checkpoint anterior (2026-09-03) — histórico, dejado sin borrar por
@@ -636,6 +746,15 @@ las referencias a Issue #54/#62 más abajo</summary>
 
 </details>
 
+## Prioridades de Backlog (marcadas por Facu)
+
+**#57** (corregir envío de repuestos desde RAYPAC), **#47** (mejorar
+visibilidad entre roles) y **#52** (sistema de backups) son las issues más
+viejas que siguen abiertas en el Backlog. Facu pidió priorizarlas (nota del
+2026-09-16) para que sean candidatas preferentes en cuanto se termine la
+tarea en curso — aunque es posible que un compañero las agarre antes.
+Chequear su estado en GitHub antes de asumir que siguen libres.
+
 ## Instrucciones de flujo de trabajo para Claude Code
 
 **PRs chicos, siempre.** No armar un PR gigante con toda una tarea/issue resuelta de
@@ -874,6 +993,20 @@ el estado real del issue en GitHub, no solo que el PR esté mergeado.
   ```
   (Nota: reportar este bug al equipo — la solución de fondo es mover `load_dotenv()`
   arriba del import de `config` en `app.py`.)
+- **Gotcha de testing (no es bug de la app): sin `debug=True`, Jinja no
+  detecta cambios en templates ni libera el puerto solo.** Sin
+  `FLASK_DEBUG=1`, `auto_reload` de Jinja queda en `False` - un server ya
+  corriendo sigue sirviendo la versión de un template que ya compiló en
+  memoria, aunque el archivo en disco cambie. Si además queda un segundo
+  proceso intentando levantar en el puerto 5000 mientras el primero sigue
+  vivo, `curl`/el navegador pueden seguir pegándole al viejo sin ningún
+  error visible - un cambio recién hecho puede parecer que "no aparece"
+  sin ninguna pista de por qué. Antes de probar un cambio de template,
+  siempre: 1) confirmar que no quede un proceso viejo en el puerto
+  (`Get-NetTCPConnection -LocalPort 5000 -State Listen` en PowerShell,
+  matar el PID que devuelva) y 2) reiniciar el server después de cada
+  cambio de template, no asumir que el primer arranque de la sesión
+  alcanza para toda la sesión.
 - **Correr la app:** `python -m CODIGO_FUENTE.app` desde la raíz del repo (NO
   `python CODIGO_FUENTE/app.py` directo, porque los imports internos son relativos
   al paquete `CODIGO_FUENTE`).
