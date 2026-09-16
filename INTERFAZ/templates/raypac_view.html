@@ -165,8 +165,14 @@
     <!-- CREAR FICHA DML (solo para DML_ST y ADMIN, y solo si ya existe ticket) -->
     {% if entry.is_frozen and user_role in ['ADMIN', 'DML_ST'] %}
     <div class="card shadow-sm">
-        <div class="card-header bg-success text-white">
-            <h5 class="mb-0"><i class="bi bi-clipboard2-plus-fill"></i> Crear Ficha de Servicio Técnico en DML</h5>
+        <div class="card-header {{ 'bg-info' if ficha else 'bg-success' }} text-white">
+            <h5 class="mb-0">
+                {% if ficha %}
+                <i class="bi bi-file-earmark-text"></i> Ficha de Servicio Técnico en DML
+                {% else %}
+                <i class="bi bi-clipboard2-plus-fill"></i> Crear Ficha de Servicio Técnico en DML
+                {% endif %}
+            </h5>
         </div>
         <div class="card-body">
             {% if ficha %}
