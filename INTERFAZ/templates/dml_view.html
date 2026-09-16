@@ -204,7 +204,12 @@
     </div>
 
     <!-- ACCIONES (Ver Ticket / Descargar PDF siempre visibles, igual que antes;
-         Editar/Crear Ticket/Cerrar Ficha solo si no es modo solo lectura) -->
+         Editar/Crear Ticket/Cerrar Ficha solo si no es modo solo lectura).
+         #158: antes los 6 botones eran sólidos y del mismo peso visual, sin
+         distinguir cuáles son acciones reales (hacen algo) de cuáles son
+         solo ver/navegar. "Ver Ticket" y "Descargar PDF" pasan a outline -
+         siguen siendo igual de clickeables, pero visualmente retroceden
+         frente a Editar/Crear Ticket/Cerrar Ficha/Registrar Acuse. -->
     <div class="card shadow-sm mb-4">
         <div class="card-body d-flex flex-wrap align-items-center gap-2">
             {% if not readonly %}
@@ -233,12 +238,23 @@
             {% endif %}
 
             {% if ficha.numero_ticket %}
-            <a href="{{ url_for('tickets.ticket_view', numero_ticket=ficha.numero_ticket) }}" class="btn btn-info" target="_blank">
+            <a href="{{ url_for('tickets.ticket_view', numero_ticket=ficha.numero_ticket) }}" class="btn btn-outline-info" target="_blank">
                 <i class="bi bi-search"></i> Ver Ticket: {{ ficha.numero_ticket }}
             </a>
             {% endif %}
 
-            <a href="{{ url_for('dml.descargar_ficha_pdf', id=ficha.id) }}" class="btn btn-success" target="_blank">
+            {% if ficha.is_closed and not ficha.recibido_por and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'RAYPAC'] %}
+            {# #158: al cerrar la ficha, los botones de acción de arriba
+               desaparecen (is_closed) y no quedaba ningún acceso al
+               siguiente paso del flujo real ("Registrar Acuse" en
+               /dml/entregadas) - había que saber que esa pantalla existe.
+               open_acuse abre directo el modal de esta ficha ahí. #}
+            <a href="{{ url_for('dml.dml_entregadas', open_acuse=ficha.id) }}" class="btn btn-success">
+                <i class="bi bi-clipboard-check"></i> Registrar Acuse
+            </a>
+            {% endif %}
+
+            <a href="{{ url_for('dml.descargar_ficha_pdf', id=ficha.id) }}" class="btn btn-outline-secondary" target="_blank">
                 <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
             </a>
         </div>
