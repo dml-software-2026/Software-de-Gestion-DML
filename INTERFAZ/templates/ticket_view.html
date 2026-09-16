@@ -175,6 +175,13 @@
                 <a href="{{ url_for('dml.dml_view', id=ticket.ficha_id) }}" class="btn btn-primary">
                     📄 Ver Ficha Completa
                 </a>
+                {% elif get_current_user()['role'] in ['ADMIN', 'DML_ST'] and ticket.raypac_id %}
+                {# #158: sin esto, no había ningún botón para avanzar al
+                   siguiente paso del flujo (crear ticket → crear ficha) - el
+                   usuario tenía que volver a buscarlo en /raypac. #}
+                <a href="{{ url_for('dml.dml_new', raypac_id=ticket.raypac_id) }}" class="btn btn-success">
+                    <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML
+                </a>
                 {% endif %}
                 <a href="{{ url_for('tickets.tickets_list') }}" class="btn btn-secondary">
                     🔙 Volver a Tickets
