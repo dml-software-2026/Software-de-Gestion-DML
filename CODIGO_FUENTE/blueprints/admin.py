@@ -60,7 +60,9 @@ def cargar_stock_desde_web():
         db = get_db()
         repuestos_cargados = 0
         repuestos_actualizados = 0
+        cargas_comunes = 0
         errores = 0
+        resultados_filas = []  # auditoría por fila (#213): se loguea en el 2do loop, después del commit de negocio
 
         with open(csv_path, 'r', encoding='utf-8-sig') as f:
             reader = csv.reader(f, delimiter=';')
@@ -73,6 +75,8 @@ def cargar_stock_desde_web():
                 if len(row) < 11:
                     continue
 
+                codigo = None
+                item = None
                 try:
                     # Extraer datos
                     codigo = row[2].strip() if len(row) > 2 and row[2] else None
@@ -89,9 +93,21 @@ def cargar_stock_desde_web():
                         cantidad = int(float(cantidad_str))
                     except Exception:
                         errores += 1
+                        resultados_filas.append({
+                            "record_id": None, "item": item, "resultado": "error",
+                            "motivo": f"cantidad_invalida={cantidad_str}"
+                        })
                         continue
 
                     if cantidad <= 0:
+                        cursor = db.execute("SELECT id FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,))
+                        fila_existente = cursor.fetchone()
+                        cargas_comunes += 1
+                        resultados_filas.append({
+                            "record_id": fila_existente["id"] if fila_existente else None,
+                            "item": item, "resultado": "carga_comun",
+                            "motivo": "cantidad_cero_o_menor"
+                        })
                         continue
 
                     # 1. Insertar o actualizar en matriz_repuestos
@@ -100,18 +116,23 @@ def cargar_stock_desde_web():
 
                     if not existe_matriz:
                         numero_correlativo = idx
-                        db.execute("""
+                        cursor = db.execute("""
                             INSERT INTO matriz_repuestos (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
                             VALUES (%s, %s, %s, %s, %s, 'DML')
+                            RETURNING id
                         """, (numero_correlativo, codigo, item, cantidad, cantidad))
+                        record_id_fila = cursor.fetchone()["id"]
                         repuestos_cargados += 1
+                        resultado_fila = "nuevo"
                     else:
                         db.execute("""
                             UPDATE matriz_repuestos
                             SET item = %s, cantidad_actual = %s
                             WHERE codigo_repuesto = %s
                         """, (item, cantidad, codigo))
+                        record_id_fila = existe_matriz["id"]
                         repuestos_actualizados += 1
+                        resultado_fila = "actualizado"
 
                     # 2. Insertar o actualizar en stock_ubicaciones (DML)
                     cursor = db.execute("""
@@ -133,29 +154,45 @@ def cargar_stock_desde_web():
                             WHERE codigo_repuesto = %s AND ubicacion = 'DML'
                         """, (cantidad, codigo_ubicacion, codigo))
 
-                except Exception:
+                    resultados_filas.append({
+                        "record_id": record_id_fila, "item": item, "resultado": resultado_fila
+                    })
+
+                except Exception as e:
                     errores += 1
+                    resultados_filas.append({
+                        "record_id": None, "item": item, "resultado": "error", "motivo": str(e)
+                    })
                     continue
 
-        db.commit()
+        db.commit()  # commit de negocio, atómico — sin cambios respecto a hoy
 
-        log_action(
-            user['id'],
-            "CARGA_CSV",
-            "matriz_repuestos",
-            None,
-            None,
-            f"resultado=exito, nuevos={repuestos_cargados}, "
-            f"actualizados={repuestos_actualizados}, errores_fila={errores}"
-        )
+        # Segundo loop: auditoría por fila, ya con el commit de negocio hecho.
+        # try/except individual: si una fila falla al loguearse, no corta a
+        # las demás, pero se acumula para avisar al final (#213 rediseño).
+        fallos_auditoria = []
+        for r in resultados_filas:
+            try:
+                detalle = f"item={r.get('item')}, resultado={r['resultado']}"
+                if r.get("motivo"):
+                    detalle += f", motivo={r['motivo']}"
+                log_action(user['id'], "CARGA_CSV", "matriz_repuestos", r["record_id"], None, detalle)
+            except Exception:
+                fallos_auditoria.append(r.get("item") or "(sin código)")
 
         output.append("[STOCK] ✅ Carga completada!")
         output.append(f"[STOCK] 📦 Repuestos nuevos: {repuestos_cargados}")
         output.append(f"[STOCK] 🔄 Repuestos actualizados: {repuestos_actualizados}")
+        output.append(f"[STOCK] ➖ Cargas comunes (cantidad 0 o menor): {cargas_comunes}")
         output.append(f"[STOCK] ⚠️ Errores: {errores}")
 
-        print(f"[STOCK] Nuevos: {repuestos_cargados}, Actualizados: {repuestos_actualizados}, Errores: {errores}",
-              file=sys.stderr, flush=True)
+        if fallos_auditoria:
+            aviso = f"{len(fallos_auditoria)} fila(s) no pudieron auditarse: {', '.join(fallos_auditoria)}"
+            output.append(f"[STOCK] ⚠️ {aviso}")
+            flash(f"Carga completada, pero {aviso}", "warning")
+
+        print(f"[STOCK] Nuevos: {repuestos_cargados}, Actualizados: {repuestos_actualizados}, "
+              f"Cargas comunes: {cargas_comunes}, Errores: {errores}", file=sys.stderr, flush=True)
 
         result = "<br>".join(output)
         result += "<br><br><a href='/stock'>Ver Stock Cargado</a>"
