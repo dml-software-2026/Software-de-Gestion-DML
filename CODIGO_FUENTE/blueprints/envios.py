@@ -57,9 +57,7 @@ def envios_list():
         """
     ).fetchall()
 
-    # Combinar ambos tipos de envíos
-    todos_envios = list(envios_repuestos) + list(envios_maquinas)
-    # Ordenar por fecha de creación descendente
+    # Ordenar cada lista por fecha de creación descendente por separado
     def _sort_key(x):
         # Normaliza: envios_repuestos.created_at es TIMESTAMPTZ (datetime
         # CON zona horaria), pero raypac_entries.frozen_at (usado como
@@ -76,9 +74,14 @@ def envios_list():
         if isinstance(val, date):
             return datetime.combine(val, datetime.min.time(), tzinfo=UTC)
         return datetime.min.replace(tzinfo=UTC)
-    todos_envios.sort(key=_sort_key, reverse=True)
-    return render_template("envios_list.html", envios=todos_envios)
 
+    envios_repuestos = sorted(envios_repuestos, key=_sort_key, reverse=True)
+    envios_maquinas = sorted(envios_maquinas, key=_sort_key, reverse=True)
+    return render_template(
+        "envios_list.html",
+        envios_repuestos=envios_repuestos,
+        envios_maquinas=envios_maquinas,
+    )
 @envios_bp.route("/new", methods=["GET", "POST"])
 @login_required
 @role_required("ADMIN", "RAYPAC")
