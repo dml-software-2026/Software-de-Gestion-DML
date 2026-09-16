@@ -64,6 +64,7 @@
                     <th>Comercial</th>
                     <th>Remito</th>
                     <th>Estado</th>
+                    <th>Envío a DML</th>
                     {% if user_role in ['ADMIN', 'DML_ST'] %}
                     <th>Ficha ST</th>
                     {% endif %}
@@ -86,6 +87,18 @@
                         <span class="badge" style="background-color: #6c757d; color: black; font-size: 12px;">FREEZADO</span>
                         {% else %}
                         <span class="badge" style="background-color: #ffc107; color: black; font-size: 12px;">Editable</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {# #199: hallazgo del recorrido del #198 - RAYPAC solo se
+                           enteraba de que el equipo llegó a DML entrando al detalle.
+                           Mismos badges/texto que raypac_view.html para consistencia. #}
+                        {% if entry.estado_envio_equipos == 'RECIBIDO' %}
+                        <span class="badge bg-success">Recibido en DML</span>
+                        {% elif entry.estado_envio_equipos == 'ENVIADO' %}
+                        <span class="badge bg-warning text-dark">Enviado desde RAYPAC</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Pendiente de Envío</span>
                         {% endif %}
                     </td>
                     {% if user_role in ['ADMIN', 'DML_ST'] %}
