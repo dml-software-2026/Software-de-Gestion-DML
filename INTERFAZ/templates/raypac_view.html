@@ -17,9 +17,9 @@
                 {% if entry.estado_envio_equipos == 'RECIBIDO' %}
                 <span class="badge bg-success">Recibido en DML</span>
                 {% elif entry.estado_envio_equipos == 'ENVIADO' %}
-                <span class="badge bg-warning text-dark">Enviado desde RAYPAC</span>
+                <span class="badge bg-info text-dark">Enviado desde RAYPAC</span>
                 {% else %}
-                <span class="badge bg-secondary">Pendiente de Envío</span>
+                <span class="badge bg-light text-muted border">Pendiente de Envío</span>
                 {% endif %}
             </p>
             {% if entry.is_frozen %}
@@ -103,7 +103,7 @@
             <p class="mb-1"><span class="badge bg-success">Recibido en DML</span> Recepcionado por DML</p>
             {% elif entry.estado_envio_equipos == 'ENVIADO' %}
             <p class="mb-1">
-                <span class="badge bg-warning text-dark">Enviado desde RAYPAC</span>
+                <span class="badge bg-info text-dark">Enviado desde RAYPAC</span>
                 {% if entry.fecha_envio_equipos %}
                 <span class="text-muted small">Enviado: {{ entry.fecha_envio_equipos }}</span>
                 {% endif %}
@@ -116,7 +116,7 @@
             </form>
             {% endif %}
             {% else %}
-            <p class="mb-0"><span class="badge bg-secondary">Pendiente de Envío</span></p>
+            <p class="mb-0"><span class="badge bg-light text-muted border">Pendiente de Envío</span></p>
             {% endif %}
 
             <hr>
