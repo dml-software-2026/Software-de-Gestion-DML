@@ -1,0 +1,51 @@
+{% if envios %}
+{# #195: sin este wrapper, las columnas desbordaban en mobile - mismo patrón que dml_list.html/
+   raypac_list.html/envios_view.html. #}
+<div class="table-responsive">
+{# #199: table-striped + thead oscuro, mismo patrón que dml_list.html/raypac_list.html/tickets_list.html #}
+<table class="table table-striped table-hover align-middle">
+  <thead class="table-dark">
+    <tr>
+      <th>Remito</th>
+      <th>Fecha envío</th>
+      <th>Fecha recepción</th>
+      <th>Estado</th>
+      <th>Items</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for envio in envios %}
+    <tr>
+      <td><strong>{{ envio.numero_remito }}</strong></td>
+      <td>{{ envio.fecha_envio }}</td>
+      <td>{{ envio.fecha_recepcion or '-' }}</td>
+      <td>
+        {% if envio.estado_envio == 'RECIBIDO' %}
+        <span class="badge bg-success">Recibido</span>
+        {% elif envio.estado_envio == 'ENVIADO' %}
+        <span class="badge bg-warning text-dark">En Tránsito</span>
+        {% else %}
+        <span class="badge bg-secondary">Pendiente</span>
+        {% endif %}
+      </td>
+      <td>{{ envio.items_count }}</td>
+      <td class="text-end">
+        {% if envio.tipo_envio == 'MAQUINA' %}
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('raypac.raypac_view', id=envio.id) }}">
+          <i class="bi bi-eye"></i> Ver
+        </a>
+        {% else %}
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('envios.envios_view', id=envio.id) }}">
+          <i class="bi bi-eye"></i> Ver
+        </a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="text-muted">No hay envíos de este tipo todavía.</p>
+{% endif %}
