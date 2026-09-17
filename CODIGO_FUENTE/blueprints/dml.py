@@ -382,7 +382,19 @@ def dml_edit(id):
     repuestos = [dict(r) for r in repuestos]
     ficha = dict(ficha)
 
-    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos)
+    # #158: mismo tracker que dml_view() - Facu pidió que también se vea acá,
+    # no solo en la vista de solo lectura.
+    if ficha['fecha_entrega_cliente']:
+        current_step = 4
+    elif ficha['is_closed']:
+        current_step = 3
+    else:
+        current_step = 2
+    flow_steps = build_flow_steps(
+        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+    )
+
+    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps)
 
 
 # ======================== REPUESTOS ========================
