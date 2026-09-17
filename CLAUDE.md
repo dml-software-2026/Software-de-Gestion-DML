@@ -18,6 +18,148 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+- **Última actualización:** 2026-09-17, cierre de sesión (Facu cambia de
+  máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
+- **El checkpoint del 09-16 nunca se había llegado a pushear** (quedó
+  documentado en su momento que la sesión seguía en la misma máquina) - se
+  incorporó su contenido a este mismo archivo antes de escribir lo de hoy,
+  no se perdió nada.
+- **Encargo aparte al arrancar la sesión: issue nueva `#244`** ("Investigar
+  rendimiento de Render, ¿hace falta plan pago?") - Facu pidió priorizarla
+  antes de seguir con el `#158`, la app está lenta en el Render de
+  Facu/dev. Creada en Backlog, Size S, Épica "Infraestructura y deploy",
+  asignada a Facu - alcance: confirmar si es cold-start o en caliente,
+  revisar posibles cuellos de botella de la app (queries, índices, assets)
+  antes de asumir que hace falta pagar, comparar costo/beneficio de los
+  planes pagos. **Sin arrancar la investigación en sí** - solo quedó creada
+  y priorizada, es candidata para la próxima sesión si se quiere algo más
+  chico antes de la próxima entrega grande.
+- **Tarea principal: seguir con el `#158`.** Dos piezas nuevas, cada una en
+  su propia rama, **ninguna con PR abierto todavía** (Facu las revisó en
+  vivo contra el server local, pero no llegó a abrirlos en GitHub):
+  1. **`feature/158-orden-navbar-flujo`** (2 commits) - Facu pidió que el
+     navbar siguiera el orden real del recorrido de una máquina en vez del
+     orden que tenía. Primer commit: Tickets se mueve justo después de
+     RAYPAC (antes estaba después de Fichas ST/Entregadas). **Corrección
+     en el 2do commit:** se había asumido que "Envíos" era solo logística
+     de repuestos (sin relación con el recorrido) y se lo dejó al final -
+     revisando el código (`envios.py`, recién tocado por el `#169` de esta
+     misma semana) se confirmó que esa pantalla **también** lista las
+     máquinas de RAYPAC freezadas con su `estado_envio_equipos`
+     (`PENDIENTE→ENVIADO→RECIBIDO`) - o sea que el tramo RAYPAC→DML de una
+     máquina sí pasa por ahí, y pasa *antes* del Ticket. Envíos se movió
+     también, orden final: **Inicio, RAYPAC, Envíos, Tickets, Fichas ST,
+     Entregadas, Stock, Estadísticas, Admin.** No se tocó ningún
+     condicional de rol, solo el orden de los `<li>`.
+  2. **`feature/158-tracker-flujo`** (3 commits) - la pieza más grande de
+     la sesión, con una vuelta atrás en el medio (ver más abajo):
+     - **Primer intento (revertido por completo):** Facu pidió "una barra
+       arriba que muestre en qué paso estás, con Next/Back". Se entendió
+       como un wizard dentro de `dml_edit.html` (el form más largo de la
+       app, partido en 6 pasos con Siguiente/Atrás, validación por paso,
+       barra de progreso) - se construyó completo, se probó en vivo
+       (los 6 pasos, validación de campo requerido oculto, navegación
+       Atrás) y se pusheó en su propia rama. **Facu aclaró después que no
+       era eso** - lo que quería era retomar el mismo patrón de "botón al
+       siguiente paso" que ya se había armado en sesiones anteriores del
+       `#158` (PRs #239/#241), agregándole una barra de progreso arriba de
+       cada pantalla del flujo. **Se revirtió 100%** (rama borrada local y
+       remota, sin PR abierto, cero rastro en `dev`) - si en algún momento
+       se retoma la idea de un wizard de pasos para un form largo, es una
+       tarea aparte, no confundir con el `#158`.
+     - **Lo que sí pidió: tracker de solo lectura** (sin Next/Back reales -
+       cada "paso" ya es una acción real del sistema) mostrando en qué
+       tramo está un registro puntual. Facu aclaró un punto importante:
+       **cada rol/pantalla ve solo el tramo que le compete**, no un único
+       tracker universal - se separó en 2:
+       - `raypac_view.html` (3 pasos): Ingreso RAYPAC → Envío a DML →
+         Recibido en DML (`estado_envio_equipos` de `raypac_entries`).
+       - `dml_view.html` + `dml_edit.html` + `ticket_view.html` (4 pasos):
+         Ticket creado → Ficha en reparación → Entregada → Acuse
+         registrado (`dml_fichas.is_closed`/`fecha_entrega_cliente`).
+         `ticket_view.html` es la vista pública que ve el cliente sin
+         login - confirmado con Facu que el tracker va también ahí (es
+         justamente la función de esa pantalla, seguimiento del cliente).
+       Componente compartido: `_flow_tracker.html` (mismo patrón de
+       partial que ya usaba `_envios_tabla.html`) + `build_flow_steps()`
+       nuevo en `CODIGO_FUENTE/services/flujo.py`. Probado en vivo en los
+       3 estados de cada tracker (vacío/en curso/completo) con fichas e
+       ingresos reales de la base local.
+       - **Hallazgo de Facu probando en vivo:** el tracker solo se había
+         agregado a `dml_view.html`, no a `dml_edit.html` - se agregó ahí
+         también (mismo cálculo de paso).
+     - **Ronda de feedback sobre botones, mismo commit:** Facu pidió que
+       "Volver" quede siempre abajo a la izquierda y la acción que avanza
+       el flujo (Crear Ficha DML, Cerrar Ficha, Registrar Acuse, Ver Ficha
+       DML, etc.) abajo a la derecha, en **las 4 pantallas relevantes**
+       (`ticket_view.html`, `dml_view.html`, `raypac_view.html`,
+       `dml_edit.html`), no solo donde ya estaba así. De paso, sacar los
+       emoji que hacían de flecha (`⬅️`/`🔙`) y usar íconos reales
+       (`bi-arrow-left`/`bi-arrow-right`) - el `🔙` en particular se
+       renderiza como un recuadro violeta en la mayoría de las fuentes de
+       emoji (era la queja de "color violeta", no una clase CSS mal
+       puesta). En `dml_view.html`/`raypac_view.html` esto implicó sacar
+       "Volver al listado" del encabezado y mover ahí también la acción
+       principal (antes mezclada en una fila con Editar/Ver
+       Ticket/Descargar PDF) - las acciones secundarias quedan donde
+       estaban.
+  - **Verificado sin overlap de archivos entre las 2 ramas** (`feature/158-orden-navbar-flujo`
+    solo toca `base.html`; `feature/158-tracker-flujo` toca todo lo
+    demás) - **mergean en cualquier orden, sin conflicto**, confirmado
+    simulando el merge localmente contra `dev`.
+  - **Quedan sin resolver, igual que en el checkpoint del 09-16:** el ítem
+    menor de `envios_view.html` (3 botones para ADMIN sin mucha
+    diferenciación, prioridad baja) y la charla sobre el **`#205`** (orden
+    invertido Crear Ticket/Dar de Alta en DML) - Facu la sigue posponiendo,
+    no se tocó nada relacionado esta sesión tampoco.
+- **Falsa alarma en el camino, ya aclarada:** Facu reportó "la ficha quedó
+  mal" a mitad de sesión, sospechando de los cambios de hoy - se revisó
+  `dml_view.html`/`dml_edit.html` en vivo (ficha abierta y cerrada) sin
+  encontrar nada raro, y Facu confirmó después que fue una confusión propia
+  (la cantidad de campos difiere entre crear y editar una ficha, no un bug).
+  No generó ningún cambio de código.
+- **2 gotchas nuevos de esta sesión:**
+  1. La herramienta de resize de ventana del navegador (Claude in Chrome)
+     **no cambió el viewport real en ningún intento de esta sesión**
+     (confirmado con `window.innerWidth` después de llamarla) - mismo
+     síntoma que limitaciones ya documentadas en checkpoints viejos, pero
+     esta vez ni siquiera devolvió error, solo no tuvo efecto. El testing
+     de mobile de todo lo de hoy quedó 100% en manos de Facu.
+  2. **Patrón de "rama de integración local" + seguir commiteando en la
+     rama real por separado:** si se corrige algo y se commitea en la rama
+     real (ej. `feature/158-tracker-flujo`) mientras hay una rama de
+     integración local activa (`test/158-integración-local`, nunca
+     pusheada) para que Facu pruebe todo junto, **hay que volver a
+     mergear ese commit nuevo también en la rama de integración** antes de
+     decirle a Facu "ya está, refrescá" - si no, el próximo
+     `git checkout` a la rama de integración pisa los archivos con la
+     versión vieja (sin el fix) y parece que el cambio nunca se aplicó.
+     Pasó esta sesión, generó un "no veo cambios" evitable.
+- **Próximo paso concreto:**
+  1. Facu tiene que abrir 3 PRs contra `dev` - `feature/158-orden-navbar-flujo`,
+     `feature/158-tracker-flujo` (ninguna depende de la otra, mergean en
+     cualquier orden) y este mismo checkpoint
+     (`docs/checkpoint-sesion-2026-09-17`) - importante hacerlo *antes* de
+     arrancar la próxima sesión en la otra máquina.
+  2. Con los 2 PRs del `#158` mergeados, decidir si el issue queda cerrado
+     o si se retoma por el ítem menor de `envios_view.html`.
+  3. Retomar la charla pendiente sobre el `#205` - sigue pospuesta.
+  4. Facu mencionó que pronto arranca a planificar la próxima entrega -
+     este checkpoint sirve de resumen de lo hecho para esa planificación.
+     Candidatos para la próxima tarea grande: los 3 de "Prioridades de
+     Backlog" (`#57`, `#47`, `#52`), la investigación nueva del `#244`, o
+     **#170**/**#195** ya mencionados en checkpoints anteriores.
+- **Ambiente local de esta máquina:** usado activamente hoy, sin necesidad
+  de setup (mismo equipo de siempre). El server de pruebas se detuvo al
+  cerrar la sesión. La próxima sesión es en **otra máquina** - repetir el
+  setup de entorno local de cero ahí (ver sección "Setup de entorno local"
+  más abajo) si todavía no está armado.
+- **Bloqueos:** ninguno.
+
+<details>
+<summary>Checkpoint anterior (2026-09-16) — histórico, dejado sin borrar por
+referencia</summary>
+
 - **Última actualización:** 2026-09-16, cierre de sesión (Facu sigue en la
   misma máquina la próxima vez - por eso este checkpoint queda commiteado
   local nada más, sin pushear todavía; se pushea recién cuando avise que
@@ -121,6 +263,8 @@ asumir contexto de nada más.
   de setup (mismo equipo de siempre). El server de pruebas se detuvo al
   cerrar la sesión. La próxima sesión sigue en esta misma máquina.
 - **Bloqueos:** ninguno.
+
+</details>
 
 <details>
 <summary>Checkpoint anterior (2026-09-10) — histórico, dejado sin borrar por
