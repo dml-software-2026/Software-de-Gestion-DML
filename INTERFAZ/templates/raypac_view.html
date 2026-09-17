@@ -165,11 +165,27 @@
     <!-- CREAR FICHA DML (solo para DML_ST y ADMIN, y solo si ya existe ticket) -->
     {% if entry.is_frozen and user_role in ['ADMIN', 'DML_ST'] %}
     <div class="card shadow-sm">
-        <div class="card-header bg-success text-white">
-            <h5 class="mb-0"><i class="bi bi-clipboard2-plus-fill"></i> Crear Ficha de Servicio Técnico en DML</h5>
+        <div class="card-header {{ 'bg-info' if ficha else 'bg-success' }} text-white">
+            <h5 class="mb-0">
+                {% if ficha %}
+                <i class="bi bi-file-earmark-text"></i> Ficha de Servicio Técnico en DML
+                {% else %}
+                <i class="bi bi-clipboard2-plus-fill"></i> Crear Ficha de Servicio Técnico en DML
+                {% endif %}
+            </h5>
         </div>
         <div class="card-body">
-            {% if ticket %}
+            {% if ficha %}
+            {# Sin este chequeo, esta tarjeta seguía ofreciendo "Crear Ficha
+               DML" para siempre (el ticket ya existe, así que la rama de
+               abajo nunca se activaba) aunque la ficha ya estuviera creada
+               e incluso cerrada - clickearlo llevaba a un error confuso en
+               dml_new(). #}
+            <p>Ya existe una ficha de Servicio Técnico para este ingreso.</p>
+            <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-lg btn-info">
+                <i class="bi bi-file-earmark-text"></i> Ver Ficha DML
+            </a>
+            {% elif ticket %}
             <p>La máquina ya fue enviada a ST y tiene ticket asociado: <strong>{{ ticket.numero_ticket }}</strong></p>
             <a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-lg btn-success">
                 <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML
@@ -178,7 +194,10 @@
             <div class="alert alert-warning mb-0">
                 <i class="bi bi-exclamation-triangle"></i> <strong>Debe crear un ticket primero</strong>
                 <p class="mb-2 mt-2">Antes de crear la ficha, es necesario generar un ticket de seguimiento para el cliente.</p>
-                <a href="{{ url_for('raypac.raypac_list') }}" class="btn btn-primary">
+                {# #158: antes mandaba al listado /raypac en vez de ir directo
+                   al form real - el usuario tenía que volver a buscar el
+                   botón "Crear Ticket" ahí. #}
+                <a href="{{ url_for('tickets.ticket_nuevo', raypac_id=entry.id) }}" class="btn btn-primary">
                     <i class="bi bi-ticket"></i> Ir a crear ticket
                 </a>
             </div>

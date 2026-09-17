@@ -183,7 +183,19 @@ def raypac_view(id, readonly=False):
     # Verificar si existe un ticket asociado
     ticket = db.execute("SELECT numero_ticket FROM tickets WHERE raypac_id = %s", (id,)).fetchone()
 
-    return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly, ticket=ticket)
+    # Verificar si ya existe una ficha DML - sin esto, la tarjeta "Crear Ficha
+    # DML" seguía ofreciendo crear una nueva para siempre (ticket ya existe,
+    # así que "ticket" arriba sigue siendo verdadero) aunque la ficha ya
+    # estuviera creada e incluso cerrada. dml_new() rechaza el intento con un
+    # mensaje confuso ("Debe crear un ticket primero") porque busca un ticket
+    # sin ficha_id asociado, que deja de existir en cuanto la ficha se crea.
+    ficha = db.execute(
+        "SELECT id FROM dml_fichas WHERE raypac_id = %s ORDER BY created_at DESC LIMIT 1",
+        (id,)
+    ).fetchone()
+
+    return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly,
+                            ticket=ticket, ficha=ficha)
 
 
 @raypac_bp.route("/<int:id>/edit", methods=["GET", "POST"])
