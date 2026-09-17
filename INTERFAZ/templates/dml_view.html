@@ -39,12 +39,11 @@
                 {% endif %}
             </p>
         </div>
+        {% if readonly %}
         <div class="text-end">
-            <a class="btn btn-outline-secondary" href="{{ url_for('dml.dml_list') }}">Volver al listado</a>
-            {% if readonly %}
             <span class="badge bg-info text-dark ms-1">Modo Solo Lectura</span>
-            {% endif %}
         </div>
+        {% endif %}
     </div>
 
     {% include "_flow_tracker.html" %}
@@ -205,38 +204,26 @@
         </div>
     </div>
 
-    <!-- ACCIONES (Ver Ticket / Descargar PDF siempre visibles, igual que antes;
-         Editar/Crear Ticket/Cerrar Ficha solo si no es modo solo lectura).
-         #158: antes los 6 botones eran sólidos y del mismo peso visual, sin
-         distinguir cuáles son acciones reales (hacen algo) de cuáles son
-         solo ver/navegar. "Ver Ticket" y "Descargar PDF" pasan a outline -
-         siguen siendo igual de clickeables, pero visualmente retroceden
-         frente a Editar/Crear Ticket/Cerrar Ficha/Registrar Acuse. -->
+    <!-- ACCIONES SECUNDARIAS (Ver Ticket / Descargar PDF siempre visibles,
+         igual que antes; Editar/Crear Ticket solo si no es modo solo
+         lectura). #158: "Cerrar Ficha" y "Registrar Acuse" - las acciones
+         que avanzan al siguiente paso del flujo - se sacan de acá y pasan a
+         la barra de abajo (Volver a la izquierda, siguiente paso a la
+         derecha), mismo criterio que ticket_view.html/dml_edit.html. -->
     <div class="card shadow-sm mb-4">
         <div class="card-body d-flex flex-wrap align-items-center gap-2">
-            {% if not readonly %}
-            {% if not ficha.is_closed %}
+            {% if not readonly and not ficha.is_closed %}
             <a href="{{ url_for('dml.dml_edit', id=ficha.id) }}" class="btn btn-primary">
                 <i class="bi bi-pencil"></i> Editar Ficha
             </a>
             {% endif %}
 
-            {% if not ficha.numero_ticket %}
+            {% if not readonly and not ficha.numero_ticket %}
             <form method="POST" action="{{ url_for('dml.crear_ticket_endpoint', id=ficha.id) }}" class="d-inline">
                 <button type="submit" class="btn btn-warning">
                     <i class="bi bi-ticket-perforated"></i> Crear Ticket
                 </button>
             </form>
-            {% endif %}
-
-            {% if not ficha.is_closed %}
-            <form method="POST" action="{{ url_for('dml.dml_close', id=ficha.id) }}" class="d-inline"
-                  onsubmit="return confirmarAccion(event, '¿Deseas FINALIZAR esta ficha? Se enviará notificación al comercial.');">
-                <button type="submit" class="btn btn-danger">
-                    <i class="bi bi-lock-fill"></i> Cerrar Ficha
-                </button>
-            </form>
-            {% endif %}
             {% endif %}
 
             {% if ficha.numero_ticket %}
@@ -245,21 +232,36 @@
             </a>
             {% endif %}
 
-            {% if ficha.is_closed and not ficha.recibido_por and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'RAYPAC'] %}
-            {# #158: al cerrar la ficha, los botones de acción de arriba
-               desaparecen (is_closed) y no quedaba ningún acceso al
-               siguiente paso del flujo real ("Registrar Acuse" en
-               /dml/entregadas) - había que saber que esa pantalla existe.
-               open_acuse abre directo el modal de esta ficha ahí. #}
-            <a href="{{ url_for('dml.dml_entregadas', open_acuse=ficha.id) }}" class="btn btn-success">
-                <i class="bi bi-clipboard-check"></i> Registrar Acuse
-            </a>
-            {% endif %}
-
             <a href="{{ url_for('dml.descargar_ficha_pdf', id=ficha.id) }}" class="btn btn-outline-secondary" target="_blank">
                 <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
             </a>
         </div>
+    </div>
+
+    <!-- NAVEGACIÓN: Volver siempre abajo a la izquierda, la acción que avanza
+         al siguiente paso del flujo real (Cerrar Ficha / Registrar Acuse)
+         abajo a la derecha cuando corresponde. -->
+    <div class="d-flex justify-content-between flex-wrap gap-2 mb-4">
+        <a class="btn btn-secondary" href="{{ url_for('dml.dml_list') }}">
+            <i class="bi bi-arrow-left"></i> Volver al listado
+        </a>
+
+        {% if not readonly and not ficha.is_closed %}
+        <form method="POST" action="{{ url_for('dml.dml_close', id=ficha.id) }}" class="d-inline"
+              onsubmit="return confirmarAccion(event, '¿Deseas FINALIZAR esta ficha? Se enviará notificación al comercial.');">
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-lock-fill"></i> Cerrar Ficha <i class="bi bi-arrow-right"></i>
+            </button>
+        </form>
+        {% elif ficha.is_closed and not ficha.recibido_por and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'RAYPAC'] %}
+        {# al cerrar la ficha, los botones de acción de arriba desaparecen
+           (is_closed) y no quedaba ningún acceso al siguiente paso del flujo
+           real ("Registrar Acuse" en /dml/entregadas) - había que saber que
+           esa pantalla existe. open_acuse abre directo el modal ahí. #}
+        <a href="{{ url_for('dml.dml_entregadas', open_acuse=ficha.id) }}" class="btn btn-success">
+            <i class="bi bi-clipboard-check"></i> Registrar Acuse <i class="bi bi-arrow-right"></i>
+        </a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
