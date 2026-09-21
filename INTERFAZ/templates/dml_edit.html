@@ -17,7 +17,9 @@
        form_agregar_repuesto, form-mover-stock-<id>, form-eliminar-<id>)
        y los name= que lee el backend (parte_<idx>, estado_reparacion, etc.)
        quedan exactamente iguales. #}
-    <h2 class="mb-4"><i class="bi bi-wrench-adjustable"></i> Editar Ficha DML #{{ ficha.numero_ficha }}</h2>
+    <h2 class="mb-3"><i class="bi bi-wrench-adjustable"></i> Editar Ficha DML #{{ ficha.numero_ficha }}</h2>
+
+    {% include "_flow_tracker.html" %}
 
     <!-- FORM PRINCIPAL: DATOS DE LA FICHA -->
     <div class="card shadow-sm mb-4">
@@ -125,14 +127,17 @@
                     </small>
                 </div>
 
-                <!-- BOTONES PRINCIPALES DEL FORM -->
-                <div class="d-flex flex-wrap gap-2 pt-3 border-top">
-                    <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="bi bi-save"></i> Guardar Cambios
-                    </button>
+                <!-- BOTONES PRINCIPALES DEL FORM: Cancelar/Volver abajo a la
+                     izquierda, Guardar (el paso siguiente) abajo a la
+                     derecha - mismo criterio de jerarquía del #158 (acción
+                     principal a la derecha, secundaria a la izquierda). -->
+                <div class="d-flex flex-wrap justify-content-between gap-2 pt-3 border-top">
                     <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-secondary btn-lg">
                         <i class="bi bi-x-circle"></i> Cancelar
                     </a>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-save"></i> Guardar Cambios
+                    </button>
                 </div>
             </form>
         </div>
