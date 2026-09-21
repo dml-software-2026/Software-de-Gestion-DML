@@ -5,6 +5,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
+    PageBreak,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -125,7 +126,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     # OBSERVACIONES
     story.append(Paragraph("OBSERVACIONES", heading_style))
     obs_data = [[ficha['observaciones'] or "Ingreso reciente, pendiente inspección inicial"]]
-    obs_table = Table(obs_data, colWidths=[6*inch])
+    obs_table = Table(obs_data, colWidths=[6.5*inch])
     obs_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('FONTSIZE', (0, 0), (-1, -1), 8.5),
@@ -139,7 +140,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     # DIAGNÓSTICO DE REPARACIÓN
     story.append(Paragraph("DIAGNÓSTICO DE REPARACIÓN", heading_style))
     rep_diag_data = [[ficha['diagnostico_reparacion'] or "Pendiente"]]
-    rep_diag_table = Table(rep_diag_data, colWidths=[6*inch])
+    rep_diag_table = Table(rep_diag_data, colWidths=[6.5*inch])
     rep_diag_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('FONTSIZE', (0, 0), (-1, -1), 8.5),
@@ -150,55 +151,10 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     story.append(rep_diag_table)
     story.append(Spacer(1, 0.15*inch))
 
-    # REPUESTOS COLOCADOS
-    story.append(Paragraph("REPUESTOS COLOCADOS", heading_style))
-    rep_rows = [["Cantidad", "Código", "DESCRIPCION", "ESTADO", "EN STOCK", "EN FALTA"]]
-    if repuestos:
-        for rep in repuestos:
-            rep_rows.append([
-                str(rep['cantidad_utilizada'] or 1),
-                rep['codigo_repuesto'] or "",
-                (rep['descripcion'] or '')[:25],
-                rep['estado_repuesto'] or "",
-                "✓" if rep['en_stock'] else "",
-                "✗" if rep['en_falta'] else ""
-            ])
-    # Relleno hasta 10 filas
-    while len(rep_rows) < 11:
-        rep_rows.append(["", "", "", "", "", ""])
-
-    rep_table = Table(rep_rows, colWidths=[0.7*inch, 1.0*inch, 2.0*inch, 0.9*inch, 0.8*inch, 0.7*inch])
-    rep_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#808080')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8.5),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    story.append(rep_table)
-    story.append(Spacer(1, 0.15*inch))
-
-    # FILA SEPARADA - Ciclos
-    story.append(Spacer(1, 0.05*inch))
-    ciclos_rows = [["N° DE CICLOS DE LA MÁQUINA CON LAS QUE SALE DE ST", str(ficha['n_ciclos'] or 0)]]
-    ciclos_table = Table(ciclos_rows, colWidths=[5.3*inch, 1.2*inch])
-    ciclos_table.setStyle(TableStyle([
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
-        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-    ]))
-    story.append(ciclos_table)
-    story.append(Spacer(1, 0.15*inch))
-
     # CICLOS Y DATOS FINALES
     story.append(Paragraph("CICLOS Y DATOS FINALES", heading_style))
     marca_rows = [
+        ["N° DE CICLOS DE LA MÁQUINA CON LAS QUE SALE DE ST", str(ficha['n_ciclos'] or 0)],
         ["TIPO DE MÁQUINA QUE INGRESO AL ST", raypac['tipo_maquina'] if raypac else "A BATERIA"],
         ["HORAS ADICIONALES DE TRABAJO", ficha['horas_adic'] or "NO APLICA"],
         ["MECANIZADO ADICIONAL REALIZADO A LA MAQUINA", ficha['mecanizado_adic'] or "NO APLICA"],
@@ -216,6 +172,45 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     story.append(marca_table)
+
+    # REPUESTOS COLOCADOS (siempre en página 2+)
+    story.append(PageBreak())
+    story.append(Paragraph("REPUESTOS COLOCADOS", heading_style))
+
+    if repuestos:
+        rep_rows = [["Cantidad", "Código", "DESCRIPCION", "ESTADO", "EN STOCK", "EN FALTA"]]
+        for rep in repuestos:
+            rep_rows.append([
+                str(rep['cantidad_utilizada'] or 1),
+                rep['codigo_repuesto'] or "",
+                (rep['descripcion'] or '')[:25],
+                rep['estado_repuesto'] or "",
+                "✓" if rep['en_stock'] else "",
+                "✗" if rep['en_falta'] else ""
+            ])
+
+        rep_table = Table(rep_rows, colWidths=[0.7*inch, 1.0*inch, 2.0*inch, 0.9*inch, 0.8*inch, 0.7*inch])
+        rep_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#808080')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8.5),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        story.append(rep_table)
+    else:
+        story.append(Paragraph("No se registraron repuestos en esta ficha.",
+                                ParagraphStyle('Italic', parent=normal_style, fontName='Helvetica-Oblique')))
+
+    story.append(Spacer(1, 0.15*inch))
+
+    # Generar PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
 
     # Generar PDF
     doc.build(story)
