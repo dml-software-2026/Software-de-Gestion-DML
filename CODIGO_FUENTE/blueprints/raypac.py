@@ -275,13 +275,13 @@ def raypac_freeze(id):
         return redirect(url_for("raypac.raypac_view", id=id))
 
     # Auto-completar formato si solo ingresa 4 dígitos (últimos)
-    if re.match(r'^\d{1,4}$', numero_remito):
-        # Usuario ingresó solo números (1-4 dígitos), auto-completar
-        ultimo = numero_remito.zfill(4)  # Rellenar con ceros a la izquierda
-        numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXX
+    if re.match(r'^\d{1,8}$', numero_remito):
+        # Autocompletar con el prefijo estándar 00001-, siempre 8 dígitos del lado derecho
+        ultimo = numero_remito.zfill(8)  # Rellenar con ceros a la izquierda hasta completar 8 dígitos
+        numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXXXXXX (8 dígitos)
         flash(f"📋 Remito auto-completado: {numero_remito}", "info")
-    elif not re.match(r'^\d{4,5}-\d{4,7}$', numero_remito):
-        flash("⚠️ Formato de remito inválido. Ingresa solo los últimos 4 dígitos (ej: 4222) o el formato completo ####-#### (ej: 00001-04222).", "error")
+    elif not re.match(r'^\d{4,5}-\d{8}$', numero_remito):
+        flash("⚠️ Formato de remito inválido. Ingresa solo los dígitos del remito (ej: 4222 o 2568) o el formato completo #####-######## (ej: 00001-00004222).", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     # Verificar que no exista ya en raypac_entries
@@ -330,10 +330,10 @@ def raypac_unfreeze(id):
 
     unfreeze_code = request.form.get("unfreeze_code", "").strip()
 
-    # CAMBIO DAVID: Verificar código usando últimos 4 dígitos del remito
-    # Formato remito: 0000-0000, últimos 4 dígitos = "0000" después del guión
+    # CAMBIO DAVID: Verificar código usando los dígitos del remito después del guión
+    # Formato remito: 00001-XXXX o 00001-XXXXX (la cantidad de dígitos crece con el tiempo)
     if entry['numero_remito'] and '-' in entry['numero_remito']:
-        codigo_correcto = entry['numero_remito'].split('-')[-1]  # Últimos 4 dígitos
+        codigo_correcto = entry['numero_remito'].split('-')[-1]  # Todo lo que sigue al guión
     else:
         codigo_correcto = entry['numero_remito'][-4:] if entry['numero_remito'] else ""
 

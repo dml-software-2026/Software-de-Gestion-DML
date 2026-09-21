@@ -111,15 +111,15 @@ def envios_new():
                 return render_template("envios_form.html", stock=stock_raypac)
 
             # Auto-completar formato si solo ingresa 4 dígitos (últimos)
-            if re.match(r'^\d{1,4}$', numero_remito_input):
-                # Usuario ingresó solo números (1-4 dígitos), auto-completar
-                ultimo = numero_remito_input.zfill(4)  # Rellenar con ceros a la izquierda
-                numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXX
+            if re.match(r'^\d{1,8}$', numero_remito_input):
+                # Autocompletar con el prefijo estándar 00001-, siempre 8 dígitos del lado derecho
+                ultimo = numero_remito_input.zfill(8)  # Rellenar con ceros a la izquierda hasta completar 8 dígitos
+                numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXXXXXX (8 dígitos)
                 flash(f"📋 Remito auto-completado: {numero_remito}", "info")
-            elif re.match(r'^\d{4,5}-\d{4,7}$', numero_remito_input):
+            elif re.match(r'^\d{4,5}-\d{8}$', numero_remito_input):
                 numero_remito = numero_remito_input
             else:
-                flash("⚠️ Formato de remito inválido. Ingresa solo los últimos 4 dígitos (ej: 4222) o el formato completo ####-#### (ej: 00001-04222).", "error")
+                flash("⚠️ Formato de remito inválido. Ingresa solo los dígitos del remito (ej: 4222 o 2568) o el formato completo #####-######## (ej: 00001-00004222).", "error")
                 return render_template("envios_form.html", stock=stock_raypac)
 
             # Verificar que no exista ya en envios_repuestos
