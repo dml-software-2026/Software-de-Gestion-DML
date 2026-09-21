@@ -196,16 +196,16 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     story.append(ciclos_table)
     story.append(Spacer(1, 0.15*inch))
 
-    # MARCAR CON UNA CRUZ LO QUE CORRESPONDA
-    story.append(Paragraph("MARCAR CON UNA CRUZ LO QUE CORRESPONDA", heading_style))
+    # CICLOS Y DATOS FINALES
+    story.append(Paragraph("CICLOS Y DATOS FINALES", heading_style))
     marca_rows = [
         ["TIPO DE MÁQUINA QUE INGRESO AL ST", raypac['tipo_maquina'] if raypac else "A BATERIA"],
-        ["El módulo reparación Base es de tres (3hs)", "A DEFINIR"],
         ["HORAS ADICIONALES DE TRABAJO", ficha['horas_adic'] or "NO APLICA"],
         ["MECANIZADO ADICIONAL REALIZADO A LA MAQUINA", ficha['mecanizado_adic'] or "NO APLICA"],
-        ["TIPO DE TRABAJO REALIZADO", "REPARACIÓN"],
+        ["TIPO DE TRABAJO REALIZADO", raypac['tipo_solicitud'] if raypac else ""],
         ["TÉCNICO RESPONSABLE DEL ST DE DML", ficha['tecnico_resp'] or ""],
     ]
+
     marca_table = Table(marca_rows, colWidths=[5.3*inch, 1.2*inch])
     marca_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
