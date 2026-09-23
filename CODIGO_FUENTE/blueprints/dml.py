@@ -421,6 +421,8 @@ def agregar_repuesto(id):
         estado_repuesto = "EN STOCK"
         # Descontar del stock en DML usando ajustar_stock_ubicacion
         ajustar_stock_ubicacion(codigo, "DML", -cantidad_utilizada)
+        # Actualizar estadísticas de uso (solo cuando el repuesto se usa de verdad)
+        actualizar_estadistica_repuesto(codigo, cantidad_utilizada)
     else:
         en_stock = 0
         en_falta = 1
@@ -434,8 +436,7 @@ def agregar_repuesto(id):
     """, (id, codigo, repuesto['item'], cantidad_utilizada, cantidad_utilizada, estado_repuesto, en_stock, en_falta))
     db.commit()
 
-    # Actualizar estadísticas de uso
-    actualizar_estadistica_repuesto(codigo, cantidad_utilizada)
+    # (se sacó la llamada a actualizar_estadistica_repuesto que estaba acá)
 
     # Verificar alerta de stock después de descontar
     if en_stock:
@@ -567,6 +568,9 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
         WHERE codigo_repuesto = %s
     """, (repuesto['cantidad_utilizada'], repuesto['codigo_repuesto']))
 
+    # Actualizar estadísticas de uso (se agrega esta línea)
+    actualizar_estadistica_repuesto(repuesto['codigo_repuesto'], repuesto['cantidad_utilizada'])
+
     db.commit()
 
     log_action(user['id'], "MOVER_REPUESTO_A_STOCK", "dml_repuestos", repuesto_id,
@@ -592,10 +596,14 @@ def eliminar_repuesto(ficha_id, repuesto_id):
     if repuesto['en_stock']:
         ajustar_stock_ubicacion(repuesto['codigo_repuesto'], "DML", repuesto['cantidad_utilizada'])
 
-        # Restar de estadísticas (reversar el uso)
+        # Restar de estadísticas (reversar el uso): 1 uso menos, y la cantidad
+        # real utilizada menos — no restar cantidad_utilizada de total_usos,
+        # que cuenta "veces", no "unidades". GREATEST evita negativos.
         db.execute("""
             UPDATE estadisticas_repuestos
-            SET total_usos = total_usos - %s, updated_at = CURRENT_TIMESTAMP
+            SET total_usos = GREATEST(total_usos - 1, 0),
+                cantidad_utilizada = GREATEST(cantidad_utilizada - %s, 0),
+                updated_at = CURRENT_TIMESTAMP
             WHERE codigo_repuesto = %s
         """, (repuesto['cantidad_utilizada'], repuesto['codigo_repuesto']))
 
