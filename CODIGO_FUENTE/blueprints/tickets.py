@@ -31,6 +31,9 @@ def ticket_nuevo(raypac_id):
     if not raypac['is_frozen']:
         flash("El ingreso RAYPAC debe estar freezado para crear un ticket.", "error")
         return redirect(url_for("raypac.raypac_view", id=raypac_id))
+    if raypac['estado_envio_equipos'] != 'RECIBIDO':
+        flash("Debe dar de alta el equipo en DML antes de crear el ticket.", "error")
+        return redirect(url_for("raypac.raypac_view", id=raypac_id))    
 
     # Verificar si ya existe ticket para este RAYPAC
     ticket_existente = db.execute(

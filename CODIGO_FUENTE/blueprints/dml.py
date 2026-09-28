@@ -292,7 +292,7 @@ def dml_edit(id):
                 horas = float(horas_raw) if horas_raw else None
             except ValueError:
                 horas = None  # texto no numérico (ej. "NO APLICA")
-            numero_remito = request.form.get("numero_remito_salida")
+            numero_remito = request.form.get("numero_remito_salida") or None
             tecnico_resp = request.form.get("tecnico_resp") or ""
 
             # #157: "MÁQUINA ENTREGADA" ya no es una opción del <select> (ver

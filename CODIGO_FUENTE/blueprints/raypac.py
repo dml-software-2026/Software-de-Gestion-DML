@@ -297,11 +297,18 @@ def raypac_freeze(id):
         return redirect(url_for("raypac.raypac_view", id=id))
 
     db.execute("""
-        UPDATE raypac_entries
-        SET is_frozen = TRUE, frozen_at = CURRENT_TIMESTAMP, numero_remito = %s,
-            estado_envio_equipos = 'ENVIADO', fecha_envio_equipos = CURRENT_TIMESTAMP
-        WHERE id = %s
-    """, (numero_remito, id))
+    UPDATE raypac_entries
+    SET is_frozen = TRUE, frozen_at = CURRENT_TIMESTAMP, numero_remito = %s,
+        estado_envio_equipos = CASE
+            WHEN estado_envio_equipos = 'RECIBIDO' THEN estado_envio_equipos
+            ELSE 'ENVIADO'
+        END,
+        fecha_envio_equipos = CASE
+            WHEN estado_envio_equipos = 'RECIBIDO' THEN fecha_envio_equipos
+            ELSE CURRENT_TIMESTAMP
+        END
+    WHERE id = %s
+""", (numero_remito, id))
     db.commit()
 
     log_action(user['id'], "FREEZE", "raypac_entries", id, None,
