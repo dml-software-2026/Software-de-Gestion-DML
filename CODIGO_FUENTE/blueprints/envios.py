@@ -26,20 +26,30 @@ def envios_list():
     user = get_current_user()
     db = get_db()
 
-    # Obtener envíos de repuestos
+    # ?estado=todos muestra también los recibidos; por defecto se ocultan
+    mostrar_recibidos = request.args.get("estado") == "todos"
+
+    # Estos fragmentos son fijos (no vienen del usuario): el parámetro de la
+    # URL solo elige cuál de los dos usar, así que no hay riesgo de inyección SQL.
+    filtro_repuestos = "" if mostrar_recibidos else "WHERE COALESCE(e.estado_envio, '') <> 'RECIBIDO'"
+    filtro_maquinas = "" if mostrar_recibidos else (
+        "AND NOT (f.fecha_entrega_cliente IS NOT NULL "
+        "OR (f.numero_remito_salida IS NULL AND COALESCE(r.estado_envio_equipos, '') = 'RECIBIDO'))"
+    )
+
     envios_repuestos = db.execute(
-        """
+        f"""
         SELECT e.*,
                'REPUESTO' as tipo_envio,
                (SELECT COUNT(*) FROM envios_repuestos_detalles d WHERE d.envio_id = e.id) AS items_count
         FROM envios_repuestos e
+        {filtro_repuestos}
         ORDER BY e.created_at DESC
         """
     ).fetchall()
 
-    # Obtener ingresos RAYPAC (equipos/máquinas) que fueron enviados
     envios_maquinas = db.execute(
-        """
+        f"""
         SELECT
             r.id,
             'MAQUINA' as tipo_envio,
@@ -65,6 +75,7 @@ def envios_list():
             LIMIT 1
         ) f ON TRUE
         WHERE r.is_frozen = TRUE
+        {filtro_maquinas}
         ORDER BY r.frozen_at DESC
         """
     ).fetchall()
@@ -93,6 +104,7 @@ def envios_list():
         "envios_list.html",
         envios_repuestos=envios_repuestos,
         envios_maquinas=envios_maquinas,
+        mostrar_recibidos=mostrar_recibidos,
     )
 @envios_bp.route("/new", methods=["GET", "POST"])
 @login_required

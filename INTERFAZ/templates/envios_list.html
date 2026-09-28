@@ -8,6 +8,13 @@
     <a class="btn btn-success" href="{{ url_for('envios.envios_new') }}"><i class="bi bi-plus-circle"></i> Nuevo envío</a>
     {% endif %}
   </div>
+    <div class="mb-3">
+    {% if mostrar_recibidos %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('envios.envios_list') }}">Ocultar recibidos</a>
+    {% else %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('envios.envios_list', estado='todos') }}">Ver también recibidos</a>
+    {% endif %}
+  </div>
 
   {% if envios_maquinas or envios_repuestos %}
   <ul class="nav nav-tabs mb-3" id="enviosTab" role="tablist">
@@ -36,7 +43,13 @@
     </div>
   </div>
   {% else %}
-  <div class="alert alert-info">No hay envíos registrados.</div>
+  <div class="alert alert-info">
+    {% if mostrar_recibidos %}
+    No hay envíos registrados.
+    {% else %}
+    No hay envíos pendientes. Usá "Ver también recibidos" para consultar el historial.
+    {% endif %}
+  </div>
   {% endif %}
   
   <div class="text-muted text-center mt-3 small">
