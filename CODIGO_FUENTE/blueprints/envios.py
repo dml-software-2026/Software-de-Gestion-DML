@@ -32,7 +32,10 @@ def envios_list():
     # Estos fragmentos son fijos (no vienen del usuario): el parámetro de la
     # URL solo elige cuál de los dos usar, así que no hay riesgo de inyección SQL.
     filtro_repuestos = "" if mostrar_recibidos else "WHERE COALESCE(e.estado_envio, '') <> 'RECIBIDO'"
-    filtro_maquinas = "" if mostrar_recibidos else "AND COALESCE(r.estado_envio_equipos, '') <> 'RECIBIDO'"
+    filtro_maquinas = "" if mostrar_recibidos else (
+        "AND NOT (f.fecha_entrega_cliente IS NOT NULL "
+        "OR (f.numero_remito_salida IS NULL AND COALESCE(r.estado_envio_equipos, '') = 'RECIBIDO'))"
+    )
 
     envios_repuestos = db.execute(
         f"""
@@ -72,6 +75,7 @@ def envios_list():
             LIMIT 1
         ) f ON TRUE
         WHERE r.is_frozen = TRUE
+        {filtro_maquinas}
         ORDER BY r.frozen_at DESC
         """
     ).fetchall()
