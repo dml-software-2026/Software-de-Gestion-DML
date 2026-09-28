@@ -751,6 +751,16 @@ def dml_close(id):
     if repuestos_count == 0 and partes_inspeccionadas == 0:
         errores.append("Debe inspeccionar al menos una parte o agregar repuestos utilizados")
 
+    # 5. #226: no se puede cerrar con repuestos EN FALTA (criterio de David).
+    # Una ficha sin repuestos (solo mano de obra) no entra acá y cierra normal.
+    repuestos_en_falta = db.execute(
+        "SELECT codigo_repuesto FROM dml_repuestos WHERE ficha_id = %s AND en_falta = 1",
+        (id,)
+    ).fetchall()
+    if repuestos_en_falta:
+        codigos = ", ".join(r['codigo_repuesto'] for r in repuestos_en_falta)
+        errores.append(f"Hay repuestos EN FALTA que impiden el cierre: {codigos}")
+
     if errores:
         flash("⚠️ No se puede cerrar la ficha. Campos requeridos faltantes:", "error")
         for error in errores:
