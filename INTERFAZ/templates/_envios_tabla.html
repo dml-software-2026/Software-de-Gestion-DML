@@ -21,7 +21,11 @@
       <td>{{ envio.fecha_envio }}</td>
       <td>{{ envio.fecha_recepcion or '-' }}</td>
       <td>
-        {% if envio.estado_envio == 'RECIBIDO' %}
+        {% if envio.estado_envio == 'ENTREGADO' %}
+        <span class="badge bg-primary">Entregado</span>
+        {% elif envio.estado_envio == 'EN_TRANSITO_VUELTA' %}
+        <span class="badge bg-warning text-dark">En Tránsito a RAYPAC</span>
+        {% elif envio.estado_envio == 'RECIBIDO' %}
         <span class="badge bg-success">Recibido</span>
         {% elif envio.estado_envio == 'ENVIADO' %}
         <span class="badge bg-warning text-dark">En Tránsito</span>

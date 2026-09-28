@@ -11,6 +11,7 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.flujo import build_flow_steps
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
 
@@ -194,8 +195,19 @@ def raypac_view(id, readonly=False):
         (id,)
     ).fetchone()
 
+    # #158: tracker de 3 pasos (Ingreso/Envío/Recibido) - es el tramo que
+    # le compete a RAYPAC, se corta ahí (crear ticket/ficha ya es del lado
+    # DML, ver dml_view()/ticket_view()).
+    if entry['estado_envio_equipos'] == 'RECIBIDO':
+        current_step = 3
+    elif entry['is_frozen']:
+        current_step = 2
+    else:
+        current_step = 1
+    flow_steps = build_flow_steps(["Ingreso RAYPAC", "Envío a DML", "Recibido en DML"], current_step)
+
     return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly,
-                            ticket=ticket, ficha=ficha)
+                            ticket=ticket, ficha=ficha, flow_steps=flow_steps)
 
 
 @raypac_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -297,11 +309,18 @@ def raypac_freeze(id):
         return redirect(url_for("raypac.raypac_view", id=id))
 
     db.execute("""
-        UPDATE raypac_entries
-        SET is_frozen = TRUE, frozen_at = CURRENT_TIMESTAMP, numero_remito = %s,
-            estado_envio_equipos = 'ENVIADO', fecha_envio_equipos = CURRENT_TIMESTAMP
-        WHERE id = %s
-    """, (numero_remito, id))
+    UPDATE raypac_entries
+    SET is_frozen = TRUE, frozen_at = CURRENT_TIMESTAMP, numero_remito = %s,
+        estado_envio_equipos = CASE
+            WHEN estado_envio_equipos = 'RECIBIDO' THEN estado_envio_equipos
+            ELSE 'ENVIADO'
+        END,
+        fecha_envio_equipos = CASE
+            WHEN estado_envio_equipos = 'RECIBIDO' THEN fecha_envio_equipos
+            ELSE CURRENT_TIMESTAMP
+        END
+    WHERE id = %s
+""", (numero_remito, id))
     db.commit()
 
     log_action(user['id'], "FREEZE", "raypac_entries", id, None,

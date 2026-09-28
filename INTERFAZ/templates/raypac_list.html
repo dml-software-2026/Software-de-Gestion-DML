@@ -133,17 +133,11 @@
                             </a>
                             <br><a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-sm btn-success">Crear Ficha</a>
                         {% elif entry.is_frozen and not entry.ticket_id %}
-                            {# Freezado pero sin ticket → crear ticket primero.
-                               Antes era un <form method="POST"> con un botón sin
-                               ningún campo - ticket_nuevo() exige "técnico
-                               responsable" y al no venir en el POST, la
-                               respuesta terminaba re-renderizando el form
-                               completo de ticket_nuevo.html como resultado de
-                               ese POST (refrescar la página reenviaba el form).
-                               La ruta ya soporta GET y muestra ese mismo form
-                               correctamente, así que esto pasa a ser un link
-                               normal. #}
+                            {% if entry.estado_envio_equipos == 'RECIBIDO' %}
                             <a href="{{ url_for('tickets.ticket_nuevo', raypac_id=entry.id) }}" class="btn btn-sm btn-primary">Crear Ticket</a>
+                            {% else %}
+                            <span class="badge bg-light text-muted border">Pendiente de alta en DML</span>
+                            {% endif %}
                         {% else %}
                             {# No freezado → pendiente. Ver #194 en la columna
                                "Estado" (freeze) sobre por qué no comparte

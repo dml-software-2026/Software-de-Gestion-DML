@@ -32,7 +32,7 @@ def envios_list():
     # Estos fragmentos son fijos (no vienen del usuario): el parámetro de la
     # URL solo elige cuál de los dos usar, así que no hay riesgo de inyección SQL.
     filtro_repuestos = "" if mostrar_recibidos else "WHERE COALESCE(e.estado_envio, '') <> 'RECIBIDO'"
-    filtro_maquinas = "" if mostrar_recibidos else "AND COALESCE(estado_envio_equipos, '') <> 'RECIBIDO'"
+    filtro_maquinas = "" if mostrar_recibidos else "AND COALESCE(r.estado_envio_equipos, '') <> 'RECIBIDO'"
 
     envios_repuestos = db.execute(
         f"""
@@ -48,20 +48,31 @@ def envios_list():
     envios_maquinas = db.execute(
         f"""
         SELECT
-            id,
+            r.id,
             'MAQUINA' as tipo_envio,
-            numero_remito,
-            fecha_recepcion as fecha_envio,
+            r.numero_remito,
+            r.fecha_recepcion as fecha_envio,
             NULL as fecha_recepcion,
-            estado_envio_equipos as estado_envio,
+            CASE
+                WHEN f.fecha_entrega_cliente IS NOT NULL THEN 'ENTREGADO'
+                WHEN f.numero_remito_salida IS NOT NULL THEN 'EN_TRANSITO_VUELTA'
+                WHEN r.estado_envio_equipos = 'RECIBIDO' THEN 'RECIBIDO'
+                WHEN r.estado_envio_equipos = 'ENVIADO' THEN 'ENVIADO'
+                ELSE 'PENDIENTE'
+            END as estado_envio,
             NULL as tipo_entrega,
-            cliente || ' - ' || modelo_maquina as numero_remito_display,
-            frozen_at as created_at,
+            r.cliente || ' - ' || r.modelo_maquina as numero_remito_display,
+            r.frozen_at as created_at,
             1 as items_count
-        FROM raypac_entries
-        WHERE is_frozen = TRUE
-        {filtro_maquinas}
-        ORDER BY frozen_at DESC
+        FROM raypac_entries r
+        LEFT JOIN LATERAL (
+            SELECT * FROM dml_fichas
+            WHERE raypac_id = r.id
+            ORDER BY created_at DESC
+            LIMIT 1
+        ) f ON TRUE
+        WHERE r.is_frozen = TRUE
+        ORDER BY r.frozen_at DESC
         """
     ).fetchall()
 

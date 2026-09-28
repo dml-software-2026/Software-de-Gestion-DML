@@ -28,13 +28,14 @@
             </p>
             {% endif %}
         </div>
+        {% if readonly %}
         <div class="text-end">
-            <a class="btn btn-outline-secondary" href="{{ url_for('raypac.raypac_list') }}">Volver al listado</a>
-            {% if readonly %}
             <span class="badge bg-info text-dark ms-1">Modo Solo Lectura</span>
-            {% endif %}
         </div>
+        {% endif %}
     </div>
+
+    {% include "_flow_tracker.html" %}
 
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-primary text-white">
@@ -164,7 +165,7 @@
 
     <!-- CREAR FICHA DML (solo para DML_ST y ADMIN, y solo si ya existe ticket) -->
     {% if entry.is_frozen and user_role in ['ADMIN', 'DML_ST'] %}
-    <div class="card shadow-sm">
+    <div class="card shadow-sm mb-4">
         <div class="card-header {{ 'bg-info' if ficha else 'bg-success' }} text-white">
             <h5 class="mb-0">
                 {% if ficha %}
@@ -181,29 +182,46 @@
                abajo nunca se activaba) aunque la ficha ya estuviera creada
                e incluso cerrada - clickearlo llevaba a un error confuso en
                dml_new(). #}
-            <p>Ya existe una ficha de Servicio Técnico para este ingreso.</p>
-            <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-lg btn-info">
-                <i class="bi bi-file-earmark-text"></i> Ver Ficha DML
-            </a>
+            <p class="mb-0">Ya existe una ficha de Servicio Técnico para este ingreso.</p>
             {% elif ticket %}
-            <p>La máquina ya fue enviada a ST y tiene ticket asociado: <strong>{{ ticket.numero_ticket }}</strong></p>
-            <a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-lg btn-success">
-                <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML
-            </a>
+            <p class="mb-0">La máquina ya fue enviada a ST y tiene ticket asociado: <strong>{{ ticket.numero_ticket }}</strong></p>
             {% else %}
             <div class="alert alert-warning mb-0">
                 <i class="bi bi-exclamation-triangle"></i> <strong>Debe crear un ticket primero</strong>
-                <p class="mb-2 mt-2">Antes de crear la ficha, es necesario generar un ticket de seguimiento para el cliente.</p>
-                {# #158: antes mandaba al listado /raypac en vez de ir directo
-                   al form real - el usuario tenía que volver a buscar el
-                   botón "Crear Ticket" ahí. #}
-                <a href="{{ url_for('tickets.ticket_nuevo', raypac_id=entry.id) }}" class="btn btn-primary">
-                    <i class="bi bi-ticket"></i> Ir a crear ticket
-                </a>
+                <p class="mb-0 mt-2">Antes de crear la ficha, es necesario generar un ticket de seguimiento para el cliente.</p>
             </div>
             {% endif %}
         </div>
     </div>
     {% endif %}
+
+    <!-- NAVEGACIÓN: Volver siempre abajo a la izquierda, la acción que avanza
+         al siguiente paso del flujo real (Ver/Crear Ficha, ir a crear
+         ticket) abajo a la derecha cuando corresponde - mismo criterio que
+         ticket_view.html/dml_view.html/dml_edit.html. -->
+    <div class="d-flex justify-content-between flex-wrap gap-2 mb-4">
+        <a class="btn btn-secondary" href="{{ url_for('raypac.raypac_list') }}">
+            <i class="bi bi-arrow-left"></i> Volver al listado
+        </a>
+
+        {% if entry.is_frozen and user_role in ['ADMIN', 'DML_ST'] %}
+        {% if ficha %}
+        <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-info">
+            <i class="bi bi-file-earmark-text"></i> Ver Ficha DML <i class="bi bi-arrow-right"></i>
+        </a>
+        {% elif ticket %}
+        <a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML <i class="bi bi-arrow-right"></i>
+        </a>
+        {% else %}
+        {# #158: antes mandaba al listado /raypac en vez de ir directo al
+           form real - el usuario tenía que volver a buscar el botón "Crear
+           Ticket" ahí. #}
+        <a href="{{ url_for('tickets.ticket_nuevo', raypac_id=entry.id) }}" class="btn btn-primary">
+            <i class="bi bi-ticket"></i> Ir a crear ticket <i class="bi bi-arrow-right"></i>
+        </a>
+        {% endif %}
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

@@ -21,6 +21,7 @@ from CODIGO_FUENTE.decorators import (
     verify_admin_password,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.flujo import build_flow_steps
 from CODIGO_FUENTE.services.mail import send_mail
 from CODIGO_FUENTE.services.numeracion import crear_ticket, generate_ficha_number
 from CODIGO_FUENTE.services.pdf import generar_pdf_ficha
@@ -240,8 +241,22 @@ def dml_view(id, readonly=False):
         (id,)
     ).fetchall()
 
+    # #158: tracker de 4 pasos (Ticket/Ficha/Entregada/Acuse) - es el tramo
+    # del lado DML (ver raypac_view() para el tramo de 3 pasos del lado
+    # RAYPAC). Ticket creado siempre está en "done" acá: dml_new() exige un
+    # ticket existente antes de poder crear la ficha.
+    if ficha['fecha_entrega_cliente']:
+        current_step = 4
+    elif ficha['is_closed']:
+        current_step = 3
+    else:
+        current_step = 2
+    flow_steps = build_flow_steps(
+        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+    )
+
     return render_template("dml_view.html", ficha=ficha, raypac=raypac, partes=partes, repuestos=repuestos,
-                           user_role=user['role'], readonly=readonly)
+                           user_role=user['role'], readonly=readonly, flow_steps=flow_steps)
 
 
 @dml_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -292,7 +307,7 @@ def dml_edit(id):
                 horas = float(horas_raw) if horas_raw else None
             except ValueError:
                 horas = None  # texto no numérico (ej. "NO APLICA")
-            numero_remito = request.form.get("numero_remito_salida")
+            numero_remito = request.form.get("numero_remito_salida") or None
             tecnico_resp = request.form.get("tecnico_resp") or ""
 
             # #157: "MÁQUINA ENTREGADA" ya no es una opción del <select> (ver
@@ -367,7 +382,19 @@ def dml_edit(id):
     repuestos = [dict(r) for r in repuestos]
     ficha = dict(ficha)
 
-    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos)
+    # #158: mismo tracker que dml_view() - Facu pidió que también se vea acá,
+    # no solo en la vista de solo lectura.
+    if ficha['fecha_entrega_cliente']:
+        current_step = 4
+    elif ficha['is_closed']:
+        current_step = 3
+    else:
+        current_step = 2
+    flow_steps = build_flow_steps(
+        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+    )
+
+    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps)
 
 
 # ======================== REPUESTOS ========================
@@ -723,6 +750,16 @@ def dml_close(id):
 
     if repuestos_count == 0 and partes_inspeccionadas == 0:
         errores.append("Debe inspeccionar al menos una parte o agregar repuestos utilizados")
+
+    # 5. #226: no se puede cerrar con repuestos EN FALTA (criterio de David).
+    # Una ficha sin repuestos (solo mano de obra) no entra acá y cierra normal.
+    repuestos_en_falta = db.execute(
+        "SELECT codigo_repuesto FROM dml_repuestos WHERE ficha_id = %s AND en_falta = 1",
+        (id,)
+    ).fetchall()
+    if repuestos_en_falta:
+        codigos = ", ".join(r['codigo_repuesto'] for r in repuestos_en_falta)
+        errores.append(f"Hay repuestos EN FALTA que impiden el cierre: {codigos}")
 
     if errores:
         flash("⚠️ No se puede cerrar la ficha. Campos requeridos faltantes:", "error")

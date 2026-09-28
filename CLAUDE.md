@@ -18,6 +18,258 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+- **Última actualización:** 2026-09-17, cierre de sesión (Facu cambia de
+  máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
+- **El checkpoint del 09-16 nunca se había llegado a pushear** (quedó
+  documentado en su momento que la sesión seguía en la misma máquina) - se
+  incorporó su contenido a este mismo archivo antes de escribir lo de hoy,
+  no se perdió nada.
+- **Encargo aparte al arrancar la sesión: issue nueva `#244`** ("Investigar
+  rendimiento de Render, ¿hace falta plan pago?") - Facu pidió priorizarla
+  antes de seguir con el `#158`, la app está lenta en el Render de
+  Facu/dev. Creada en Backlog, Size S, Épica "Infraestructura y deploy",
+  asignada a Facu - alcance: confirmar si es cold-start o en caliente,
+  revisar posibles cuellos de botella de la app (queries, índices, assets)
+  antes de asumir que hace falta pagar, comparar costo/beneficio de los
+  planes pagos. **Sin arrancar la investigación en sí** - solo quedó creada
+  y priorizada, es candidata para la próxima sesión si se quiere algo más
+  chico antes de la próxima entrega grande.
+- **Tarea principal: seguir con el `#158`.** Dos piezas nuevas, cada una en
+  su propia rama, **ninguna con PR abierto todavía** (Facu las revisó en
+  vivo contra el server local, pero no llegó a abrirlos en GitHub):
+  1. **`feature/158-orden-navbar-flujo`** (2 commits) - Facu pidió que el
+     navbar siguiera el orden real del recorrido de una máquina en vez del
+     orden que tenía. Primer commit: Tickets se mueve justo después de
+     RAYPAC (antes estaba después de Fichas ST/Entregadas). **Corrección
+     en el 2do commit:** se había asumido que "Envíos" era solo logística
+     de repuestos (sin relación con el recorrido) y se lo dejó al final -
+     revisando el código (`envios.py`, recién tocado por el `#169` de esta
+     misma semana) se confirmó que esa pantalla **también** lista las
+     máquinas de RAYPAC freezadas con su `estado_envio_equipos`
+     (`PENDIENTE→ENVIADO→RECIBIDO`) - o sea que el tramo RAYPAC→DML de una
+     máquina sí pasa por ahí, y pasa *antes* del Ticket. Envíos se movió
+     también, orden final: **Inicio, RAYPAC, Envíos, Tickets, Fichas ST,
+     Entregadas, Stock, Estadísticas, Admin.** No se tocó ningún
+     condicional de rol, solo el orden de los `<li>`.
+  2. **`feature/158-tracker-flujo`** (3 commits) - la pieza más grande de
+     la sesión, con una vuelta atrás en el medio (ver más abajo):
+     - **Primer intento (revertido por completo):** Facu pidió "una barra
+       arriba que muestre en qué paso estás, con Next/Back". Se entendió
+       como un wizard dentro de `dml_edit.html` (el form más largo de la
+       app, partido en 6 pasos con Siguiente/Atrás, validación por paso,
+       barra de progreso) - se construyó completo, se probó en vivo
+       (los 6 pasos, validación de campo requerido oculto, navegación
+       Atrás) y se pusheó en su propia rama. **Facu aclaró después que no
+       era eso** - lo que quería era retomar el mismo patrón de "botón al
+       siguiente paso" que ya se había armado en sesiones anteriores del
+       `#158` (PRs #239/#241), agregándole una barra de progreso arriba de
+       cada pantalla del flujo. **Se revirtió 100%** (rama borrada local y
+       remota, sin PR abierto, cero rastro en `dev`) - si en algún momento
+       se retoma la idea de un wizard de pasos para un form largo, es una
+       tarea aparte, no confundir con el `#158`.
+     - **Lo que sí pidió: tracker de solo lectura** (sin Next/Back reales -
+       cada "paso" ya es una acción real del sistema) mostrando en qué
+       tramo está un registro puntual. Facu aclaró un punto importante:
+       **cada rol/pantalla ve solo el tramo que le compete**, no un único
+       tracker universal - se separó en 2:
+       - `raypac_view.html` (3 pasos): Ingreso RAYPAC → Envío a DML →
+         Recibido en DML (`estado_envio_equipos` de `raypac_entries`).
+       - `dml_view.html` + `dml_edit.html` + `ticket_view.html` (4 pasos):
+         Ticket creado → Ficha en reparación → Entregada → Acuse
+         registrado (`dml_fichas.is_closed`/`fecha_entrega_cliente`).
+         `ticket_view.html` es la vista pública que ve el cliente sin
+         login - confirmado con Facu que el tracker va también ahí (es
+         justamente la función de esa pantalla, seguimiento del cliente).
+       Componente compartido: `_flow_tracker.html` (mismo patrón de
+       partial que ya usaba `_envios_tabla.html`) + `build_flow_steps()`
+       nuevo en `CODIGO_FUENTE/services/flujo.py`. Probado en vivo en los
+       3 estados de cada tracker (vacío/en curso/completo) con fichas e
+       ingresos reales de la base local.
+       - **Hallazgo de Facu probando en vivo:** el tracker solo se había
+         agregado a `dml_view.html`, no a `dml_edit.html` - se agregó ahí
+         también (mismo cálculo de paso).
+     - **Ronda de feedback sobre botones, mismo commit:** Facu pidió que
+       "Volver" quede siempre abajo a la izquierda y la acción que avanza
+       el flujo (Crear Ficha DML, Cerrar Ficha, Registrar Acuse, Ver Ficha
+       DML, etc.) abajo a la derecha, en **las 4 pantallas relevantes**
+       (`ticket_view.html`, `dml_view.html`, `raypac_view.html`,
+       `dml_edit.html`), no solo donde ya estaba así. De paso, sacar los
+       emoji que hacían de flecha (`⬅️`/`🔙`) y usar íconos reales
+       (`bi-arrow-left`/`bi-arrow-right`) - el `🔙` en particular se
+       renderiza como un recuadro violeta en la mayoría de las fuentes de
+       emoji (era la queja de "color violeta", no una clase CSS mal
+       puesta). En `dml_view.html`/`raypac_view.html` esto implicó sacar
+       "Volver al listado" del encabezado y mover ahí también la acción
+       principal (antes mezclada en una fila con Editar/Ver
+       Ticket/Descargar PDF) - las acciones secundarias quedan donde
+       estaban.
+  - **Verificado sin overlap de archivos entre las 2 ramas** (`feature/158-orden-navbar-flujo`
+    solo toca `base.html`; `feature/158-tracker-flujo` toca todo lo
+    demás) - **mergean en cualquier orden, sin conflicto**, confirmado
+    simulando el merge localmente contra `dev`.
+  - **Quedan sin resolver, igual que en el checkpoint del 09-16:** el ítem
+    menor de `envios_view.html` (3 botones para ADMIN sin mucha
+    diferenciación, prioridad baja) y la charla sobre el **`#205`** (orden
+    invertido Crear Ticket/Dar de Alta en DML) - Facu la sigue posponiendo,
+    no se tocó nada relacionado esta sesión tampoco.
+- **Falsa alarma en el camino, ya aclarada:** Facu reportó "la ficha quedó
+  mal" a mitad de sesión, sospechando de los cambios de hoy - se revisó
+  `dml_view.html`/`dml_edit.html` en vivo (ficha abierta y cerrada) sin
+  encontrar nada raro, y Facu confirmó después que fue una confusión propia
+  (la cantidad de campos difiere entre crear y editar una ficha, no un bug).
+  No generó ningún cambio de código.
+- **2 gotchas nuevos de esta sesión:**
+  1. La herramienta de resize de ventana del navegador (Claude in Chrome)
+     **no cambió el viewport real en ningún intento de esta sesión**
+     (confirmado con `window.innerWidth` después de llamarla) - mismo
+     síntoma que limitaciones ya documentadas en checkpoints viejos, pero
+     esta vez ni siquiera devolvió error, solo no tuvo efecto. El testing
+     de mobile de todo lo de hoy quedó 100% en manos de Facu.
+  2. **Patrón de "rama de integración local" + seguir commiteando en la
+     rama real por separado:** si se corrige algo y se commitea en la rama
+     real (ej. `feature/158-tracker-flujo`) mientras hay una rama de
+     integración local activa (`test/158-integración-local`, nunca
+     pusheada) para que Facu pruebe todo junto, **hay que volver a
+     mergear ese commit nuevo también en la rama de integración** antes de
+     decirle a Facu "ya está, refrescá" - si no, el próximo
+     `git checkout` a la rama de integración pisa los archivos con la
+     versión vieja (sin el fix) y parece que el cambio nunca se aplicó.
+     Pasó esta sesión, generó un "no veo cambios" evitable.
+- **Próximo paso concreto:**
+  1. Facu tiene que abrir 3 PRs contra `dev` - `feature/158-orden-navbar-flujo`,
+     `feature/158-tracker-flujo` (ninguna depende de la otra, mergean en
+     cualquier orden) y este mismo checkpoint
+     (`docs/checkpoint-sesion-2026-09-17`) - importante hacerlo *antes* de
+     arrancar la próxima sesión en la otra máquina.
+  2. Con los 2 PRs del `#158` mergeados, decidir si el issue queda cerrado
+     o si se retoma por el ítem menor de `envios_view.html`.
+  3. Retomar la charla pendiente sobre el `#205` - sigue pospuesta.
+  4. Facu mencionó que pronto arranca a planificar la próxima entrega -
+     este checkpoint sirve de resumen de lo hecho para esa planificación.
+     Candidatos para la próxima tarea grande: los 3 de "Prioridades de
+     Backlog" (`#57`, `#47`, `#52`), la investigación nueva del `#244`, o
+     **#170**/**#195** ya mencionados en checkpoints anteriores.
+- **Ambiente local de esta máquina:** usado activamente hoy, sin necesidad
+  de setup (mismo equipo de siempre). El server de pruebas se detuvo al
+  cerrar la sesión. La próxima sesión es en **otra máquina** - repetir el
+  setup de entorno local de cero ahí (ver sección "Setup de entorno local"
+  más abajo) si todavía no está armado.
+- **Bloqueos:** ninguno.
+
+<details>
+<summary>Checkpoint anterior (2026-09-16) — histórico, dejado sin borrar por
+referencia</summary>
+
+- **Última actualización:** 2026-09-16, cierre de sesión (Facu sigue en la
+  misma máquina la próxima vez - por eso este checkpoint queda commiteado
+  local nada más, sin pushear todavía; se pushea recién cuando avise que
+  cambia de máquina).
+- **Al arrancar hoy, `dev` ya estaba mucho más adelantado que este mismo
+  checkpoint** (el `#199`/`#201`/`#206` de la sesión del 09-10 y varias
+  tareas más de sesiones intermedias ya estaban mergeadas - `#191`, `#194`,
+  `#195`, `#199`, `#202`, `#213`, entre otras). No hubo que resolver nada
+  ahí, solo confirmar el estado real con `git log`/`gh issue list` antes de
+  asumir contexto del checkpoint viejo.
+- **Tarea de la sesión: terminar el `#199` (quedaba un hallazgo sin
+  resolver: indicador de recepción DML en `/raypac`) y arrancar el `#158`
+  (flujo guiado - jerarquía de botones + botón al siguiente paso).**
+  - **`#199` - ✅ terminado y mergeado a `dev` durante la sesión (PR #237,
+    mergeado por Facu mientras se trabajaba en el `#158`).** Se agregó la
+    columna "Envío a DML" a `raypac_list.html` (mismos badges que
+    `raypac_view.html`). Iteración de colores con Facu: la paleta inicial
+    (amarillo/gris) repetía la de la columna "Estado" (freeze) en la misma
+    fila, dando sensación de que faltaba algo - se recolor a celeste/gris
+    clarito. De paso se repensó toda la columna "Ficha ST" (mezclaba
+    colores hex sueltos: verde+celeste+naranja+amarillo+blanco en una sola
+    celda) al mismo criterio: un solo badge de color fuerte por celda
+    (el hito real), referencias (número de ticket) a etiqueta neutra con
+    ícono. Se evaluó también poner "Freezado" en verde cuando no queda
+    nada pendiente - **Facu decidió que no, se queda como está**.
+  - **`#158` - relevamiento hecho (fork de solo lectura sobre los templates
+    de RAYPAC/tickets/DML/envíos/stock) + 4 candidatos implementados,
+    probados y pusheados, los 4 con PR abierto (por Facu) y CI en verde:**
+    1. **PR #239** (`feature/158-boton-crear-ficha-desde-ticket`) - botón
+       "Crear Ficha DML" en `ticket_view.html` cuando el ticket no tiene
+       ficha todavía (antes no había ningún botón - había que saber que el
+       flujo seguía en `/raypac`). `Refs #158`.
+    2. **PR #241** (`feature/158-jerarquia-botones-dml-view`) - botón
+       "Registrar Acuse" en `dml_view.html` cuando la ficha está cerrada
+       sin acuse (antes no quedaba ningún acceso a `/dml/entregadas` -
+       abre directo el modal de esa ficha vía `?open_acuse=<id>`);
+       "Ver Ticket"/"Descargar PDF" pasan a estilo outline para
+       diferenciarse de las acciones reales (antes los 6 botones eran
+       sólidos, sin jerarquía); de paso, el link "Ir a crear ticket" de
+       `raypac_view.html` pasa de apuntar al listado a ir directo al form
+       real. `Refs #158`.
+    3. **PR #242** (`fix/raypac-crear-ticket-post-vacio`) - hallazgo
+       aparte, no es del `#158`: el botón "Crear Ticket" de `/raypac` era
+       un `<form method="POST">` con un submit sin campos - no crea
+       tickets con datos falsos (la validación de "técnico responsable"
+       bloquea el INSERT), pero deja al usuario en una página
+       resultado-de-POST que el navegador puede querer reenviar al
+       refrescar. Pasa a ser un link `GET` normal (la ruta ya soporta GET
+       y muestra el form real).
+    4. **PR #240** (`fix/raypac-view-crear-ficha-ya-existente`) - hallazgo
+       de Facu haciendo el recorrido completo del flujo (pedido
+       explícitamente para probar el `#158` de punta a punta en vez de
+       por estados sueltos - encontró esto justo por eso): la tarjeta
+       "Crear Ficha de Servicio Técnico en DML" de `raypac_view.html`
+       solo chequeaba si existía un ticket (siempre verdadero una vez
+       creado), nunca si ya existía una ficha - seguía ofreciendo
+       "Crear Ficha DML" para siempre, con un error confuso al clickear
+       ("Debe crear un ticket primero") aunque el ticket sí existiera.
+       2 commits (Facu encontró en la revisión visual que el título de la
+       tarjeta también quedaba desactualizado, no solo el botón): ahora
+       tanto el título/color del header como el botón cambian a "Ver
+       Ficha DML" si la ficha ya existe.
+  - **Verificado que los 4 PRs mergean sin conflicto en cualquier orden**
+    (simulado localmente mergeando los 4 contra `dev` en una rama de
+    prueba, borrada después - los PRs #240 y #241 tocan la misma tarjeta
+    de `raypac_view.html` pero en líneas distintas, git las combina solo).
+  - **Quedan sin resolver del `#158`:** el ítem menor de `envios_view.html`
+    (3 botones para ADMIN sin mucha diferenciación, prioridad baja,
+    marcado como no bloqueante en el relevamiento) y la decisión sobre el
+    **`#205`** (orden invertido: la lista de RAYPAC ofrece "Crear Ticket"
+    antes que "Dar de Alta en DML", sin validación que dependa de uno del
+    otro) - Facu prefirió posponer esa charla para la próxima sesión, no
+    se tocó nada relacionado.
+- **Gotcha nuevo, agregado a "Setup de entorno local":** sin
+  `FLASK_DEBUG=1`, Jinja no re-lee templates modificados en caliente
+  (`auto_reload` sigue el valor de `debug`) - y si queda un server viejo
+  compitiendo por el puerto 5000 mientras se levanta uno nuevo, `curl`/el
+  navegador pueden seguir pegándole al viejo sin ningún error visible.
+  Pasó en esta sesión probando el botón nuevo de `ticket_view.html` - no
+  aparecía por ninguna de las dos razones combinadas, no por un bug real
+  del template. Antes de dar un cambio de template por "no funciona",
+  confirmar que no quede un proceso viejo en el puerto y reiniciar el
+  server después de cada cambio.
+- **Nueva sección agregada a este archivo: "Prioridades de Backlog"**
+  (después del checkpoint, antes de "Instrucciones de flujo de trabajo") -
+  pedido explícito de Facu: **`#57`, `#47`, `#52`** son las issues más
+  viejas que siguen abiertas en Backlog, marcadas como candidatas
+  preferentes para cuando se termine la tarea en curso.
+- **Próximo paso concreto:**
+  1. Facu tiene que mergear los 4 PRs de hoy (`#239`, `#240`, `#241`,
+     `#242`) - cualquier orden, ya verificado que no chocan entre sí.
+  2. Decidir si con esto el `#158` queda cerrado (el ítem de
+     `envios_view.html` es prioridad baja, no bloqueante) o si vale la
+     pena retomarlo por ese ítem menor.
+  3. Retomar la charla pendiente sobre el `#205` (orden Dar de Alta antes
+     de Crear Ticket) - Facu la dejó para la próxima sesión a propósito.
+  4. Después de eso, candidatos para la próxima tarea grande: los 3 de
+     "Prioridades de Backlog" arriba (`#57`, `#47`, `#52`), o **#170**/
+     **#195** ya mencionados en checkpoints anteriores.
+- **Ambiente local de esta máquina:** usado activamente hoy, sin necesidad
+  de setup (mismo equipo de siempre). El server de pruebas se detuvo al
+  cerrar la sesión. La próxima sesión sigue en esta misma máquina.
+- **Bloqueos:** ninguno.
+
+</details>
+
+<details>
+<summary>Checkpoint anterior (2026-09-10) — histórico, dejado sin borrar por
+referencia</summary>
+
 - **Última actualización:** 2026-09-10, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
 - **Los 3 pendientes del checkpoint anterior (07/09→09/09) ya están
@@ -135,6 +387,8 @@ asumir contexto de nada más.
   sección "Setup de entorno local" más abajo) si todavía no está
   armado.
 - **Bloqueos:** ninguno.
+
+</details>
 
 <details>
 <summary>Checkpoint anterior (2026-09-03) — histórico, dejado sin borrar por
@@ -636,6 +890,15 @@ las referencias a Issue #54/#62 más abajo</summary>
 
 </details>
 
+## Prioridades de Backlog (marcadas por Facu)
+
+**#57** (corregir envío de repuestos desde RAYPAC), **#47** (mejorar
+visibilidad entre roles) y **#52** (sistema de backups) son las issues más
+viejas que siguen abiertas en el Backlog. Facu pidió priorizarlas (nota del
+2026-09-16) para que sean candidatas preferentes en cuanto se termine la
+tarea en curso — aunque es posible que un compañero las agarre antes.
+Chequear su estado en GitHub antes de asumir que siguen libres.
+
 ## Instrucciones de flujo de trabajo para Claude Code
 
 **PRs chicos, siempre.** No armar un PR gigante con toda una tarea/issue resuelta de
@@ -874,6 +1137,20 @@ el estado real del issue en GitHub, no solo que el PR esté mergeado.
   ```
   (Nota: reportar este bug al equipo — la solución de fondo es mover `load_dotenv()`
   arriba del import de `config` en `app.py`.)
+- **Gotcha de testing (no es bug de la app): sin `debug=True`, Jinja no
+  detecta cambios en templates ni libera el puerto solo.** Sin
+  `FLASK_DEBUG=1`, `auto_reload` de Jinja queda en `False` - un server ya
+  corriendo sigue sirviendo la versión de un template que ya compiló en
+  memoria, aunque el archivo en disco cambie. Si además queda un segundo
+  proceso intentando levantar en el puerto 5000 mientras el primero sigue
+  vivo, `curl`/el navegador pueden seguir pegándole al viejo sin ningún
+  error visible - un cambio recién hecho puede parecer que "no aparece"
+  sin ninguna pista de por qué. Antes de probar un cambio de template,
+  siempre: 1) confirmar que no quede un proceso viejo en el puerto
+  (`Get-NetTCPConnection -LocalPort 5000 -State Listen` en PowerShell,
+  matar el PID que devuelva) y 2) reiniciar el server después de cada
+  cambio de template, no asumir que el primer arranque de la sesión
+  alcanza para toda la sesión.
 - **Correr la app:** `python -m CODIGO_FUENTE.app` desde la raíz del repo (NO
   `python CODIGO_FUENTE/app.py` directo, porque los imports internos son relativos
   al paquete `CODIGO_FUENTE`).
