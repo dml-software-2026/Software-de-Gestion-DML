@@ -8,66 +8,48 @@
     <a class="btn btn-success" href="{{ url_for('envios.envios_new') }}"><i class="bi bi-plus-circle"></i> Nuevo envío</a>
     {% endif %}
   </div>
+    <div class="mb-3">
+    {% if mostrar_recibidos %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('envios.envios_list') }}">Ocultar recibidos</a>
+    {% else %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('envios.envios_list', estado='todos') }}">Ver también recibidos</a>
+    {% endif %}
+  </div>
 
-  {% if envios %}
-  <table class="table table-hover align-middle">
-    <thead>
-      <tr>
-        <th>Remito</th>
-        <th>Tipo</th>
-        <th>Fecha envío</th>
-        <th>Fecha recepción</th>
-        <th>Estado</th>
-        <th>Items</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for envio in envios %}
-      <tr>
-        <td>
-          {% if envio.tipo_envio == 'MAQUINA' %}
-          <strong>{{ envio.numero_remito }}</strong>
-          {% else %}
-          <strong>{{ envio.numero_remito }}</strong>
-          {% endif %}
-        </td>
-        <td>
-          {% if envio.tipo_envio == 'MAQUINA' %}
-          <span class="badge" style="background-color: #6c757d; color: white;">Máquina</span>
-          {% else %}
-          <span class="badge" style="background-color: #17a2b8; color: white;">Repuestos</span>
-          {% endif %}
-        </td>
-        <td>{{ envio.fecha_envio }}</td>
-        <td>{{ envio.fecha_recepcion or '-' }}</td>
-        <td>
-          {% if envio.estado_envio == 'RECIBIDO' %}
-          <span class="badge bg-success">Recibido</span>
-          {% elif envio.estado_envio == 'ENVIADO' %}
-          <span class="badge bg-warning text-dark">En Tránsito</span>
-          {% else %}
-          <span class="badge bg-secondary">Pendiente</span>
-          {% endif %}
-        </td>
-        <td>{{ envio.items_count }}</td>
-        <td class="text-end">
-          {% if envio.tipo_envio == 'MAQUINA' %}
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('raypac.raypac_view', id=envio.id) }}">
-            <i class="bi bi-eye"></i> Ver
-          </a>
-          {% else %}
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('envios.envios_view', id=envio.id) }}">
-            <i class="bi bi-eye"></i> Ver
-          </a>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  {% if envios_maquinas or envios_repuestos %}
+  <ul class="nav nav-tabs mb-3" id="enviosTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-maquinas-btn" data-bs-toggle="tab"
+              data-bs-target="#tab-maquinas" type="button" role="tab">
+        Máquinas enviadas <span class="badge bg-secondary ms-1">{{ envios_maquinas|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-repuestos-btn" data-bs-toggle="tab"
+              data-bs-target="#tab-repuestos" type="button" role="tab">
+        Repuestos enviados <span class="badge bg-info ms-1">{{ envios_repuestos|length }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="enviosTabContent">
+    <div class="tab-pane fade show active" id="tab-maquinas" role="tabpanel">
+      {% set envios = envios_maquinas %}
+      {% include "_envios_tabla.html" %}
+    </div>
+    <div class="tab-pane fade" id="tab-repuestos" role="tabpanel">
+      {% set envios = envios_repuestos %}
+      {% include "_envios_tabla.html" %}
+    </div>
+  </div>
   {% else %}
-  <div class="alert alert-info">No hay envíos registrados.</div>
+  <div class="alert alert-info">
+    {% if mostrar_recibidos %}
+    No hay envíos registrados.
+    {% else %}
+    No hay envíos pendientes. Usá "Ver también recibidos" para consultar el historial.
+    {% endif %}
+  </div>
   {% endif %}
   
   <div class="text-muted text-center mt-3 small">

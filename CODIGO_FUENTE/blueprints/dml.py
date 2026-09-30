@@ -1,4 +1,5 @@
 from datetime import datetime
+from io import BytesIO
 
 from flask import (
     Blueprint,
@@ -17,11 +18,13 @@ from CODIGO_FUENTE.decorators import (
     login_required,
     permission_required,
     role_required,
+    verify_admin_password,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.flujo import build_flow_steps
 from CODIGO_FUENTE.services.mail import send_mail
 from CODIGO_FUENTE.services.numeracion import crear_ticket, generate_ficha_number
-from CODIGO_FUENTE.services.pdf import generar_ficha_pdf, generate_ficha_pdf
+from CODIGO_FUENTE.services.pdf import generar_pdf_ficha
 from CODIGO_FUENTE.services.stock import (
     actualizar_estadistica_repuesto,
     ajustar_stock_ubicacion,
@@ -37,15 +40,40 @@ dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
 def dml_list(readonly=False):
     user = get_current_user()
     db = get_db()
-    fichas = db.execute("""
+
+    buscar = request.args.get("buscar", "")
+    estado = request.args.get("estado", "")
+
+    # Mismo patrón de búsqueda/filtro que tickets_list (#193) - las fichas
+    # cerradas no entran acá a propósito, ya tienen su propia pantalla en
+    # /dml/entregadas, no hace falta un toggle "mostrar cerrados" como en
+    # tickets.
+    query = """
         SELECT f.*, r.cliente, r.numero_serie
         FROM dml_fichas f
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
         WHERE f.is_closed = FALSE
-        ORDER BY f.created_at DESC
-    """).fetchall()
+    """
+    params = []
 
-    return render_template("dml_list.html", fichas=fichas, user_role=user['role'], readonly=readonly)
+    if buscar:
+        query += """ AND (CAST(f.numero_ficha AS TEXT) LIKE %s
+                       OR r.cliente ILIKE %s
+                       OR r.numero_serie ILIKE %s
+                       OR f.numero_ticket ILIKE %s)"""
+        comodin = f"%{buscar}%"
+        params.extend([comodin, comodin, comodin, comodin])
+
+    if estado:
+        query += " AND f.estado_reparacion = %s"
+        params.append(estado)
+
+    query += " ORDER BY f.created_at DESC"
+
+    fichas = db.execute(query, params).fetchall()
+
+    return render_template("dml_list.html", fichas=fichas, user_role=user['role'], readonly=readonly,
+                            buscar=buscar, estado=estado)
 
 
 @dml_bp.route("/entregadas")
@@ -213,8 +241,22 @@ def dml_view(id, readonly=False):
         (id,)
     ).fetchall()
 
+    # #158: tracker de 4 pasos (Ticket/Ficha/Entregada/Acuse) - es el tramo
+    # del lado DML (ver raypac_view() para el tramo de 3 pasos del lado
+    # RAYPAC). Ticket creado siempre está en "done" acá: dml_new() exige un
+    # ticket existente antes de poder crear la ficha.
+    if ficha['fecha_entrega_cliente']:
+        current_step = 4
+    elif ficha['is_closed']:
+        current_step = 3
+    else:
+        current_step = 2
+    flow_steps = build_flow_steps(
+        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+    )
+
     return render_template("dml_view.html", ficha=ficha, raypac=raypac, partes=partes, repuestos=repuestos,
-                           user_role=user['role'], readonly=readonly)
+                           user_role=user['role'], readonly=readonly, flow_steps=flow_steps)
 
 
 @dml_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -236,16 +278,19 @@ def dml_edit(id):
     if request.method == "POST":
         try:
             unfreeze_code = request.form.get("unfreeze_code")
-            # TODO SEGURIDAD (Épica 2): código hardcodeado "ADMIN2024", mismo
-            # que en raypac_edit. Se repite en al menos 2 lugares del código -
-            # candidato claro para centralizar en una sola variable de entorno.
-            if ficha['is_closed'] and unfreeze_code != "ADMIN2024":
+            # #133: se confirma contra la contraseña del propio usuario
+            # logueado (mismo mecanismo que el login), no un código fijo
+            # separado que había que memorizar aparte.
+            if ficha['is_closed'] and not verify_admin_password(unfreeze_code):
                 flash("Código incorrecto.", "error")
                 return redirect(url_for("dml.dml_view", id=id))
 
             # Capturar SOLO los campos editables (no los de RAYPAC)
             fecha_ingreso = request.form.get("fecha_ingreso")
-            fecha_egreso = request.form.get("fecha_egreso")
+            # #176: "Fecha de Egreso" no es required (recién se completa al
+            # cerrar la ficha) - el string vacío rompía el UPDATE de más
+            # abajo (Postgres no acepta '' para una columna date).
+            fecha_egreso = request.form.get("fecha_egreso") or None
 
             estado = request.form.get("estado_reparacion")
             # CAMBIO DAVID: No usar diagnostico_inicial, ya viene de RAYPAC
@@ -262,8 +307,16 @@ def dml_edit(id):
                 horas = float(horas_raw) if horas_raw else None
             except ValueError:
                 horas = None  # texto no numérico (ej. "NO APLICA")
-            numero_remito = request.form.get("numero_remito_salida")
+            numero_remito = request.form.get("numero_remito_salida") or None
             tecnico_resp = request.form.get("tecnico_resp") or ""
+
+            # #157: "MÁQUINA ENTREGADA" ya no es una opción del <select> (ver
+            # dml_edit.html), pero valido igual por si llega un POST armado a
+            # mano - el único camino a ese estado es "Cerrar Ficha", que corre
+            # el checklist completo y marca is_closed=TRUE.
+            if estado == 'MÁQUINA ENTREGADA':
+                flash("Para marcar la ficha como entregada, usá el botón 'Cerrar Ficha'.", "error")
+                return redirect(url_for("dml.dml_edit", id=id))
 
             # Validación de flujo lógico de estados según documento David
             # Orden lógico: A LA ESPERA DE REVISIÓN → EN REPARACIÓN → [A LA ESPERA DE REPUESTOS] → MÁQUINA LISTA PARA RETIRAR → MÁQUINA ENTREGADA
@@ -329,7 +382,19 @@ def dml_edit(id):
     repuestos = [dict(r) for r in repuestos]
     ficha = dict(ficha)
 
-    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos)
+    # #158: mismo tracker que dml_view() - Facu pidió que también se vea acá,
+    # no solo en la vista de solo lectura.
+    if ficha['fecha_entrega_cliente']:
+        current_step = 4
+    elif ficha['is_closed']:
+        current_step = 3
+    else:
+        current_step = 2
+    flow_steps = build_flow_steps(
+        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+    )
+
+    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps)
 
 
 # ======================== REPUESTOS ========================
@@ -383,6 +448,8 @@ def agregar_repuesto(id):
         estado_repuesto = "EN STOCK"
         # Descontar del stock en DML usando ajustar_stock_ubicacion
         ajustar_stock_ubicacion(codigo, "DML", -cantidad_utilizada)
+        # Actualizar estadísticas de uso (solo cuando el repuesto se usa de verdad)
+        actualizar_estadistica_repuesto(codigo, cantidad_utilizada)
     else:
         en_stock = 0
         en_falta = 1
@@ -396,8 +463,7 @@ def agregar_repuesto(id):
     """, (id, codigo, repuesto['item'], cantidad_utilizada, cantidad_utilizada, estado_repuesto, en_stock, en_falta))
     db.commit()
 
-    # Actualizar estadísticas de uso
-    actualizar_estadistica_repuesto(codigo, cantidad_utilizada)
+    # (se sacó la llamada a actualizar_estadistica_repuesto que estaba acá)
 
     # Verificar alerta de stock después de descontar
     if en_stock:
@@ -529,6 +595,9 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
         WHERE codigo_repuesto = %s
     """, (repuesto['cantidad_utilizada'], repuesto['codigo_repuesto']))
 
+    # Actualizar estadísticas de uso (se agrega esta línea)
+    actualizar_estadistica_repuesto(repuesto['codigo_repuesto'], repuesto['cantidad_utilizada'])
+
     db.commit()
 
     log_action(user['id'], "MOVER_REPUESTO_A_STOCK", "dml_repuestos", repuesto_id,
@@ -554,10 +623,14 @@ def eliminar_repuesto(ficha_id, repuesto_id):
     if repuesto['en_stock']:
         ajustar_stock_ubicacion(repuesto['codigo_repuesto'], "DML", repuesto['cantidad_utilizada'])
 
-        # Restar de estadísticas (reversar el uso)
+        # Restar de estadísticas (reversar el uso): 1 uso menos, y la cantidad
+        # real utilizada menos — no restar cantidad_utilizada de total_usos,
+        # que cuenta "veces", no "unidades". GREATEST evita negativos.
         db.execute("""
             UPDATE estadisticas_repuestos
-            SET total_usos = total_usos - %s, updated_at = CURRENT_TIMESTAMP
+            SET total_usos = GREATEST(total_usos - 1, 0),
+                cantidad_utilizada = GREATEST(cantidad_utilizada - %s, 0),
+                updated_at = CURRENT_TIMESTAMP
             WHERE codigo_repuesto = %s
         """, (repuesto['cantidad_utilizada'], repuesto['codigo_repuesto']))
 
@@ -686,6 +759,16 @@ def dml_close(id):
     if repuestos_count == 0 and partes_inspeccionadas == 0:
         errores.append("Debe inspeccionar al menos una parte o agregar repuestos utilizados")
 
+    # 5. #226: no se puede cerrar con repuestos EN FALTA (criterio de David).
+    # Una ficha sin repuestos (solo mano de obra) no entra acá y cierra normal.
+    repuestos_en_falta = db.execute(
+        "SELECT codigo_repuesto FROM dml_repuestos WHERE ficha_id = %s AND en_falta = 1",
+        (id,)
+    ).fetchall()
+    if repuestos_en_falta:
+        codigos = ", ".join(r['codigo_repuesto'] for r in repuestos_en_falta)
+        errores.append(f"Hay repuestos EN FALTA que impiden el cierre: {codigos}")
+
     if errores:
         flash("⚠️ No se puede cerrar la ficha. Campos requeridos faltantes:", "error")
         for error in errores:
@@ -693,11 +776,15 @@ def dml_close(id):
         return redirect(url_for("dml.dml_edit", id=id))
 
     try:
-        # Cerrar la ficha y marcar como ENTREGADA
+        # Cerrar la ficha y marcar como entregada. #156: usar el valor
+        # canonico real ('MÁQUINA ENTREGADA', el mismo del <select> de
+        # dml_edit.html y de estados_orden/color map) en vez del 'ENTREGADA'
+        # suelto que dejaba la ficha en un estado huerfano - mismo patron
+        # de bug que el #44, pero en el flujo de cierre en vez del de alta.
         fecha_egreso = datetime.now().strftime("%Y-%m-%d")
         db.execute("""
             UPDATE dml_fichas
-            SET is_closed = TRUE, fecha_egreso = %s, estado_reparacion = 'ENTREGADA'
+            SET is_closed = TRUE, fecha_egreso = %s, estado_reparacion = 'MÁQUINA ENTREGADA'
             WHERE id = %s
         """, (fecha_egreso, id))
 
@@ -788,8 +875,11 @@ def dml_registrar_acuse(id):
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_entregadas"))
 
-    if ficha['estado_reparacion'] != 'ENTREGADA':
-        flash("Solo se puede registrar acuse de fichas marcadas como ENTREGADA.", "error")
+    # 'ENTREGADA' queda como alias legado: fichas cerradas antes de este fix
+    # (#156) quedaron con ese valor suelto en vez del canonico 'MÁQUINA
+    # ENTREGADA'. Mismo criterio de alias que dejo el #44.
+    if ficha['estado_reparacion'] not in ('MÁQUINA ENTREGADA', 'ENTREGADA'):
+        flash("Solo se puede registrar acuse de fichas marcadas como entregadas.", "error")
         return redirect(url_for("dml.dml_view", id=id))
 
     try:
@@ -828,79 +918,18 @@ def dml_registrar_acuse(id):
 
 
 # ======================== PDF DE FICHA ========================
-# NOTA: estas 2 rutas se agregaron en un checkpoint posterior al resto del
-# archivo - en la primera pasada de extracción no se habían visto todavía
-# (estaban ubicadas mas adelante en el app.py original, cerca del bloque de
-# usuarios/admin, aunque su URL es /dml/... y por eso corresponden aca).
-
-@dml_bp.route("/<int:id>/generar-ficha", methods=["POST"])
-@login_required
-@role_required("ADMIN", "DML_ST")
-def generar_ficha(id):
-    user = get_current_user()
-    db = get_db()
-
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
-    if not ficha:
-        flash("Ficha no encontrada.", "error")
-        return redirect(url_for("dml.dml_list"))
-
-    # Verificar que esté en "MÁQUINA LISTA PARA RETIRAR"
-    if ficha['estado_reparacion'] != 'MÁQUINA LISTA PARA RETIRAR':
-        flash("La máquina debe estar en estado 'MÁQUINA LISTA PARA RETIRAR'.", "error")
-        return redirect(url_for("dml.dml_view", id=id))
-
-    try:
-        # Generar PDF para validar que no hay errores
-        pdf_buffer = generate_ficha_pdf(id)
-
-        # Guardar en BD
-        db.execute(
-            "UPDATE dml_fichas SET ficha_generada = 1, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-            (id,)
-        )
-        db.commit()
-
-        # Intentar enviar correo al comercial (no bloquear si falla)
-        try:
-            raypac = db.execute(
-                "SELECT mail_comercial FROM raypac_entries WHERE id = %s",
-                (ficha['raypac_id'],)
-            ).fetchone()
-
-            if raypac and raypac['mail_comercial']:
-                html_body = f"""
-                <html>
-                <body>
-                <h2>Máquina Lista para Entregar</h2>
-                <p>La máquina <strong>{ficha['numero_ficha']}</strong> se encuentra lista para retirar.</p>
-                <p>Datos del ticket: {ficha['numero_ticket']}</p>
-                <p>Saludos, DML</p>
-                </body>
-                </html>
-                """
-                send_mail(raypac['mail_comercial'],
-                         f"Máquina {ficha['numero_ticket']} - Lista para Retirar",
-                         html_body)
-
-                db.execute(
-                    "UPDATE dml_fichas SET ticket_enviado = 1 WHERE id = %s",
-                    (id,)
-                )
-                db.commit()
-        except Exception as e:
-            print(f"Error al enviar email: {e!s}")
-
-        log_action(user['id'], "GENERATE_FICHA", "dml_fichas", id, None,
-                  f"Ficha #{ficha['numero_ficha']}")
-
-        flash("Ficha generada exitosamente. Descarga el PDF con el botón disponible.", "success")
-        return redirect(url_for("dml.dml_view", id=id))
-
-    except Exception as e:
-        flash(f"Error al generar ficha: {e!s}", "error")
-        return redirect(url_for("dml.dml_view", id=id))
-
+# NOTA: esta ruta se agregó en un checkpoint posterior al resto del
+# archivo - en la primera pasada de extracción no se había visto todavía
+# (estaba ubicada mas adelante en el app.py original, cerca del bloque de
+# usuarios/admin, aunque su URL es /dml/... y por eso corresponde aca).
+#
+# #134: existía también generar_ficha() (POST /generar-ficha), código
+# huérfano - ningún template la llamaba. Se eliminó: lo que hacía (generar
+# el PDF, avisar por mail al comercial que la máquina está lista) ya lo
+# cubren descargar_ficha_pdf() de acá abajo y dml_close() ("Cerrar Ficha",
+# manda el mismo mail de "MÁQUINA LISTA PARA RETIRAR"), y el flag que
+# marcaba (ficha_generada, más ticket_enviado) no lo leía nada en código
+# vivo - quedan sin usar en el schema, no se tocaron.
 
 @dml_bp.route("/<int:id>/pdf", methods=["GET"])
 @login_required
@@ -915,17 +944,14 @@ def descargar_ficha_pdf(id):
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_list"))
 
-    # Generar PDF on-demand
-    pdf_buffer = generar_ficha_pdf(id)
-
-    if not pdf_buffer:
+     # Generar PDF on-demand
+    pdf_bytes = generar_pdf_ficha(id)
+    if not pdf_bytes:
         flash("No se pudo generar el PDF.", "error")
         return redirect(url_for("dml.dml_view", id=id))
-
     log_action(user['id'], "DOWNLOAD_FICHA_PDF", "dml_fichas", id, None,
               f"Ficha #{ficha['numero_ficha']}")
-
     # Devolver PDF
-    return send_file(pdf_buffer, mimetype='application/pdf',
+    return send_file(BytesIO(pdf_bytes), mimetype='application/pdf',
                     as_attachment=True,
                     download_name=f"ficha_{ficha['numero_ficha']:07d}.pdf")

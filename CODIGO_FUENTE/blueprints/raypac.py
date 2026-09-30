@@ -11,6 +11,7 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.flujo import build_flow_steps
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
 
@@ -39,8 +40,14 @@ def raypac_list(readonly=False):
     user = get_current_user()
     db = get_db()
 
-    try:
-        entries = db.execute("""
+    buscar = request.args.get("buscar", "")
+    estado = request.args.get("estado", "")
+
+    # Mismo patrón de búsqueda/filtro que tickets_list (#193). "Estado" acá
+    # filtra por freeze (lo que ya muestra la columna "Estado" de la tabla),
+    # no por el estado de la ficha DML asociada - ese es un dato de otra
+    # tabla y ya tiene su propio filtro en /dml.
+    query = """
             SELECT r.*,
                    (SELECT COUNT(*) FROM dml_fichas f WHERE f.raypac_id = r.id) AS fichas_count,
                    (SELECT f.id FROM dml_fichas f WHERE f.raypac_id = r.id ORDER BY f.created_at DESC LIMIT 1) AS ficha_id,
@@ -48,8 +55,28 @@ def raypac_list(readonly=False):
                    (SELECT t.id FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_id,
                    (SELECT t.numero_ticket FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_numero
             FROM raypac_entries r
-            ORDER BY r.created_at DESC
-        """).fetchall()
+            WHERE 1=1
+    """
+    params = []
+
+    if buscar:
+        query += """ AND (r.cliente ILIKE %s
+                       OR r.numero_serie ILIKE %s
+                       OR r.modelo_maquina ILIKE %s
+                       OR r.comercial ILIKE %s
+                       OR r.numero_remito ILIKE %s)"""
+        comodin = f"%{buscar}%"
+        params.extend([comodin, comodin, comodin, comodin, comodin])
+
+    if estado == "FREEZADO":
+        query += " AND r.is_frozen = TRUE"
+    elif estado == "EDITABLE":
+        query += " AND r.is_frozen = FALSE"
+
+    query += " ORDER BY r.created_at DESC"
+
+    try:
+        entries = db.execute(query, params).fetchall()
     except Exception as e:
         db.rollback()  # En caso de error, revertir la transacción
         # Si hay error en la query, mostrar mensaje y retornar lista vacía
@@ -70,7 +97,8 @@ def raypac_list(readonly=False):
         "MÁQUINA ENTREGADA": {"color": "#28a745", "texto_color": "#ffffff", "texto": "Máquina Entregada"}
     }
 
-    return render_template("raypac_list.html", entries=entries, user_role=user['role'], readonly=readonly, estado_config=estado_config)
+    return render_template("raypac_list.html", entries=entries, user_role=user['role'], readonly=readonly,
+                            estado_config=estado_config, buscar=buscar, estado=estado)
 
 
 @raypac_bp.route("/new", methods=["GET", "POST"])
@@ -156,7 +184,30 @@ def raypac_view(id, readonly=False):
     # Verificar si existe un ticket asociado
     ticket = db.execute("SELECT numero_ticket FROM tickets WHERE raypac_id = %s", (id,)).fetchone()
 
-    return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly, ticket=ticket)
+    # Verificar si ya existe una ficha DML - sin esto, la tarjeta "Crear Ficha
+    # DML" seguía ofreciendo crear una nueva para siempre (ticket ya existe,
+    # así que "ticket" arriba sigue siendo verdadero) aunque la ficha ya
+    # estuviera creada e incluso cerrada. dml_new() rechaza el intento con un
+    # mensaje confuso ("Debe crear un ticket primero") porque busca un ticket
+    # sin ficha_id asociado, que deja de existir en cuanto la ficha se crea.
+    ficha = db.execute(
+        "SELECT id FROM dml_fichas WHERE raypac_id = %s ORDER BY created_at DESC LIMIT 1",
+        (id,)
+    ).fetchone()
+
+    # #158: tracker de 3 pasos (Ingreso/Envío/Recibido) - es el tramo que
+    # le compete a RAYPAC, se corta ahí (crear ticket/ficha ya es del lado
+    # DML, ver dml_view()/ticket_view()).
+    if entry['estado_envio_equipos'] == 'RECIBIDO':
+        current_step = 3
+    elif entry['is_frozen']:
+        current_step = 2
+    else:
+        current_step = 1
+    flow_steps = build_flow_steps(["Ingreso RAYPAC", "Envío a DML", "Recibido en DML"], current_step)
+
+    return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly,
+                            ticket=ticket, ficha=ficha, flow_steps=flow_steps)
 
 
 @raypac_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -171,20 +222,18 @@ def raypac_edit(id):
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
-    if entry['is_frozen'] and not request.form.get("unfreeze_code"):
-        flash("Este registro está freezado. Requiere código de desbloqueo.", "error")
-        return render_template("raypac_view.html", entry=entry)
+    # #133: un registro freezado es inmutable por esta vía. El único camino
+    # real para volver a editar es desfrezarlo antes con raypac_unfreeze()
+    # (últimos 4 dígitos del remito, botón "Desfreezar Definitivamente"). El
+    # mecanismo viejo de aceptar un unfreeze_code acá adentro era código
+    # muerto: ningún template lo alcanzaba (raypac_view.html ya oculta el
+    # botón "Editar" para todos los roles mientras is_frozen sea true).
+    if entry['is_frozen']:
+        flash("Este registro está freezado. Desfreezalo antes de editar.", "error")
+        return redirect(url_for("raypac.raypac_view", id=id))
 
     if request.method == "POST":
         try:
-            unfreeze_code = request.form.get("unfreeze_code")
-            # TODO SEGURIDAD (Épica 2): código de desbloqueo hardcodeado
-            # ("ADMIN2024"). Mismo patrón que los hashes hardcodeados en
-            # migrate_db() y debería resolverse junto con esa tarea.
-            if entry['is_frozen'] and unfreeze_code != "ADMIN2024":
-                flash("Código de desbloqueo incorrecto.", "error")
-                return render_template("raypac_view.html", entry=entry)
-
             fecha = request.form.get("fecha_recepcion")
             tipo_solicitud = request.form.get("tipo_solicitud")
             cliente = request.form.get("cliente")
@@ -238,13 +287,13 @@ def raypac_freeze(id):
         return redirect(url_for("raypac.raypac_view", id=id))
 
     # Auto-completar formato si solo ingresa 4 dígitos (últimos)
-    if re.match(r'^\d{1,4}$', numero_remito):
-        # Usuario ingresó solo números (1-4 dígitos), auto-completar
-        ultimo = numero_remito.zfill(4)  # Rellenar con ceros a la izquierda
-        numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXX
+    if re.match(r'^\d{1,8}$', numero_remito):
+        # Autocompletar con el prefijo estándar 00001-, siempre 8 dígitos del lado derecho
+        ultimo = numero_remito.zfill(8)  # Rellenar con ceros a la izquierda hasta completar 8 dígitos
+        numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXXXXXX (8 dígitos)
         flash(f"📋 Remito auto-completado: {numero_remito}", "info")
-    elif not re.match(r'^\d{4,5}-\d{4,7}$', numero_remito):
-        flash("⚠️ Formato de remito inválido. Ingresa solo los últimos 4 dígitos (ej: 4222) o el formato completo ####-#### (ej: 00001-04222).", "error")
+    elif not re.match(r'^\d{4,5}-\d{8}$', numero_remito):
+        flash("⚠️ Formato de remito inválido. Ingresa solo los dígitos del remito (ej: 4222 o 2568) o el formato completo #####-######## (ej: 00001-00004222).", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     # Verificar que no exista ya en raypac_entries
@@ -260,11 +309,18 @@ def raypac_freeze(id):
         return redirect(url_for("raypac.raypac_view", id=id))
 
     db.execute("""
-        UPDATE raypac_entries
-        SET is_frozen = TRUE, frozen_at = CURRENT_TIMESTAMP, numero_remito = %s,
-            estado_envio_equipos = 'ENVIADO', fecha_envio_equipos = CURRENT_TIMESTAMP
-        WHERE id = %s
-    """, (numero_remito, id))
+    UPDATE raypac_entries
+    SET is_frozen = TRUE, frozen_at = CURRENT_TIMESTAMP, numero_remito = %s,
+        estado_envio_equipos = CASE
+            WHEN estado_envio_equipos = 'RECIBIDO' THEN estado_envio_equipos
+            ELSE 'ENVIADO'
+        END,
+        fecha_envio_equipos = CASE
+            WHEN estado_envio_equipos = 'RECIBIDO' THEN fecha_envio_equipos
+            ELSE CURRENT_TIMESTAMP
+        END
+    WHERE id = %s
+""", (numero_remito, id))
     db.commit()
 
     log_action(user['id'], "FREEZE", "raypac_entries", id, None,
@@ -293,10 +349,10 @@ def raypac_unfreeze(id):
 
     unfreeze_code = request.form.get("unfreeze_code", "").strip()
 
-    # CAMBIO DAVID: Verificar código usando últimos 4 dígitos del remito
-    # Formato remito: 0000-0000, últimos 4 dígitos = "0000" después del guión
+    # CAMBIO DAVID: Verificar código usando los dígitos del remito después del guión
+    # Formato remito: 00001-XXXX o 00001-XXXXX (la cantidad de dígitos crece con el tiempo)
     if entry['numero_remito'] and '-' in entry['numero_remito']:
-        codigo_correcto = entry['numero_remito'].split('-')[-1]  # Últimos 4 dígitos
+        codigo_correcto = entry['numero_remito'].split('-')[-1]  # Todo lo que sigue al guión
     else:
         codigo_correcto = entry['numero_remito'][-4:] if entry['numero_remito'] else ""
 

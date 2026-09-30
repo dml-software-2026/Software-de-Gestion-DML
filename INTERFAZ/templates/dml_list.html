@@ -23,6 +23,31 @@
         </div>
     </div>
 
+    <!-- BÚSQUEDA Y FILTROS (#193, mismo patrón que /tickets) -->
+    <div class="card mb-4 p-4">
+        <form method="GET" class="row g-3">
+            <div class="col-md-6">
+                <label for="buscar" class="form-label">Buscar por Ficha, Cliente, Serie o Ticket:</label>
+                <input type="text" class="form-control" name="buscar" id="buscar"
+                       value="{{ buscar }}" placeholder="Ej: 0000503, ANDREANI, TK-...">
+            </div>
+            <div class="col-md-4">
+                <label for="estado" class="form-label">Estado de Reparación:</label>
+                <select class="form-control js-select-enhance" name="estado" id="estado">
+                    <option value="">Todos</option>
+                    <option value="A LA ESPERA DE REVISIÓN" {% if estado == 'A LA ESPERA DE REVISIÓN' %}selected{% endif %}>A LA ESPERA DE REVISIÓN</option>
+                    <option value="A LA ESPERA DE REPUESTOS" {% if estado == 'A LA ESPERA DE REPUESTOS' %}selected{% endif %}>A LA ESPERA DE REPUESTOS</option>
+                    <option value="EN REPARACIÓN" {% if estado == 'EN REPARACIÓN' %}selected{% endif %}>EN REPARACIÓN</option>
+                    <option value="REPARACIÓN COMPLETADA" {% if estado == 'REPARACIÓN COMPLETADA' %}selected{% endif %}>REPARACIÓN COMPLETADA</option>
+                    <option value="MÁQUINA LISTA PARA RETIRAR" {% if estado == 'MÁQUINA LISTA PARA RETIRAR' %}selected{% endif %}>MÁQUINA LISTA PARA RETIRAR</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">🔍 Buscar</button>
+            </div>
+        </form>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-hover table-striped">
             <thead class="table-dark">
@@ -74,7 +99,11 @@
 
     {% if not fichas %}
     <div class="alert alert-info">
+        {% if buscar or estado %}
+        No hay fichas que coincidan con los criterios de búsqueda.
+        {% else %}
         No hay fichas de servicio técnico registradas.
+        {% endif %}
     </div>
     {% endif %}
     

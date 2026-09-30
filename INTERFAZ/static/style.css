@@ -1,4 +1,103 @@
-body { padding-bottom: 40px; }
+/* Footer siempre pegado al piso de la ventana, sin importar cuán corto
+   sea el contenido de la página (si no, en pantallas grandes con poco
+   contenido queda un hueco blanco del navegador debajo del footer, que
+   no es parte del layout). */
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    /* Gris muy claro en vez de blanco puro: las tarjetas y tablas (blancas,
+       con sombra) se despegan un poco de la página en vez de fundirse. */
+    background-color: #f4f6f9;
+}
+
+.page-content {
+    flex: 1 0 auto;
+    /* Columna, no fila: apila los mensajes flasheados + el contenido de
+       cada página igual que el <div> normal de antes. La diferencia es
+       que ahora un hijo puede pedir flex-grow-1 (como el login) para
+       ocupar justo el espacio libre entre navbar y footer, en vez de
+       calcular contra el 100% de la ventana e ignorar que hay navbar y
+       footer ocupando lugar arriba y abajo. */
+    display: flex;
+    flex-direction: column;
+}
+
+.app-footer {
+    flex-shrink: 0;
+}
+
+/* Footer: hace pareja con el navbar (mismo bg-dark) en vez de ser una
+   franja negra plana sin relación con el resto del layout. Sin borde de
+   acento — el propio bg-dark ya lo distingue del resto de la página, no
+   hace falta una línea de color arriba. */
+.app-footer .footer-brand {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.app-footer .footer-sub {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+}
+
+/* Marca (logo + nombre) en el navbar. logo.png tiene fondo blanco sólido
+   (no transparente) - puesto directo sobre la barra oscura se ve como un
+   rectángulo blanco pegado ahí. La "placa" blanca redondeada de abajo lo
+   convierte en un elemento intencional (como una credencial), en vez de
+   un recorte accidental. */
+.brand-logo-badge {
+    background-color: #fff;
+    border-radius: 6px;
+    padding: 3px 8px;
+    display: inline-flex;
+    align-items: center;
+    margin-right: 0.65rem;
+}
+
+.brand-logo-img {
+    height: 30px;
+    display: block;
+}
+
+.navbar-brand .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.navbar-brand .brand-main {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff;
+}
+
+.navbar-brand .brand-sub {
+    font-size: 0.68rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.65);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Mismo tratamiento de "placa blanca" para el logo en la tarjeta de
+   login, un poco más grande al ser la pieza central de la pantalla. */
+.login-logo-badge {
+    display: inline-flex;
+    background-color: #fff;
+    border-radius: 10px;
+    padding: 6px 14px;
+}
+
+.login-logo-img {
+    height: 42px;
+    display: block;
+}
 
 /* Navegación Mejorada */
 .nav-link-enhanced {
@@ -11,6 +110,11 @@ body { padding-bottom: 40px; }
     align-items: center;
     text-align: center;
     min-width: 90px;
+    /* Fondo sutil en reposo (no solo al pasar el mouse) para que se lean
+       como botones desde el primer vistazo, no como texto plano sobre la
+       barra oscura. */
+    background-color: rgba(255, 255, 255, 0.06);
+    border-bottom: 3px solid transparent;
 }
 
 .nav-link-enhanced i {
@@ -36,7 +140,8 @@ body { padding-bottom: 40px; }
 }
 
 .nav-link-enhanced.active {
-    background-color: rgba(255, 255, 255, 0.25);
+    background-color: rgba(255, 255, 255, 0.16);
+    border-bottom-color: #0d6efd;
     font-weight: 600;
 }
 
@@ -80,4 +185,101 @@ table.table-striped tbody td.text-dark {
 /* Additional force for all table cells regardless of class */
 table.table tbody td {
     color: #212529 !important;
+}
+
+/* Desplegable "a mano" para reemplazar <select> nativos (#132) - el
+   <select> real queda en el DOM (oculto con opacity, no display:none, para
+   que la validación required/reportValidity() del navegador lo siga
+   encontrando y enfocando) y esta caja imita su lugar visualmente. Ver
+   enhanceSelect() en base.html. */
+.dml-select-wrapper {
+    position: relative;
+}
+
+.dml-select-wrapper select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.dml-select-toggle {
+    width: 100%;
+    text-align: left;
+    background-color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    /* Base propia (no solo heredada de .form-select/.form-control): hay
+       templates (ej. dml_edit.html) que estilan sus <select> con CSS
+       propio en vez de clases de Bootstrap, así que el <select> original
+       no tiene ninguna clase para copiarle a este botón. Al cargar
+       style.css después de Bootstrap en base.html, esto gana por orden de
+       cascada sobre .form-select/.form-control cuando ambas aplican - de
+       paso normaliza el tamaño de los ~24 selects entre sí, que es
+       justamente el objetivo de unificarlos. */
+    padding: .375rem .75rem;
+    border: 1px solid #dee2e6;
+    border-radius: .375rem;
+    font-size: 1rem;
+}
+
+.dml-select-toggle span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dml-select-toggle.text-muted {
+    color: #6c757d;
+}
+
+.dml-select-menu {
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+/* Tracker de estado del flujo (#158) - franja de segmentos + label debajo
+   de cada uno, sin interacción (a diferencia de un wizard de pasos): solo
+   informa en qué tramo está un registro puntual. Ver _flow_tracker.html. */
+.dml-flow-tracker {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 1rem;
+}
+
+.dml-flow-step {
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+}
+
+.dml-flow-step-bar {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #e9ecef;
+    margin-bottom: .35rem;
+}
+
+.dml-flow-step-done .dml-flow-step-bar,
+.dml-flow-step-current .dml-flow-step-bar {
+    background-color: var(--bs-primary, #0d6efd);
+}
+
+.dml-flow-step-label {
+    font-size: .72rem;
+    line-height: 1.2;
+    color: #6c757d;
+}
+
+.dml-flow-step-done .dml-flow-step-label {
+    color: #495057;
+}
+
+.dml-flow-step-current .dml-flow-step-label {
+    color: #212529;
+    font-weight: 600;
 }

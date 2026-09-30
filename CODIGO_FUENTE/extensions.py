@@ -187,6 +187,27 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error creando tabla clientes: {e}")
         db.rollback()
 
+    # Migración: Tabla usuarios_notificaciones (destinatarios del mail de
+    # stock crítico, #59) - ver #161, nunca había estado en el schema
+    # versionado aunque el código que la usa ya está mergeado.
+    try:
+        print("[MIGRATION] Verificando tabla usuarios_notificaciones...")
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios_notificaciones (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL UNIQUE,
+                nombre TEXT,
+                activo BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.commit()
+        print("[MIGRATION] ✅ Tabla usuarios_notificaciones verificada")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error creando tabla usuarios_notificaciones: {e}")
+        db.rollback()
+
     # Migración: Agregar campos de estado a envios_repuestos
     try:
         print("[MIGRATION] Verificando campos de estado en envios_repuestos...")

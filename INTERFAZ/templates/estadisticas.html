@@ -3,141 +3,33 @@
 {% block title %}Estadísticas de Repuestos{% endblock %}
 
 {% block content %}
-<style>
-    .stats-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        background: white;
-        padding: 20px;
-    }
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 15px;
-        margin-bottom: 30px;
-    }
-    .stat-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 8px;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    .stat-card.blue {
-        background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-    }
-    .stat-card.green {
-        background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
-    }
-    .stat-card.orange {
-        background: linear-gradient(135deg, #ff6600 0%, #F57C00 100%);
-    }
-    .stat-number {
-        font-size: 32px;
-        font-weight: bold;
-        margin: 10px 0;
-    }
-    .stat-label {
-        font-size: 12px;
-        text-transform: uppercase;
-        opacity: 0.9;
-    }
-    .section-title {
-        background-color: #003366;
-        color: white;
-        padding: 12px 15px;
-        margin-top: 30px;
-        margin-bottom: 15px;
-        border-radius: 4px;
-        font-weight: bold;
-        border-left: 4px solid #FFD700;
-    }
-    .table-responsive {
-        overflow-x: auto;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-    }
-    table thead {
-        background-color: #f5f5f5;
-    }
-    table th {
-        padding: 12px;
-        text-align: left;
-        font-weight: bold;
-        border-bottom: 2px solid #ddd;
-    }
-    table td {
-        padding: 10px 12px;
-        border-bottom: 1px solid #eee;
-    }
-    table tbody tr:hover {
-        background-color: #f9f9f9;
-    }
-    .badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 0.85em;
-        font-weight: bold;
-    }
-    .badge-green {
-        background-color: #4CAF50;
-        color: white;
-    }
-    .badge-yellow {
-        background-color: #FFC107;
-        color: #333;
-    }
-    .badge-red {
-        background-color: #F44336;
-        color: white;
-    }
-    .badge-gray {
-        background-color: #9E9E9E;
-        color: white;
-    }
-    .alert-box {
-        background-color: #fff3cd;
-        border-left: 4px solid #ffc107;
-        padding: 12px;
-        border-radius: 4px;
-        margin-bottom: 15px;
-    }
-    .btn-back {
-        display: inline-block;
-        padding: 8px 15px;
-        background-color: #757575;
-        color: white;
-        border-radius: 4px;
-        text-decoration: none;
-        margin-bottom: 20px;
-    }
-    .btn-back:hover {
-        background-color: #616161;
-    }
-    @media (max-width: 768px) {
-        .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-</style>
-
-<div class="stats-container">
+{# #202: rediseño visual - antes esta vista era CSS 100% propio (tarjetas
+   con gradiente a mano, tabla sin clases Bootstrap, badges .badge-*
+   propios), la última pantalla grande que quedaba sin el lenguaje visual
+   del resto de la app (mismo criterio que dml_edit.html en el #201).
+   Se reemplaza por tarjetas Bootstrap (row/col-md-*), tabla con
+   table-responsive/table-striped/table-hover + thead oscuro (mismo
+   patrón que el #199), y badges bg-*. Se agrega además un gráfico de
+   barras (CSS puro, sin librería - acordado con Facu) al lado de la
+   tabla de Top 10, la única sección donde un gráfico suma algo real:
+   las tarjetas son escalares sueltos y la lista de stock bajo ya se
+   escanea rápido como tabla corta con badge por fila. #}
+<div class="container mt-4">
     <div class="d-flex gap-2 mb-3">
-        <a href="{{ url_for('auth.index') }}" class="btn btn-secondary">⬅️ Inicio</a>
-        <a href="{{ url_for('stock.stock_list', ubicacion=ubicacion) }}" class="btn btn-primary">📦 Ver Stock {{ ubicacion }}</a>
+        <a href="{{ url_for('auth.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Inicio
+        </a>
+        <a href="{{ url_for('stock.stock_list', ubicacion=ubicacion) }}" class="btn btn-primary">
+            <i class="bi bi-box-seam"></i> Ver Stock {{ ubicacion }}
+        </a>
     </div>
-    
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>📊 Estadísticas de Repuestos - {{ ubicacion }}</h1>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="mb-0"><i class="bi bi-bar-chart-fill"></i> Estadísticas de Repuestos - {{ ubicacion }}</h2>
         {% if ubicaciones_disponibles %}
         <div class="btn-group" role="group">
             {% for ubi in ubicaciones_disponibles %}
-            <a href="{{ url_for('estadisticas.estadisticas', ubicacion=ubi) }}" 
+            <a href="{{ url_for('estadisticas.estadisticas', ubicacion=ubi) }}"
                class="btn btn-{{ 'primary' if ubi == ubicacion else 'outline-primary' }}">
                 {{ ubi }}
             </a>
@@ -145,140 +37,199 @@
         </div>
         {% endif %}
     </div>
-    
+
     <!-- TARJETAS DE ESTADÍSTICAS GENERALES -->
-    <div class="stats-grid">
-        <div class="stat-card blue">
-            <div class="stat-label">Total de Repuestos</div>
-            <div class="stat-number">{{ stats.total_repuestos }}</div>
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card text-bg-primary shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-uppercase small">Total de Repuestos</div>
+                    <div class="display-6 fw-bold">{{ stats.total_repuestos }}</div>
+                </div>
+            </div>
         </div>
-        <div class="stat-card green">
-            <div class="stat-label">En {{ ubicacion }}</div>
-            <div class="stat-number">{{ stats.repuestos_en_ubicacion }}</div>
+        <div class="col-6 col-md-3">
+            <div class="card text-bg-success shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-uppercase small">En {{ ubicacion }}</div>
+                    <div class="display-6 fw-bold">{{ stats.repuestos_en_ubicacion }}</div>
+                </div>
+            </div>
         </div>
         {% if ubicacion == 'DML' %}
-        <div class="stat-card orange">
-            <div class="stat-label">Movimientos Totales</div>
-            <div class="stat-number">{{ stats.total_movimientos }}</div>
+        <div class="col-6 col-md-3">
+            <div class="card text-bg-warning shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-uppercase small">Movimientos Totales</div>
+                    <div class="display-6 fw-bold">{{ stats.total_movimientos }}</div>
+                </div>
+            </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Fichas Completadas</div>
-            <div class="stat-number">{{ stats.fichas_completadas }}</div>
+        <div class="col-6 col-md-3">
+            <div class="card text-bg-secondary shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-uppercase small">Fichas Completadas</div>
+                    <div class="display-6 fw-bold">{{ stats.fichas_completadas }}</div>
+                </div>
+            </div>
         </div>
         {% else %}
-        <div class="stat-card orange">
-            <div class="stat-label">Envíos Realizados</div>
-            <div class="stat-number">-</div>
-            <small style="font-size: 10px;">RAYPAC solo envía</small>
+        <div class="col-6 col-md-3">
+            <div class="card text-bg-warning shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-uppercase small">Envíos Realizados</div>
+                    <div class="display-6 fw-bold">-</div>
+                    <small>RAYPAC solo envía</small>
+                </div>
+            </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">Stock Crítico ≤2</div>
-            <div class="stat-number">{{ repuestos_criticos|length }}</div>
+        <div class="col-6 col-md-3">
+            <div class="card text-bg-secondary shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="text-uppercase small">Stock Crítico ≤2</div>
+                    <div class="display-6 fw-bold">{{ repuestos_criticos|length }}</div>
+                </div>
+            </div>
         </div>
         {% endif %}
     </div>
-    
+
     <!-- REPUESTOS CRÍTICOS (STOCK BAJO) -->
     {% if repuestos_criticos %}
-    <div class="section-title">⚠️ Repuestos con Stock Bajo en {{ ubicacion }}</div>
-    <div class="alert-box">
+    <h5 class="bg-danger text-white fw-bold p-2 rounded mb-3">
+        <i class="bi bi-exclamation-triangle-fill"></i> Repuestos con Stock Bajo en {{ ubicacion }}
+    </h5>
+    <div class="alert alert-warning">
         <strong>Atención:</strong> Los siguientes repuestos tienen stock limitado en {{ ubicacion }}. Considera hacer una reposición urgente.
     </div>
-    <div class="table-responsive">
-        <table>
-            <thead>
-                <tr>
-                    <th>Código</th>
-                    <th>Descripción</th>
-                    <th>Stock Actual</th>
-                    <th>Nivel de Alerta</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for repuesto in repuestos_criticos %}
-                <tr style="background-color: {% if repuesto.stock_actual == 0 %}#ffcdd2{% elif repuesto.stock_actual == 1 %}#fff9c4{% else %}#f1f8e9{% endif %};">
-                    <td><strong>{{ repuesto.codigo_repuesto }}</strong></td>
-                    <td>{{ repuesto.item }}</td>
-                    <td>
-                        <strong style="font-size: 16px;">
-                            {% if repuesto.stock_actual == 0 %}
-                                🔴 {{ repuesto.stock_actual }}
-                            {% elif repuesto.stock_actual == 1 %}
-                                🟡 {{ repuesto.stock_actual }}
-                            {% else %}
-                                🟠 {{ repuesto.stock_actual }}
-                            {% endif %}
-                        </strong>
-                    </td>
-                    <td>
-                        {% if repuesto.stock_actual == 0 %}
-                        <span class="badge badge-red">AGOTADO</span>
-                        {% elif repuesto.stock_actual == 1 %}
-                        <span class="badge badge-yellow">ÚLTIMO</span>
-                        {% else %}
-                        <span class="badge badge-red">CRÍTICO</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0 align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                            <th>Stock Actual</th>
+                            <th>Nivel de Alerta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for repuesto in repuestos_criticos %}
+                        <tr class="{% if repuesto.stock_actual == 0 %}table-danger{% elif repuesto.stock_actual == 1 %}table-warning{% else %}table-success{% endif %}">
+                            <td><strong>{{ repuesto.codigo_repuesto }}</strong></td>
+                            <td>{{ repuesto.item }}</td>
+                            <td class="fw-bold">
+                                {% if repuesto.stock_actual == 0 %}🔴
+                                {% elif repuesto.stock_actual == 1 %}🟡
+                                {% else %}🟠
+                                {% endif %}
+                                {{ repuesto.stock_actual }}
+                            </td>
+                            <td>
+                                {# Nota: AGOTADO (0) y CRÍTICO (2) comparten badge rojo desde siempre -
+                                   comportamiento preexistente, no tocado en esta pasada de estilo. #}
+                                {% if repuesto.stock_actual == 0 %}
+                                <span class="badge bg-danger">AGOTADO</span>
+                                {% elif repuesto.stock_actual == 1 %}
+                                <span class="badge bg-warning text-dark">ÚLTIMO</span>
+                                {% else %}
+                                <span class="badge bg-danger">CRÍTICO</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     {% endif %}
-    
+
     <!-- TOP 10 REPUESTOS MÁS UTILIZADOS (solo DML) -->
     {% if ubicacion == 'DML' %}
-    <div class="section-title">🏆 Top 10 Repuestos Más Utilizados en Reparaciones</div>
+    <h5 class="bg-primary text-white fw-bold p-2 rounded mb-3">
+        <i class="bi bi-trophy-fill"></i> Top 10 Repuestos Más Utilizados en Reparaciones
+    </h5>
     {% if top_repuestos %}
-    <div class="table-responsive">
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Código</th>
-                    <th>Descripción</th>
-                    <th>Total Usos</th>
-                    <th>Cantidad Utilizada</th>
-                    <th>Stock Actual</th>
-                    <th>Último Uso</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for repuesto in top_repuestos %}
-                <tr>
-                    <td><strong>{{ loop.index }}</strong></td>
-                    <td><strong>{{ repuesto.codigo_repuesto }}</strong></td>
-                    <td>{{ repuesto.item }}</td>
-                    <td style="text-align: center;">
-                        <span class="badge badge-green">{{ repuesto.total_usos }}</span>
-                    </td>
-                    <td style="text-align: center;">{{ repuesto.cantidad_utilizada }}</td>
-                    <td style="text-align: center; font-weight: bold;">
-                        {% if repuesto.stock_actual == 0 %}
-                            <span style="color: #F44336;">{{ repuesto.stock_actual }}</span>
-                        {% elif repuesto.stock_actual == 1 %}
-                            <span style="color: #FFC107;">{{ repuesto.stock_actual }}</span>
-                        {% elif repuesto.stock_actual == 2 %}
-                            <span style="color: #ff6600;">{{ repuesto.stock_actual }}</span>
-                        {% else %}
-                            <span style="color: #4CAF50;">{{ repuesto.stock_actual }}</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ repuesto.fecha_ultimo_uso or 'Nunca' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% set max_usos = top_repuestos[0].total_usos or 1 %}
+    <div class="row g-3 mb-4">
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-bar-chart-line"></i> Usos por repuesto
+                </div>
+                <div class="card-body">
+                    {% for repuesto in top_repuestos %}
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="text-truncate small fw-bold" style="width: 90px;" title="{{ repuesto.codigo_repuesto }}">{{ repuesto.codigo_repuesto }}</div>
+                        <div class="flex-grow-1 bg-light rounded-pill" style="height: 20px;">
+                            <div class="bg-primary rounded-pill d-flex align-items-center justify-content-end px-2"
+                                 style="height: 100%; width: {{ (repuesto.total_usos / max_usos * 100) | round(1) }}%; min-width: 26px;">
+                                <span class="text-white small fw-bold">{{ repuesto.total_usos }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0 align-middle">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Código</th>
+                                    <th>Descripción</th>
+                                    <th>Total Usos</th>
+                                    <th>Cant. Utilizada</th>
+                                    <th>Stock Actual</th>
+                                    <th>Último Uso</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for repuesto in top_repuestos %}
+                                <tr>
+                                    <td><strong>{{ loop.index }}</strong></td>
+                                    <td><strong>{{ repuesto.codigo_repuesto }}</strong></td>
+                                    <td>{{ repuesto.item }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success">{{ repuesto.total_usos }}</span>
+                                    </td>
+                                    <td class="text-center">{{ repuesto.cantidad_utilizada }}</td>
+                                    <td class="text-center fw-bold">
+                                        {% if repuesto.stock_actual == 0 %}
+                                            <span style="color: #dc3545;">{{ repuesto.stock_actual }}</span>
+                                        {% elif repuesto.stock_actual == 1 %}
+                                            <span style="color: #ffc107;">{{ repuesto.stock_actual }}</span>
+                                        {% elif repuesto.stock_actual == 2 %}
+                                            <span style="color: #ff6600;">{{ repuesto.stock_actual }}</span>
+                                        {% else %}
+                                            <span style="color: #28a745;">{{ repuesto.stock_actual }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ repuesto.fecha_ultimo_uso or 'Nunca' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     {% else %}
-    <p style="color: #666; font-style: italic;">No hay datos de estadísticas de uso disponibles.</p>
+    <p class="text-muted fst-italic">No hay datos de estadísticas de uso disponibles.</p>
     {% endif %}
     {% endif %}
-    
+
     <!-- INFORMACIÓN ÚTIL -->
-    <div style="margin-top: 40px; padding: 20px; background-color: #e3f2fd; border-radius: 4px; border-left: 4px solid #2196F3;">
-        <h3 style="margin-top: 0; color: #1565C0;">ℹ️ Sobre Esta Página</h3>
-        <ul style="margin: 0; padding-left: 20px;">
+    <div class="alert alert-info">
+        <h5 class="alert-heading"><i class="bi bi-info-circle-fill"></i> Sobre Esta Página</h5>
+        <ul class="mb-0">
             <li><strong>RAYPAC:</strong> Muestra solo stock crítico (RAYPAC solo envía repuestos, no los usa)</li>
             <li><strong>DML:</strong> Muestra estadísticas completas de uso en reparaciones + stock crítico</li>
             <li><strong>Stock crítico:</strong> Repuestos con cantidad ≤2 (Rojo: 0, Amarillo: 1, Naranja: 2)</li>
@@ -290,5 +241,4 @@
         </ul>
     </div>
 </div>
-
 {% endblock %}

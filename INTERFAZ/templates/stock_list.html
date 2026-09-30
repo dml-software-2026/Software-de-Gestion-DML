@@ -63,8 +63,15 @@
             </form>
             
             {% if rows %}
+            {# #195: sin este wrapper, la fila de Acciones (botón Editar +
+               form de Eliminar con ancho fijo de 180px) desbordaba la
+               tabla en mobile y se llevaba puesta a toda la página - mismo
+               patrón ya usado en dml_list.html/raypac_list.html/envios_view.html,
+               el scroll queda contenido en la tabla. #}
+            <div class="table-responsive">
+            {# #199: thead oscuro, mismo patrón que dml_list.html/raypac_list.html/tickets_list.html #}
             <table class="table table-striped table-hover">
-                <thead>
+                <thead class="table-dark">
                     <tr>
                         <th>Código</th>
                         <th>Descripción</th>
@@ -106,7 +113,7 @@
                             {% if user.role == 'ADMIN' %}
                             <form method="POST" action="{{ url_for('stock.stock_delete', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" style="display:inline-block; width:180px;">
                                 <input type="password" name="admin_password" class="form-control form-control-sm mb-1" placeholder="Contraseña" required>
-                                <button type="submit" class="btn btn-sm btn-danger w-100" onclick="return confirm('¿Eliminar este repuesto?')">Eliminar</button>
+                                <button type="submit" class="btn btn-sm btn-danger w-100" onclick="return confirmarAccion(event, '¿Eliminar este repuesto?')">Eliminar</button>
                             </form>
                             {% endif %}
                         </td>
@@ -115,6 +122,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% else %}
             <div class="alert alert-info">No hay repuestos en stock.</div>
             {% endif %}

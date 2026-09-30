@@ -26,40 +26,61 @@ def envios_list():
     user = get_current_user()
     db = get_db()
 
-    # Obtener envíos de repuestos
+    # ?estado=todos muestra también los recibidos; por defecto se ocultan
+    mostrar_recibidos = request.args.get("estado") == "todos"
+
+    # Estos fragmentos son fijos (no vienen del usuario): el parámetro de la
+    # URL solo elige cuál de los dos usar, así que no hay riesgo de inyección SQL.
+    filtro_repuestos = "" if mostrar_recibidos else "WHERE COALESCE(e.estado_envio, '') <> 'RECIBIDO'"
+    filtro_maquinas = "" if mostrar_recibidos else (
+        "AND NOT (f.fecha_entrega_cliente IS NOT NULL "
+        "OR (f.numero_remito_salida IS NULL AND COALESCE(r.estado_envio_equipos, '') = 'RECIBIDO'))"
+    )
+
     envios_repuestos = db.execute(
-        """
+        f"""
         SELECT e.*,
                'REPUESTO' as tipo_envio,
                (SELECT COUNT(*) FROM envios_repuestos_detalles d WHERE d.envio_id = e.id) AS items_count
         FROM envios_repuestos e
+        {filtro_repuestos}
         ORDER BY e.created_at DESC
         """
     ).fetchall()
 
-    # Obtener ingresos RAYPAC (equipos/máquinas) que fueron enviados
     envios_maquinas = db.execute(
-        """
+        f"""
         SELECT
-            id,
+            r.id,
             'MAQUINA' as tipo_envio,
-            numero_remito,
-            fecha_recepcion as fecha_envio,
+            r.numero_remito,
+            r.fecha_recepcion as fecha_envio,
             NULL as fecha_recepcion,
-            estado_envio_equipos as estado_envio,
+            CASE
+                WHEN f.fecha_entrega_cliente IS NOT NULL THEN 'ENTREGADO'
+                WHEN f.numero_remito_salida IS NOT NULL THEN 'EN_TRANSITO_VUELTA'
+                WHEN r.estado_envio_equipos = 'RECIBIDO' THEN 'RECIBIDO'
+                WHEN r.estado_envio_equipos = 'ENVIADO' THEN 'ENVIADO'
+                ELSE 'PENDIENTE'
+            END as estado_envio,
             NULL as tipo_entrega,
-            cliente || ' - ' || modelo_maquina as numero_remito_display,
-            frozen_at as created_at,
+            r.cliente || ' - ' || r.modelo_maquina as numero_remito_display,
+            r.frozen_at as created_at,
             1 as items_count
-        FROM raypac_entries
-        WHERE is_frozen = TRUE
-        ORDER BY frozen_at DESC
+        FROM raypac_entries r
+        LEFT JOIN LATERAL (
+            SELECT * FROM dml_fichas
+            WHERE raypac_id = r.id
+            ORDER BY created_at DESC
+            LIMIT 1
+        ) f ON TRUE
+        WHERE r.is_frozen = TRUE
+        {filtro_maquinas}
+        ORDER BY r.frozen_at DESC
         """
     ).fetchall()
 
-    # Combinar ambos tipos de envíos
-    todos_envios = list(envios_repuestos) + list(envios_maquinas)
-    # Ordenar por fecha de creación descendente
+    # Ordenar cada lista por fecha de creación descendente por separado
     def _sort_key(x):
         # Normaliza: envios_repuestos.created_at es TIMESTAMPTZ (datetime
         # CON zona horaria), pero raypac_entries.frozen_at (usado como
@@ -76,9 +97,15 @@ def envios_list():
         if isinstance(val, date):
             return datetime.combine(val, datetime.min.time(), tzinfo=UTC)
         return datetime.min.replace(tzinfo=UTC)
-    todos_envios.sort(key=_sort_key, reverse=True)
-    return render_template("envios_list.html", envios=todos_envios)
 
+    envios_repuestos = sorted(envios_repuestos, key=_sort_key, reverse=True)
+    envios_maquinas = sorted(envios_maquinas, key=_sort_key, reverse=True)
+    return render_template(
+        "envios_list.html",
+        envios_repuestos=envios_repuestos,
+        envios_maquinas=envios_maquinas,
+        mostrar_recibidos=mostrar_recibidos,
+    )
 @envios_bp.route("/new", methods=["GET", "POST"])
 @login_required
 @role_required("ADMIN", "RAYPAC")
@@ -108,15 +135,15 @@ def envios_new():
                 return render_template("envios_form.html", stock=stock_raypac)
 
             # Auto-completar formato si solo ingresa 4 dígitos (últimos)
-            if re.match(r'^\d{1,4}$', numero_remito_input):
-                # Usuario ingresó solo números (1-4 dígitos), auto-completar
-                ultimo = numero_remito_input.zfill(4)  # Rellenar con ceros a la izquierda
-                numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXX
+            if re.match(r'^\d{1,8}$', numero_remito_input):
+                # Autocompletar con el prefijo estándar 00001-, siempre 8 dígitos del lado derecho
+                ultimo = numero_remito_input.zfill(8)  # Rellenar con ceros a la izquierda hasta completar 8 dígitos
+                numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXXXXXX (8 dígitos)
                 flash(f"📋 Remito auto-completado: {numero_remito}", "info")
-            elif re.match(r'^\d{4,5}-\d{4,7}$', numero_remito_input):
+            elif re.match(r'^\d{4,5}-\d{8}$', numero_remito_input):
                 numero_remito = numero_remito_input
             else:
-                flash("⚠️ Formato de remito inválido. Ingresa solo los últimos 4 dígitos (ej: 4222) o el formato completo ####-#### (ej: 00001-04222).", "error")
+                flash("⚠️ Formato de remito inválido. Ingresa solo los dígitos del remito (ej: 4222 o 2568) o el formato completo #####-######## (ej: 00001-00004222).", "error")
                 return render_template("envios_form.html", stock=stock_raypac)
 
             # Verificar que no exista ya en envios_repuestos

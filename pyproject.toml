@@ -8,10 +8,6 @@ line-length = 120  # relajado vs default 88, la app tiene muchas queries largas
 
 # Archivos y carpetas que ruff IGNORA completamente
 exclude = [
-    # Archivo muerto – reemplazado por services/pdf.py en el refactor #75.
-    # Pendiente de borrar en issue #85 (unificar los 3 generadores de PDF).
-    "CODIGO_FUENTE/pdf_generator_new.py",
-
     # Scripts auxiliares – no son código de producción. Se corren manualmente.
     # Cuando alguno se estabilice y quiera lint estricto, sacarlo de esta lista.
     "CODIGO_FUENTE/scripts/",
@@ -27,3 +23,7 @@ ignore = ["DTZ", "S", "BLE", "PLW", "N", "SIM", "UP", "F841"]
 # inexistente. Pendiente de eliminar o reescribir (relacionado con #62 y #86).
 # Mientras tanto, silenciamos el warning para que CI no se caiga por esto.
 "CODIGO_FUENTE/blueprints/api.py" = ["F821"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
