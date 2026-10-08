@@ -76,7 +76,11 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         Paragraph(f"<b>{ficha['numero_ficha']:07d}</b>", small_style),
         Paragraph("<b>INFORME DML SOBRE EL<br/>EQUIPO EN REVISIÓN</b>", ParagraphStyle('Centered', parent=small_style, alignment=1))
     ]]
-    header_table = Table(header_data, colWidths=[1.2*inch, 1.2*inch, 3.6*inch])
+    # Ancho total de 7.1in: deja hueco visible dentro del frame de ~7.32in que
+    # dejan los márgenes de 1.5cm (#263) - mismo ancho total que el resto de
+    # las tablas más abajo, para que todo el PDF quede alineado al mismo
+    # margen en los 4 lados.
+    header_table = Table(header_data, colWidths=[1.4*inch, 1.4*inch, 4.3*inch])
     header_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('ALIGN', (0, 0), (1, 0), 'CENTER'),
@@ -85,14 +89,15 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         ('FONTSIZE', (0, 0), (-1, -1), 9),
     ]))
 
-    # Logo de DML arriba a la derecha (mismo archivo que la navbar de la
-    # app, INTERFAZ/static/logo.png). Ese archivo pesa ~480KB (resolución
-    # pensada para la navbar) - se reescala acá a un tamaño chico y se
-    # recomprime a JPEG antes de embeberlo, si no cada PDF quedaba +600KB
-    # más pesado por una imagen que en la hoja se ve del tamaño de una
-    # estampilla. Si el archivo no está o algo falla al procesarlo, se
-    # sigue sin el logo en vez de romper la descarga del PDF.
-    logo_cell = ""
+    # Logo de DML arriba a la derecha de la hoja (mismo archivo que la
+    # navbar de la app, INTERFAZ/static/logo.png), en su propia fila por
+    # encima del recuadro del título - puesto al lado del título (intento
+    # anterior) quedaba "cortando" el recuadro, pedido de Facu. Ese archivo
+    # pesa ~480KB (resolución pensada para la navbar) - se reescala acá a
+    # un tamaño chico y se recomprime a JPEG antes de embeberlo, si no cada
+    # PDF quedaba +600KB más pesado por una imagen que en la hoja se ve del
+    # tamaño de una estampilla. Si el archivo no está o algo falla al
+    # procesarlo, se sigue sin el logo en vez de romper la descarga del PDF.
     try:
         if os.path.exists(LOGO_PATH):
             pil_logo = PILImage.open(LOGO_PATH).convert("RGB")
@@ -102,20 +107,15 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
             logo_buffer = BytesIO()
             pil_logo.save(logo_buffer, format="JPEG", quality=88)
             logo_buffer.seek(0)
-            logo_cell = Image(logo_buffer, width=1.1*inch, height=1.1*inch * alto_px / ancho_px)
+            logo_img = Image(logo_buffer, width=1.1*inch, height=1.1*inch * alto_px / ancho_px)
+            logo_row = Table([[logo_img]], colWidths=[7.1*inch])
+            logo_row.setStyle(TableStyle([('ALIGN', (0, 0), (0, 0), 'RIGHT')]))
+            story.append(logo_row)
+            story.append(Spacer(1, 0.05*inch))
     except Exception:
-        logo_cell = ""
+        pass
 
-    # Ancho total de 7.1in: deja hueco visible dentro del frame de ~7.32in que
-    # dejan los márgenes de 1.5cm (#263) - mismo ancho total que combo_table/
-    # obs_table/rep_diag_table/marca_table/rep_table más abajo, para que todas
-    # las tablas del PDF queden alineadas al mismo margen en los 4 lados.
-    header_row = Table([[header_table, logo_cell]], colWidths=[6.0*inch, 1.1*inch])
-    header_row.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-    ]))
-    story.append(header_row)
+    story.append(header_table)
     story.append(Spacer(1, 0.08*inch))
     story.append(Paragraph("<b>Servicio Técnico</b>", ParagraphStyle('Center', parent=normal_style, alignment=1)))
     story.append(Spacer(1, 0.15*inch))
@@ -145,18 +145,31 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
             [_cell("Cargador N°:", cell_style_bold), _cell(raypac['numero_cargador'] or "", cell_style)],
         ])
 
-    left_table = Table(info_rows, colWidths=[2.2*inch, 2.2*inch])
-    left_table.setStyle(TableStyle([
+    # #263: antes esta tabla iba lado a lado con la de "partes" (ver más
+    # abajo), compartiendo fila por fila - pero cada una tiene su propia
+    # cantidad de renglones y su propia altura de fila (las de "partes" que
+    # ocupan 2 líneas por el word-wrap quedan más altas que las de acá), así
+    # que los renglones de las dos tablas no coincidían entre sí y quedaba
+    # visualmente desprolijo/desproporcionado. Pasan a ir una abajo de la
+    # otra, cada una con su propio ancho completo - sin ese problema de
+    # alineación entre dos tablas independientes.
+    story.append(Paragraph("INFORMACIÓN GENERAL", heading_style))
+    info_table = Table(info_rows, colWidths=[2.2*inch, 4.9*inch])
+    info_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('BACKGROUND', (0, 0), (-1, -1), colors.white),
     ]))
+    story.append(info_table)
+    story.append(Spacer(1, 0.15*inch))
 
-    # Columna derecha: estado del equipo (partes). #263: nombres como "MOTOR
-    # DE ARRASTRE"/"RUEDA DE ARRASTRE" no entraban en 1.2in de ancho en una
-    # sola línea - _cell() los envuelve para que bajen de renglón en vez de
-    # superponerse con la columna "Estado".
+    # ESTADO DEL EQUIPO (partes). #263: nombres como "MOTOR DE ARRASTRE"/
+    # "RUEDA DE ARRASTRE" no entraban en 1.2in de ancho en una sola línea -
+    # _cell() los envuelve para que bajen de renglón en vez de superponerse
+    # con la columna "Estado" (y ahora, en su propia tabla de ancho
+    # completo, ni siquiera hace falta que bajen de línea).
+    story.append(Paragraph("ESTADO DEL EQUIPO", heading_style))
     parts_rows = [[_cell("PARTE", parts_header_style), _cell("Estado", parts_header_style)]]
     if partes:
         for p in partes:
@@ -168,23 +181,14 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         for i in range(12):
             parts_rows.append([_cell("", parts_cell_style), _cell("", parts_cell_style)])
 
-    right_table = Table(parts_rows, colWidths=[1.2*inch, 1.5*inch])
-    right_table.setStyle(TableStyle([
+    parts_table = Table(parts_rows, colWidths=[3.5*inch, 3.6*inch])
+    parts_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
-
-    # Combinar columnas en una tabla de dos columnas. #263: left_table (4.4in)
-    # + right_table (2.7in) = 7.1in - antes sumaban 8.6in, más ancho que la
-    # hoja entera (8.5in), así que esta tabla se comía el margen entero sin
-    # importar qué valor tuviera topMargin/bottomMargin/leftMargin/rightMargin.
-    combo_table = Table([[left_table, right_table]], colWidths=[4.4*inch, 2.7*inch])
-    combo_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    story.append(combo_table)
+    story.append(parts_table)
     story.append(Spacer(1, 0.15*inch))
 
     # OBSERVACIONES - texto libre que puede ser largo (varias oraciones);
