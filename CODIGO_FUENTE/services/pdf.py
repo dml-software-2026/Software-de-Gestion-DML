@@ -1,10 +1,14 @@
+import os
 from io import BytesIO
+from xml.sax.saxutils import escape as xml_escape
 
+from PIL import Image as PILImage
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import inch
+from reportlab.lib.units import cm, inch
 from reportlab.platypus import (
+    Image,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -13,7 +17,22 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from CODIGO_FUENTE.config import BASE_DIR
 from CODIGO_FUENTE.extensions import get_db
+
+# Mismo logo que usa la navbar de la app (INTERFAZ/static/logo.png) - #263.
+LOGO_PATH = os.path.join(BASE_DIR, "INTERFAZ", "static", "logo.png")
+
+
+def _cell(text, style):
+    """Envuelve el valor de una celda en un Paragraph para que reportlab haga
+    word-wrap dentro del ancho de columna. Texto plano en una Table de
+    reportlab NO hace wrap por sí solo - si no entra en el ancho de la
+    columna, se superpone con la celda de al lado en vez de bajar de
+    renglón (#263 - reportado con "MOTOR DE ARRASTRE", "RUEDA DE ARRASTRE",
+    y el estado nuevo del #260, más largo que el resto)."""
+    valor = "" if text is None else str(text)
+    return Paragraph(xml_escape(valor), style)
 
 
 def generar_pdf_ficha(ficha_id: int) -> bytes:
@@ -35,7 +54,8 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
 
     # Crear PDF
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.4*inch, bottomMargin=0.4*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
+    # #263: margen de 1,5 cm al borde en los 4 lados (pedido de David)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=1.5*cm, rightMargin=1.5*cm)
     story = []
 
     styles = getSampleStyleSheet()
@@ -43,6 +63,12 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
                                    textColor=colors.darkblue, spaceAfter=3, fontName='Helvetica-Bold')
     normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=9)
     small_style = ParagraphStyle('Small', parent=styles['Normal'], fontSize=8)
+    # Estilos de celda para _cell() - reemplazan el texto plano del resto de
+    # las tablas para que hagan wrap en vez de superponerse (#263).
+    cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=8.5, leading=10)
+    cell_style_bold = ParagraphStyle('CellBold', parent=cell_style, fontName='Helvetica-Bold')
+    parts_header_style = ParagraphStyle('PartsHeader', parent=cell_style_bold, fontSize=8.5)
+    parts_cell_style = ParagraphStyle('PartsCell', parent=styles['Normal'], fontSize=8, leading=9.5)
 
     # ENCABEZADO: N° Ficha | número | INFORME DML SOBRE EL EQUIPO EN REVISION
     header_data = [[
@@ -50,7 +76,11 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         Paragraph(f"<b>{ficha['numero_ficha']:07d}</b>", small_style),
         Paragraph("<b>INFORME DML SOBRE EL<br/>EQUIPO EN REVISIÓN</b>", ParagraphStyle('Centered', parent=small_style, alignment=1))
     ]]
-    header_table = Table(header_data, colWidths=[1.2*inch, 1.2*inch, 3.6*inch])
+    # Ancho total de 7.1in: deja hueco visible dentro del frame de ~7.32in que
+    # dejan los márgenes de 1.5cm (#263) - mismo ancho total que el resto de
+    # las tablas más abajo, para que todo el PDF quede alineado al mismo
+    # margen en los 4 lados.
+    header_table = Table(header_data, colWidths=[1.4*inch, 1.4*inch, 4.3*inch])
     header_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('ALIGN', (0, 0), (1, 0), 'CENTER'),
@@ -58,78 +88,117 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTSIZE', (0, 0), (-1, -1), 9),
     ]))
+
+    # Logo de DML arriba a la derecha de la hoja (mismo archivo que la
+    # navbar de la app, INTERFAZ/static/logo.png), en su propia fila por
+    # encima del recuadro del título - puesto al lado del título (intento
+    # anterior) quedaba "cortando" el recuadro, pedido de Facu. Ese archivo
+    # pesa ~480KB (resolución pensada para la navbar) - se reescala acá a
+    # un tamaño chico y se recomprime a JPEG antes de embeberlo, si no cada
+    # PDF quedaba +600KB más pesado por una imagen que en la hoja se ve del
+    # tamaño de una estampilla. Si el archivo no está o algo falla al
+    # procesarlo, se sigue sin el logo en vez de romper la descarga del PDF.
+    try:
+        if os.path.exists(LOGO_PATH):
+            pil_logo = PILImage.open(LOGO_PATH).convert("RGB")
+            ancho_px = 330
+            alto_px = round(ancho_px * pil_logo.height / pil_logo.width)
+            pil_logo = pil_logo.resize((ancho_px, alto_px), PILImage.LANCZOS)
+            logo_buffer = BytesIO()
+            pil_logo.save(logo_buffer, format="JPEG", quality=88)
+            logo_buffer.seek(0)
+            logo_img = Image(logo_buffer, width=1.1*inch, height=1.1*inch * alto_px / ancho_px)
+            logo_row = Table([[logo_img]], colWidths=[7.1*inch])
+            logo_row.setStyle(TableStyle([('ALIGN', (0, 0), (0, 0), 'RIGHT')]))
+            story.append(logo_row)
+            story.append(Spacer(1, 0.05*inch))
+    except Exception:
+        pass
+
     story.append(header_table)
     story.append(Spacer(1, 0.08*inch))
     story.append(Paragraph("<b>Servicio Técnico</b>", ParagraphStyle('Center', parent=normal_style, alignment=1)))
     story.append(Spacer(1, 0.15*inch))
 
     # INFORMACIÓN GENERAL (IZQUIERDA) + ESTADO DEL EQUIPO (DERECHA)
+    # #263: valores envueltos con _cell() - texto como el estado nuevo del
+    # #260 ("A LA ESPERA DE APROBACIÓN DE PRESUPUESTO") no entraba en una
+    # sola línea de 2.2in y se superponía con la columna de al lado.
     info_rows = [
-        ["Ficha N°:", f"{ficha['numero_ficha']:07d}"],
-        ["Ticket N°:", ficha['numero_ticket'] or ""],
-        ["Fecha Ingreso DML:", ficha['fecha_ingreso']],
-        ["Fecha Egreso DML:", ficha['fecha_egreso'] or ""],
-        ["Técnico Responsable:", ficha['tecnico_resp'] or ""],
-        ["Estado:", ficha['estado_reparacion']],
+        [_cell("Ficha N°:", cell_style_bold), _cell(f"{ficha['numero_ficha']:07d}", cell_style)],
+        [_cell("Ticket N°:", cell_style_bold), _cell(ficha['numero_ticket'] or "", cell_style)],
+        [_cell("Fecha Ingreso DML:", cell_style_bold), _cell(ficha['fecha_ingreso'], cell_style)],
+        [_cell("Fecha Egreso DML:", cell_style_bold), _cell(ficha['fecha_egreso'] or "", cell_style)],
+        [_cell("Técnico Responsable:", cell_style_bold), _cell(ficha['tecnico_resp'] or "", cell_style)],
+        [_cell("Estado:", cell_style_bold), _cell(ficha['estado_reparacion'], cell_style)],
     ]
 
     if raypac:
         info_rows.extend([
-            ["Fecha recepción Raypac:", raypac['fecha_recepcion']],
-            ["Cliente:", raypac['cliente'] or ""],
-            ["N° Serie:", raypac['numero_serie'] or ""],
-            ["Modelo:", raypac['modelo_maquina'] or ""],
-            ["Tipo Máquina:", raypac['tipo_maquina'] or ""],
-            ["Comercial responsable:", raypac['comercial'] or ""],
-            ["Batería N°:", raypac['numero_bateria'] or ""],
-            ["Cargador N°:", raypac['numero_cargador'] or ""],
+            [_cell("Fecha recepción Raypac:", cell_style_bold), _cell(raypac['fecha_recepcion'], cell_style)],
+            [_cell("Cliente:", cell_style_bold), _cell(raypac['cliente'] or "", cell_style)],
+            [_cell("N° Serie:", cell_style_bold), _cell(raypac['numero_serie'] or "", cell_style)],
+            [_cell("Modelo:", cell_style_bold), _cell(raypac['modelo_maquina'] or "", cell_style)],
+            [_cell("Tipo Máquina:", cell_style_bold), _cell(raypac['tipo_maquina'] or "", cell_style)],
+            [_cell("Comercial responsable:", cell_style_bold), _cell(raypac['comercial'] or "", cell_style)],
+            [_cell("Batería N°:", cell_style_bold), _cell(raypac['numero_bateria'] or "", cell_style)],
+            [_cell("Cargador N°:", cell_style_bold), _cell(raypac['numero_cargador'] or "", cell_style)],
         ])
 
-    left_table = Table(info_rows, colWidths=[2.6*inch, 2.7*inch])
-    left_table.setStyle(TableStyle([
+    # #263: antes esta tabla iba lado a lado con la de "partes" (ver más
+    # abajo), compartiendo fila por fila - pero cada una tiene su propia
+    # cantidad de renglones y su propia altura de fila (las de "partes" que
+    # ocupan 2 líneas por el word-wrap quedan más altas que las de acá), así
+    # que los renglones de las dos tablas no coincidían entre sí y quedaba
+    # visualmente desprolijo/desproporcionado. Pasan a ir una abajo de la
+    # otra, cada una con su propio ancho completo - sin ese problema de
+    # alineación entre dos tablas independientes.
+    story.append(Paragraph("INFORMACIÓN GENERAL", heading_style))
+    info_table = Table(info_rows, colWidths=[2.2*inch, 4.9*inch])
+    info_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('BACKGROUND', (0, 0), (-1, -1), colors.white),
     ]))
+    story.append(info_table)
+    story.append(Spacer(1, 0.15*inch))
 
-    # Columna derecha: estado del equipo (partes)
-    parts_rows = [["PARTE", "Estado"]]
+    # ESTADO DEL EQUIPO (partes). #263: nombres como "MOTOR DE ARRASTRE"/
+    # "RUEDA DE ARRASTRE" no entraban en 1.2in de ancho en una sola línea -
+    # _cell() los envuelve para que bajen de renglón en vez de superponerse
+    # con la columna "Estado" (y ahora, en su propia tabla de ancho
+    # completo, ni siquiera hace falta que bajen de línea).
+    story.append(Paragraph("ESTADO DEL EQUIPO", heading_style))
+    parts_rows = [[_cell("PARTE", parts_header_style), _cell("Estado", parts_header_style)]]
     if partes:
         for p in partes:
-            parts_rows.append([p['nombre_parte'] or "", p['estado'] or "POR INSPECCIONAR"])
+            parts_rows.append([
+                _cell(p['nombre_parte'] or "", parts_cell_style),
+                _cell(p['estado'] or "POR INSPECCIONAR", parts_cell_style),
+            ])
     else:
         for i in range(12):
-            parts_rows.append(["", ""])
+            parts_rows.append([_cell("", parts_cell_style), _cell("", parts_cell_style)])
 
-    right_table = Table(parts_rows, colWidths=[1.5*inch, 1.8*inch])
-    right_table.setStyle(TableStyle([
+    parts_table = Table(parts_rows, colWidths=[3.5*inch, 3.6*inch])
+    parts_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8.5),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
-
-    # Combinar columnas en una tabla de dos columnas
-    combo_table = Table([[left_table, right_table]], colWidths=[5.3*inch, 3.3*inch])
-    combo_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    story.append(combo_table)
+    story.append(parts_table)
     story.append(Spacer(1, 0.15*inch))
 
-    # OBSERVACIONES
+    # OBSERVACIONES - texto libre que puede ser largo (varias oraciones);
+    # _cell() lo envuelve en líneas en vez de desbordar hacia afuera de la
+    # tabla en una sola línea gigante.
     story.append(Paragraph("OBSERVACIONES", heading_style))
-    obs_data = [[ficha['observaciones'] or "Ingreso reciente, pendiente inspección inicial"]]
-    obs_table = Table(obs_data, colWidths=[6.5*inch])
+    obs_data = [[_cell(ficha['observaciones'] or "Ingreso reciente, pendiente inspección inicial", cell_style)]]
+    obs_table = Table(obs_data, colWidths=[7.1*inch])
     obs_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('MINHEIGHT', (0, 0), (-1, -1), 0.5*inch),
@@ -137,13 +206,12 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     story.append(obs_table)
     story.append(Spacer(1, 0.15*inch))
 
-    # DIAGNÓSTICO DE REPARACIÓN
+    # DIAGNÓSTICO DE REPARACIÓN - mismo motivo que OBSERVACIONES.
     story.append(Paragraph("DIAGNÓSTICO DE REPARACIÓN", heading_style))
-    rep_diag_data = [[ficha['diagnostico_reparacion'] or "Pendiente"]]
-    rep_diag_table = Table(rep_diag_data, colWidths=[6.5*inch])
+    rep_diag_data = [[_cell(ficha['diagnostico_reparacion'] or "Pendiente", cell_style)]]
+    rep_diag_table = Table(rep_diag_data, colWidths=[7.1*inch])
     rep_diag_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('MINHEIGHT', (0, 0), (-1, -1), 0.5*inch),
@@ -154,20 +222,18 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     # CICLOS Y DATOS FINALES
     story.append(Paragraph("CICLOS Y DATOS FINALES", heading_style))
     marca_rows = [
-        ["N° DE CICLOS DE LA MÁQUINA CON LAS QUE SALE DE ST", str(ficha['n_ciclos'] or 0)],
-        ["TIPO DE MÁQUINA QUE INGRESO AL ST", raypac['tipo_maquina'] if raypac else "A BATERIA"],
-        ["HORAS ADICIONALES DE TRABAJO", ficha['horas_adic'] or "NO APLICA"],
-        ["MECANIZADO ADICIONAL REALIZADO A LA MAQUINA", ficha['mecanizado_adic'] or "NO APLICA"],
-        ["TIPO DE TRABAJO REALIZADO", raypac['tipo_solicitud'] if raypac else ""],
-        ["TÉCNICO RESPONSABLE DEL ST DE DML", ficha['tecnico_resp'] or ""],
+        [_cell("N° DE CICLOS DE LA MÁQUINA CON LAS QUE SALE DE ST", cell_style_bold), _cell(ficha['n_ciclos'] or 0, cell_style)],
+        [_cell("TIPO DE MÁQUINA QUE INGRESO AL ST", cell_style_bold), _cell(raypac['tipo_maquina'] if raypac else "A BATERIA", cell_style)],
+        [_cell("HORAS ADICIONALES DE TRABAJO", cell_style_bold), _cell(ficha['horas_adic'] or "NO APLICA", cell_style)],
+        [_cell("MECANIZADO ADICIONAL REALIZADO A LA MAQUINA", cell_style_bold), _cell(ficha['mecanizado_adic'] or "NO APLICA", cell_style)],
+        [_cell("TIPO DE TRABAJO REALIZADO", cell_style_bold), _cell(raypac['tipo_solicitud'] if raypac else "", cell_style)],
+        [_cell("TÉCNICO RESPONSABLE DEL ST DE DML", cell_style_bold), _cell(ficha['tecnico_resp'] or "", cell_style)],
     ]
 
-    marca_table = Table(marca_rows, colWidths=[5.3*inch, 1.2*inch])
+    marca_table = Table(marca_rows, colWidths=[5.8*inch, 1.3*inch])
     marca_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
@@ -189,7 +255,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
                 "✗" if rep['en_falta'] else ""
             ])
 
-        rep_table = Table(rep_rows, colWidths=[0.7*inch, 1.0*inch, 2.0*inch, 0.9*inch, 0.8*inch, 0.7*inch])
+        rep_table = Table(rep_rows, colWidths=[0.8*inch, 1.2*inch, 2.3*inch, 1.0*inch, 0.9*inch, 0.9*inch])
         rep_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#808080')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
