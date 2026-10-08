@@ -51,7 +51,11 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         Paragraph(f"<b>{ficha['numero_ficha']:07d}</b>", small_style),
         Paragraph("<b>INFORME DML SOBRE EL<br/>EQUIPO EN REVISIÓN</b>", ParagraphStyle('Centered', parent=small_style, alignment=1))
     ]]
-    header_table = Table(header_data, colWidths=[1.2*inch, 1.2*inch, 3.6*inch])
+    # Ancho total de 7.1in: deja hueco visible dentro del frame de ~7.32in que
+    # dejan los márgenes de 1.5cm (#263) - mismo ancho total que combo_table/
+    # obs_table/rep_diag_table/marca_table/rep_table más abajo, para que todas
+    # las tablas del PDF queden alineadas al mismo margen en los 4 lados.
+    header_table = Table(header_data, colWidths=[1.4*inch, 1.4*inch, 4.3*inch])
     header_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('ALIGN', (0, 0), (1, 0), 'CENTER'),
@@ -86,7 +90,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
             ["Cargador N°:", raypac['numero_cargador'] or ""],
         ])
 
-    left_table = Table(info_rows, colWidths=[2.6*inch, 2.7*inch])
+    left_table = Table(info_rows, colWidths=[2.2*inch, 2.2*inch])
     left_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
@@ -105,7 +109,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         for i in range(12):
             parts_rows.append(["", ""])
 
-    right_table = Table(parts_rows, colWidths=[1.5*inch, 1.8*inch])
+    right_table = Table(parts_rows, colWidths=[1.2*inch, 1.5*inch])
     right_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
@@ -116,8 +120,11 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
 
-    # Combinar columnas en una tabla de dos columnas
-    combo_table = Table([[left_table, right_table]], colWidths=[5.3*inch, 3.3*inch])
+    # Combinar columnas en una tabla de dos columnas. #263: left_table (4.4in)
+    # + right_table (2.7in) = 7.1in - antes sumaban 8.6in, más ancho que la
+    # hoja entera (8.5in), así que esta tabla se comía el margen entero sin
+    # importar qué valor tuviera topMargin/bottomMargin/leftMargin/rightMargin.
+    combo_table = Table([[left_table, right_table]], colWidths=[4.4*inch, 2.7*inch])
     combo_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
@@ -127,7 +134,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     # OBSERVACIONES
     story.append(Paragraph("OBSERVACIONES", heading_style))
     obs_data = [[ficha['observaciones'] or "Ingreso reciente, pendiente inspección inicial"]]
-    obs_table = Table(obs_data, colWidths=[6.5*inch])
+    obs_table = Table(obs_data, colWidths=[7.1*inch])
     obs_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('FONTSIZE', (0, 0), (-1, -1), 8.5),
@@ -141,7 +148,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     # DIAGNÓSTICO DE REPARACIÓN
     story.append(Paragraph("DIAGNÓSTICO DE REPARACIÓN", heading_style))
     rep_diag_data = [[ficha['diagnostico_reparacion'] or "Pendiente"]]
-    rep_diag_table = Table(rep_diag_data, colWidths=[6.5*inch])
+    rep_diag_table = Table(rep_diag_data, colWidths=[7.1*inch])
     rep_diag_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('FONTSIZE', (0, 0), (-1, -1), 8.5),
@@ -163,7 +170,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         ["TÉCNICO RESPONSABLE DEL ST DE DML", ficha['tecnico_resp'] or ""],
     ]
 
-    marca_table = Table(marca_rows, colWidths=[5.3*inch, 1.2*inch])
+    marca_table = Table(marca_rows, colWidths=[5.8*inch, 1.3*inch])
     marca_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BACKGROUND', (0, 0), (-1, -1), colors.white),
@@ -190,7 +197,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
                 "✗" if rep['en_falta'] else ""
             ])
 
-        rep_table = Table(rep_rows, colWidths=[0.7*inch, 1.0*inch, 2.0*inch, 0.9*inch, 0.8*inch, 0.7*inch])
+        rep_table = Table(rep_rows, colWidths=[0.8*inch, 1.2*inch, 2.3*inch, 1.0*inch, 0.9*inch, 0.9*inch])
         rep_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#808080')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
