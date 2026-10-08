@@ -3,7 +3,7 @@ from io import BytesIO
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import inch
+from reportlab.lib.units import cm, inch
 from reportlab.platypus import (
     PageBreak,
     Paragraph,
@@ -35,7 +35,8 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
 
     # Crear PDF
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.4*inch, bottomMargin=0.4*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
+    # #263: margen de 1,5 cm al borde en los 4 lados (pedido de David)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=1.5*cm, bottomMargin=1.5*cm, leftMargin=1.5*cm, rightMargin=1.5*cm)
     story = []
 
     styles = getSampleStyleSheet()
