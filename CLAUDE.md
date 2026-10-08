@@ -18,6 +18,223 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+- **Última actualización:** 2026-10-08, cierre de sesión (Facu cambia de
+  máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
+- **Sesión de "sacarse tareas chicas de encima" - pedido explícito de Facu
+  al arrancar** ("buscá las más cortas y las más viejas del kanban").
+  Repasado todo el board (`gh project item-list`) + los issues abiertos sin
+  tarjeta en el board - **9 issues resueltos en total, repartidos en 2
+  tandas:**
+  1. **Tanda A - limpieza de issues viejos, 3 cerrados directo sin tocar
+     código (ya estaban resueltos) + 1 con PR:**
+     - **`#33`** (actualizar DML.exe) - cerrado como obsoleto, el `.exe` ya
+       no existe en el repo (lo sacó el `#74`).
+     - **`#46`** (impresión ticket/ficha) - cerrado, el fix ya estaba en
+       `dev` desde agosto, confirmado en código (`@media print` +
+       `ticket_print.html`).
+     - **`#60`** (migrar SQLite a Postgres) - cerrado, cubierto por las
+       Fases 1 (`#61`) y 2 (`#95`), ya mergeadas.
+     - **`#168`** (`ficha_view.html`, template muerto) - confirmado que
+       sigue sin usarse y además desactualizado contra el schema actual
+       (columnas que ya no existen) → **PR #266**, pusheado.
+  2. **Tanda B - 5 pedidos de David del kanban (Backlog), cada uno su
+     propio PR chico:**
+     - **`#263`** (márgenes de PDF a 1,5cm) → **PR #267**. El más
+       trabajado de la tanda, 4 commits (ver más abajo, "vueltas del
+       PDF").
+     - **`#262`** (eliminar el máximo de 15 repuestos por ficha) →
+       **PR #268**. Sacado el bloqueo de `agregar_repuesto()` (`dml.py`) +
+       el contador "(N/15)" de `dml_edit.html`. Probado que el PDF ya
+       paginaba solo sin ningún tope propio (hasta 60 repuestos de prueba
+       en una transacción revertida, sin tocar la base real).
+     - **`#264`** (el acuse lo registra RAYPAC, no DML) → **PR #269**, 2
+       commits. El primero restringió `dml_registrar_acuse()`
+       (`@role_required("ADMIN","RAYPAC")`, antes incluía DML_ST) y el
+       botón de `dml_view.html` - **Facu probó en vivo y encontró que
+       el botón real de `/dml/entregadas` seguía sin chequeo de rol**
+       (confusión mía con otro `if` del mismo archivo, el de las columnas
+       Contacto/Email del `#109`, que no tiene nada que ver) - 2do commit
+       lo corrigió. Alcance confirmado con Facu antes de tocar nada:
+       ADMIN mantiene el acceso de excepción, se le saca solo a DML_ST.
+     - **`#261`** (renombrar el 3er paso del tracker a "Lista para
+       retirar") → **PR #270**. Solo el label del tracker de 4 pasos
+       (`build_flow_steps()` en `dml.py`/`tickets.py`) - el estado real
+       de la ficha (`MÁQUINA ENTREGADA`) no se tocó, sigue igual en
+       `estados_orden`/los mapas de color/`dml_entregadas()`.
+     - **`#260`** (nuevo estado "A la espera de aprobación de
+       presupuesto") → **PR #271**. Agregado como opción del `<select>`
+       de `dml_edit.html`, nivel 1 en `estados_orden` (mismo nivel que
+       "EN REPARACIÓN"/"A LA ESPERA DE REPUESTOS" - confirmado con Facu
+       que no necesita un orden estricto propio, es un estado de espera
+       externa que puede ir y volver), badge naranja (mismo color que "A
+       LA ESPERA DE REPUESTOS") en los 3 lugares que ya tenían mapa de
+       color (`dml_list.html`, `dml_view.html`, `raypac.py`) + el filtro
+       de búsqueda de `dml_list.html`.
+  - **Nueva regla de proceso, ya agregada a este mismo archivo** (sección
+    "Instrucciones de flujo de trabajo"): antes de implementar un issue
+    con descripción ambigua (pasó con el `#264`), preguntarle el alcance a
+    Facu con el comportamiento actual + 2-3 lecturas posibles, no asumir.
+- **Las "vueltas del PDF" (`#263`, PR #267) - 3 commits de corrección
+  encima del primero, todos a partir de que Facu probó en vivo:**
+  1. Commit 1: el margen de `SimpleDocTemplate` a 1,5cm en los 4 lados.
+  2. **Facu probó: "los márgenes siguen igual".** Causa real: las tablas
+     de la ficha tenían anchos fijos en pulgadas pensados para el frame
+     viejo - una en particular (`combo_table`, info + partes del equipo)
+     medía 8,6in, **más ancha que la hoja entera (8,5in)**, así que se
+     comía el margen sin importar qué valor tuviera. Se llevaron todas
+     las tablas a un ancho común de 7,1in.
+  3. **Facu probó: "las columnas se superponen".** Causa: reportlab NO
+     hace word-wrap de texto plano en celdas de `Table` - si el texto no
+     entra en el ancho de columna, se dibuja igual y pisa la celda de al
+     lado (medido con `stringWidth()`: "MOTOR DE ARRASTRE" necesitaba
+     1.235in en una columna de 1.2in). Se agregó `_cell()`, que envuelve
+     cualquier valor de celda en un `Paragraph` (sí hace wrap, texto
+     escapado con `xml.sax.saxutils.escape` por si algún campo libre trae
+     `<`/`&`). De paso se agregó el logo de DML (mismo archivo que la
+     navbar, reescalado con Pillow + recomprimido a JPEG antes de
+     embeberlo - el original pesa ~480KB, sin reescalar cada PDF sumaba
+     +600KB de más).
+  4. **Facu probó de nuevo: la tabla quedó "desproporcionada" (el logo
+     tapaba el título, y las 2 tablas lado a lado no alineaban sus
+     filas).** Causa de la desalineación: info_table y parts_table son 2
+     tablas independientes compartiendo una fila - cada una calcula el
+     alto de sus propias filas por separado, y como la de partes tenía
+     texto en 2 líneas (por el wrap del commit anterior) y la de info no,
+     los renglones no coincidían entre sí. Se separaron en 2 tablas
+     apiladas (una abajo de la otra, cada una con su propio título
+     "INFORMACIÓN GENERAL"/"ESTADO DEL EQUIPO" y ancho completo) - con
+     todo el ancho de la hoja disponible, "PARTE" ya ni necesita el wrap.
+     El logo se sacó de al lado del título y pasó a su propia fila, por
+     encima del recuadro.
+  - **Moraleja para la próxima vez que se toque `services/pdf.py`:**
+    reportlab no es forgiving con `colWidths` fijos - cualquier cambio de
+    layout necesita medirse con `stringWidth()` (peor caso de texto real)
+    contra la columna, no solo "verse bien" en un dato de prueba corto.
+- **Server local: usado activamente toda la sesión, se detuvo al cerrar.**
+  Truco usado para que Facu probara los 6 PRs juntos en un solo server
+  (mismo patrón de sesiones anteriores): rama local
+  `test/sesion-2026-10-08-integracion-local`, cortada de `dev` con las 6
+  ramas mergeadas adentro, **nunca pusheada a GitHub** - se reconstruyó 2
+  veces en la sesión (cada vez que se corrigió algo en una rama real había
+  que volver a mergearlo ahí, gotcha ya documentado en checkpoints viejos)
+  y se borró al cerrar.
+  - **Gotcha nuevo de hoy, para anotar:** después de reiniciar el server
+    parado en la rama de integración, seguí ahí sin volver a la rama real
+    y el commit de la 2da vuelta del PDF (punto 3 de arriba) quedó
+    pusheado por error... a la rama de integración, que nunca se
+    pushea (`git push origin fix/263-...` no falló, solo no tenía nada
+    nuevo que subir - el commit real estaba en otra rama). Se notó porque
+    el mensaje de `git push` decía "Everything up-to-date" en vez de
+    mostrar el commit nuevo. Se corrigió con `git cherry-pick` a la rama
+    correcta antes de pushear de verdad. **Antes de cada `git commit`,
+    confirmar `git branch --show-current`** cuando hay una rama de
+    integración activa en paralelo a las ramas reales - no asumir que se
+    sigue en la rama real solo porque se estuvo ahí antes en la sesión.
+- **Decisión de Facu: los 6 PRs quedan abiertos a propósito, no
+  mergear todavía** - los quiere revisar/probar todos él mismo antes de
+  aprobar. No es un bloqueo, es la secuencia normal (ver "Un PR abierto en
+  GitHub no se mergea solo" en las instrucciones de flujo de trabajo).
+  **Confirmado que los 6 están pusheados y al día** (`git rev-parse` local
+  vs. `origin/<rama>` idéntico en los 6, chequeado al cierre de la
+  sesión).
+- **Checklist de pruebas para la próxima sesión (o para Facu antes de
+  mergear) - PR por PR:**
+  1. **PR #266** (`chore/168`, borrar `ficha_view.html`) - no necesita
+     prueba funcional, es un archivo que no usa ninguna ruta. Alcanza con
+     revisar el diff.
+  2. **PR #267** (`fix/263`, margen + logo + tablas del PDF) - descargar
+     el PDF de una ficha (botón "Descargar PDF" desde `/dml/<id>`) y
+     confirmar: (a) margen visible en los 4 bordes, (b) logo de DML
+     arriba a la derecha, en su propia línea, sin tocar el recuadro del
+     título, (c) "INFORMACIÓN GENERAL" y "ESTADO DEL EQUIPO" como 2
+     tablas apiladas, prolijas, sin desfasaje de filas, (d) ningún texto
+     cortado ni superpuesto (en particular los nombres de partes como
+     "MOTOR DE ARRASTRE"). Si hay alguna ficha con muchos repuestos
+     cargados, confirmar que la tabla de REPUESTOS COLOCADOS sigue
+     paginando bien.
+  3. **PR #268** (`fix/262`, sacar tope de 15 repuestos) - en
+     `/dml/<id>/edit`, confirmar que el contador ya no dice "(N/15)" y
+     que se pueden agregar más de 15 repuestos sin el error "Máximo 15
+     repuestos por ficha."
+  4. **PR #269** (`fix/264`, acuse solo RAYPAC) - como `tecnico` (DML_ST):
+     entrar a `/dml/entregadas` y confirmar que el botón "Acuse" **no**
+     aparece en ninguna fila; entrar a una ficha cerrada sin acuse y
+     confirmar que tampoco aparece "Registrar Acuse" ahí. Como `raypac` o
+     `admin`: confirmar que el botón sí aparece en los 2 lugares, y
+     probar el flujo completo de registrar un acuse real (fecha + nombre
+     de quien recibe) para confirmar que sigue funcionando.
+  5. **PR #270** (`fix/261`, renombrar 3er paso del tracker) - en
+     `/dml/<id>`, `/dml/<id>/edit` y `/ticket/<numero>`, el tracker de 4
+     pasos debería mostrar "Lista para retirar" en el 3er paso (antes
+     decía "Entregada"). Confirmar aparte que el badge de estado real de
+     una ficha entregada sigue diciendo "MÁQUINA ENTREGADA" sin cambios
+     (lo que cambió es solo el texto del tracker).
+  6. **PR #271** (`feature/260`, nuevo estado de presupuesto) - en
+     `/dml/<id>/edit`, elegir "A LA ESPERA DE APROBACIÓN DE PRESUPUESTO"
+     en el desplegable de Estado y guardar - confirmar que persiste
+     (volver a entrar a la ficha). Ver el badge naranja en `/dml`
+     (listado) y en `/dml/<id>`. Probar el filtro de Estado en `/dml`
+     (listado) con ese valor. De paso, chequear que se vea bien en
+     `/raypac` (columna de estado de la ficha asociada).
+  - **Nota aparte:** ninguno de estos 6 cambios se probó en mobile esta
+    sesión (sin acceso a la extensión de Claude in Chrome, igual que
+    sesiones anteriores) - si Facu prueba desde el celu o el emulador,
+    poco probable que rompa algo (son cambios chicos, sin tocar layout
+    salvo el PDF que no es HTML), pero no está confirmado.
+- **Limpieza de ramas al arrancar la sesión:** 10 ramas locales viejas
+  borradas (`chore/206-...`, `docs/checkpoint-sesion-2026-09-07`,
+  `docs/checkpoint-sesion-2026-09-10`,
+  `docs/hallazgos-chicos-preguntar-no-crear-issue`,
+  `feature/193-buscador-filtro-dml`, `feature/193-buscador-filtro-raypac`,
+  `feature/200-rediseno-vistas-detalle-raypac-envios`,
+  `feature/201-rediseno-dml-edit`, `feature/201-rediseno-formularios-edicion`,
+  `test/201-integracion-local`) - confirmado antes de borrar que las 10
+  ya tenían su contenido en `dev` (incluida la corrección de proceso del
+  `#206`/hallazgos chicos, que ya estaba en este mismo archivo desde la
+  sesión del 09-10/09-17).
+- **3 hallazgos chicos, documentados pero sin resolver, preguntados a
+  Facu sobre la marcha (no se tocó nada sin confirmar primero, nueva
+  regla de este mismo checkpoint):**
+  1. `INTERFAZ/README.md` desactualizado (dice "15 archivos", lista 17,
+     hay 29 reales) - Facu no llegó a responder qué hacer.
+  2. 7 scripts sueltos de `CODIGO_FUENTE/scripts/` (+`load_stock.py`/
+     `show_stats.py`) siguen con `import sqlite3` - no los importa la
+     app, pero no funcionan si se corren hoy. Mencionado en el comentario
+     de cierre del `#60`.
+  3. `dml.db.bak` sin trackear en el working dir de esta máquina (leftover
+     de la era SQLite) - no molesta (`config.py` busca `dml.db` exacto,
+     no `.bak`), pero es basura. Sin decisión de Facu todavía.
+  4. **Hallazgo aparte, no relacionado con la tarea de hoy:** una ficha de
+     prueba vieja en la base local (`#501`) tiene el estado guardado como
+     `A LA ESPERA DE REVISI%D3N` (con `%D3` en vez de `Ó` - un artefacto
+     de encoding/URL-decode mal aplicado en algún momento). Visto de
+     pasada generando PDFs de prueba, no se tocó ni se investigó la
+     causa - puede ser dato legado de una migración vieja, candidato a
+     revisar si aparece en más fichas.
+- **Próximo paso concreto:**
+  1. **Facu revisa/prueba los 6 PRs** con el checklist de arriba (en esta
+     máquina o en la nueva) y los mergea cuando esté conforme - sin apuro,
+     quedan abiertos mientras tanto.
+  2. Después de mergear, cerrar a mano el único issue que sigue `OPEN` en
+     GitHub de este lote: **`#168`** (los otros 5 del lote - `#260`,
+     `#261`, `#262`, `#263`, `#264` - Facu ya los cerró él mismo durante
+     la sesión).
+  3. Decidir sobre los 3 hallazgos chicos sin resolver (arriba).
+  4. Candidatos para la próxima tarea grande, sin cambios respecto al
+     checkpoint anterior: los 3 de "Prioridades de Backlog" (`#57`,
+     `#47`, `#52`), la investigación del `#244` (rendimiento de Render,
+     sin arrancar), o **#170**/**#195**.
+- **Ambiente local de esta máquina:** usado activamente hoy, sin
+  necesidad de setup (mismo equipo de siempre). El server de pruebas se
+  detuvo al cerrar la sesión. La próxima sesión es en **otra máquina** -
+  repetir el setup de entorno local de cero ahí (ver sección "Setup de
+  entorno local" más abajo) si todavía no está armado.
+- **Bloqueos:** ninguno.
+
+<details>
+<summary>Checkpoint anterior (2026-09-17) — histórico, dejado sin borrar por
+referencia</summary>
+
 - **Última actualización:** 2026-09-17, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
 - **El checkpoint del 09-16 nunca se había llegado a pushear** (quedó
@@ -155,6 +372,8 @@ asumir contexto de nada más.
   setup de entorno local de cero ahí (ver sección "Setup de entorno local"
   más abajo) si todavía no está armado.
 - **Bloqueos:** ninguno.
+
+</details>
 
 <details>
 <summary>Checkpoint anterior (2026-09-16) — histórico, dejado sin borrar por
@@ -969,6 +1188,18 @@ para hallazgos chicos sin necesidad).
   antes de decidir cómo seguir.
 En cualquiera de los dos casos: no arreglar nada por cuenta propia sin
 preguntar primero.
+
+**Tarea del kanban con descripción ambigua: preguntar el alcance antes de
+tocar código.** Pedido de Facu (2026-10-08) - varios issues nuevos que entran
+al kanban (ejemplo real: el `#264`, "El acuse es solo de RAYPAC", podía
+leerse como "nadie más que RAYPAC" o como "se le saca el acceso a DML pero
+ADMIN sigue teniendo la excepción") quedan creados con una sola línea de
+descripción, sin alcance ni casos borde aclarados. Antes de implementar algo
+así, mostrarle a Facu el comportamiento actual del código (decorador/
+condición real) + 2-3 lecturas posibles con una recomendación, y que elija -
+no asumir la interpretación más obvia e implementar directo. Si la
+descripción ya es inequívoca (ej. `#263`, "márgenes de PDF a 1,5cm") no hace
+falta preguntar nada, se implementa directo.
 
 **Cambios visuales/templates: revisar mobile, sin que sea perfecto.**
 Pedido de Facu (2026-09-10). Cada vez que se toque un template, además de
