@@ -22,7 +22,6 @@ Contiene 15 archivos HTML de templates Jinja2:
 - dml_list.html - Lista de fichas
 - dml_view.html - Detalle de ficha
 - dml_edit.html - Edición de ficha
-- ficha_view.html - Vista de ficha
 
 **Módulo STOCK:**
 - stock_list.html - Lista de items
