@@ -864,7 +864,7 @@ def dml_close(id):
 
 @dml_bp.route("/<int:id>/acuse", methods=["POST"])
 @login_required
-@role_required("ADMIN", "DML_ST", "RAYPAC")
+@role_required("ADMIN", "RAYPAC")
 def dml_registrar_acuse(id):
     """Registra el acuse de recibo de una máquina entregada."""
     user = get_current_user()
