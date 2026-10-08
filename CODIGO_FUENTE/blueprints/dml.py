@@ -252,7 +252,7 @@ def dml_view(id, readonly=False):
     else:
         current_step = 2
     flow_steps = build_flow_steps(
-        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+        ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
     return render_template("dml_view.html", ficha=ficha, raypac=raypac, partes=partes, repuestos=repuestos,
@@ -391,7 +391,7 @@ def dml_edit(id):
     else:
         current_step = 2
     flow_steps = build_flow_steps(
-        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+        ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
     return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps)
