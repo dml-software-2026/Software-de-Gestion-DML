@@ -37,6 +37,7 @@
                     <option value="">Todos</option>
                     <option value="A LA ESPERA DE REVISIÓN" {% if estado == 'A LA ESPERA DE REVISIÓN' %}selected{% endif %}>A LA ESPERA DE REVISIÓN</option>
                     <option value="A LA ESPERA DE REPUESTOS" {% if estado == 'A LA ESPERA DE REPUESTOS' %}selected{% endif %}>A LA ESPERA DE REPUESTOS</option>
+                    <option value="A LA ESPERA DE APROBACIÓN DE PRESUPUESTO" {% if estado == 'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO' %}selected{% endif %}>A LA ESPERA DE APROBACIÓN DE PRESUPUESTO</option>
                     <option value="EN REPARACIÓN" {% if estado == 'EN REPARACIÓN' %}selected{% endif %}>EN REPARACIÓN</option>
                     <option value="REPARACIÓN COMPLETADA" {% if estado == 'REPARACIÓN COMPLETADA' %}selected{% endif %}>REPARACIÓN COMPLETADA</option>
                     <option value="MÁQUINA LISTA PARA RETIRAR" {% if estado == 'MÁQUINA LISTA PARA RETIRAR' %}selected{% endif %}>MÁQUINA LISTA PARA RETIRAR</option>
@@ -79,6 +80,7 @@
                             'EN REPARACIÓN': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                             'EN REPARACION': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                             'A LA ESPERA DE REPUESTOS': {'bg': '#fd7e14', 'border': '#fd7e14', 'text': '#000000'},
+                            'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO': {'bg': '#fd7e14', 'border': '#fd7e14', 'text': '#000000'},
                             'REPARACIÓN COMPLETADA': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                             'MÁQUINA LISTA PARA RETIRAR': {'bg': '#ffc107', 'border': '#ffc107', 'text': '#000000'},
                             'MÁQUINA ENTREGADA': {'bg': '#28a745', 'border': '#28a745', 'text': '#ffffff'}

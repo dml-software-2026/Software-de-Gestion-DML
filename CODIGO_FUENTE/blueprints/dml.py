@@ -326,6 +326,7 @@ def dml_edit(id):
                 'EN REPARACIÓN': 1,
                 'EN REPARACION': 1,  # alias sin tilde, ver #44 - encoding legado en datos viejos
                 'A LA ESPERA DE REPUESTOS': 1,  # Mismo nivel que EN REPARACIÓN (puede ir y volver)
+                'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO': 1,  # #260 - idem, espera externa sin que DML pueda avanzar
                 'REPARACIÓN COMPLETADA': 2,
                 'MÁQUINA LISTA PARA RETIRAR': 3,
                 'MÁQUINA ENTREGADA': 4,
