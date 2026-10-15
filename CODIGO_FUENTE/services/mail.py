@@ -1,46 +1,47 @@
-import smtplib
 import sys
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import traceback
 
+import resend
 from flask import current_app
 
 
 def send_mail(to_email, subject, html_body):
-    """Envía mail con manejo de errores y timeout."""
+    """Envía mail vía Resend. Devuelve True/False, nunca rompe la request."""
     try:
-        # Verificar que email no esté vacío
         if not to_email or not to_email.strip():
             print("⚠️ Email destinatario vacío, saltando envío", file=sys.stderr, flush=True)
             return False
 
-        # Verificar configuración SMTP
-        if not current_app.config.get('MAIL_USERNAME'):
-            print(f"⚠️ SMTP no configurado (MAIL_USERNAME vacío). Email NO enviado a {to_email}", file=sys.stderr, flush=True)
-            print(f"   Asunto: {subject}", file=sys.stderr, flush=True)
+        api_key = current_app.config.get("RESEND_API_KEY")
+        if not api_key:
+            print(f"⚠️ RESEND_API_KEY no configurada. Mail NO enviado a {to_email}", file=sys.stderr, flush=True)
             return False
 
-        msg = MIMEMultipart('alternative')
-        msg['From'] = current_app.config['MAIL_DEFAULT_SENDER']
-        msg['To'] = to_email
-        msg['Subject'] = subject
-        msg.attach(MIMEText(html_body, 'html'))
+        # Modo dev: redirige todo a un único mail para no escribirle a usuarios reales
+        redirect = current_app.config.get("MAIL_DEV_REDIRECT")
+        if redirect:
+            subject = f"[DEV → {to_email}] {subject}"
+            to_email = redirect
 
-        print(f"📧 Intentando enviar email a {to_email}...", file=sys.stderr, flush=True)
-        print(f"   Servidor: {current_app.config['MAIL_SERVER']}:{current_app.config['MAIL_PORT']}", file=sys.stderr, flush=True)
-
-        # Timeout de 10 segundos para evitar bloqueos
-        with smtplib.SMTP(current_app.config['MAIL_SERVER'], current_app.config['MAIL_PORT'], timeout=10) as server:
-            if current_app.config['MAIL_USE_TLS']:
-                server.starttls()
-            if current_app.config['MAIL_USERNAME']:
-                server.login(current_app.config['MAIL_USERNAME'], current_app.config['MAIL_PASSWORD'])
-            server.send_message(msg)
-
-        print(f"✅ Mail enviado exitosamente a {to_email}", file=sys.stderr, flush=True)
+        resend.api_key = api_key
+        resend.Emails.send({
+            "from": current_app.config["MAIL_FROM"],
+            "to": [to_email.strip()],
+            "subject": subject,
+            "html": html_body,
+        })
+        print(f"✅ Mail enviado a {to_email}", file=sys.stderr, flush=True)
         return True
     except Exception as e:
         print(f"❌ Error enviando mail a {to_email}: {type(e).__name__}: {e!s}", file=sys.stderr, flush=True)
-        import traceback
         traceback.print_exc()
         return False
+
+
+def get_destinatarios_activos():
+    """Emails activos de la tabla usuarios_notificaciones."""
+    from CODIGO_FUENTE.extensions import get_db
+    rows = get_db().execute(
+        "SELECT email FROM usuarios_notificaciones WHERE activo = TRUE"
+    ).fetchall()
+    return [r["email"] for r in rows]
