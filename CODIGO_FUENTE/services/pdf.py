@@ -8,8 +8,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm, inch
 from reportlab.platypus import (
+    CondPageBreak,
     Image,
-    PageBreak,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -239,8 +239,11 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     ]))
     story.append(marca_table)
 
-    # REPUESTOS COLOCADOS (siempre en página 2+)
-    story.append(PageBreak())
+    # REPUESTOS COLOCADOS - arranca a continuación de lo anterior (antes iba
+    # siempre en hoja nueva con PageBreak, dejando media hoja en blanco). El
+    # CondPageBreak evita que el título quede solo al pie de una hoja.
+    story.append(Spacer(1, 0.15*inch))
+    story.append(CondPageBreak(1*inch))
     story.append(Paragraph("REPUESTOS COLOCADOS", heading_style))
 
     if repuestos:
@@ -255,7 +258,8 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
                 "✗" if rep['en_falta'] else ""
             ])
 
-        rep_table = Table(rep_rows, colWidths=[0.8*inch, 1.2*inch, 2.3*inch, 1.0*inch, 0.9*inch, 0.9*inch])
+        rep_table = Table(rep_rows, colWidths=[0.8*inch, 1.2*inch, 2.3*inch, 1.0*inch, 0.9*inch, 0.9*inch],
+                          repeatRows=1)  # repite el encabezado si la tabla sigue en otra hoja
         rep_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#808080')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
