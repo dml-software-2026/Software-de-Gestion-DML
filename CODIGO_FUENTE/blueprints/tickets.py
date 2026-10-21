@@ -227,7 +227,7 @@ def ticket_view(numero_ticket):
     else:
         current_step = 1
     flow_steps = build_flow_steps(
-        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+        ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
     return render_template("ticket_view.html", ticket=ticket, historial=historial, flow_steps=flow_steps)
