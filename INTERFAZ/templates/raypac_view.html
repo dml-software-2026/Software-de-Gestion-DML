@@ -221,6 +221,11 @@
             <i class="bi bi-ticket"></i> Ir a crear ticket <i class="bi bi-arrow-right"></i>
         </a>
         {% endif %}
+        {% elif user_role == 'RAYPAC' and ficha %}
+        {# #265: RAYPAC solo puede ver la ficha (crearla es del lado DML). #}
+        <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-info">
+            <i class="bi bi-file-earmark-text"></i> Ver Ficha DML <i class="bi bi-arrow-right"></i>
+        </a>
         {% endif %}
     </div>
 </div>
