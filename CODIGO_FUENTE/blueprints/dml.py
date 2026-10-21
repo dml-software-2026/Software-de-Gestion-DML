@@ -4,7 +4,6 @@ from io import BytesIO
 from flask import (
     Blueprint,
     flash,
-    jsonify,
     redirect,
     render_template,
     request,
@@ -475,67 +474,6 @@ def agregar_repuesto(id):
     return redirect(url_for("dml.dml_edit", id=id))
 
 
-@dml_bp.route("/<int:id>/marcar-falta/<int:repuesto_id>", methods=["POST"])
-@login_required
-@role_required("ADMIN", "DML_REPUESTOS")
-def marcar_repuesto_falta(id, repuesto_id):
-    db = get_db()
-
-    repuesto = db.execute(
-        "SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s",
-        (repuesto_id, id)
-    ).fetchone()
-
-    if not repuesto:
-        return jsonify({"error": "Repuesto no encontrado"}), 404
-
-    db.execute(
-        "UPDATE dml_repuestos SET en_falta = 1, en_stock = 0 WHERE id = %s",
-        (repuesto_id,)
-    )
-    db.commit()
-
-    return jsonify({"success": True}), 200
-
-
-@dml_bp.route("/<int:id>/marcar-llegada/<int:repuesto_id>", methods=["POST"])
-@login_required
-@role_required("ADMIN", "DML_REPUESTOS")
-def marcar_repuesto_llegada(id, repuesto_id):
-    db = get_db()
-    user = get_current_user()
-
-    repuesto = db.execute(
-        "SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s",
-        (repuesto_id, id)
-    ).fetchone()
-
-    if not repuesto:
-        return jsonify({"error": "Repuesto no encontrado"}), 404
-
-    # Cambiar estado
-    db.execute(
-        "UPDATE dml_repuestos SET en_falta = 0, en_stock = 1, estado_repuesto = 'EN STOCK' WHERE id = %s",
-        (repuesto_id,)
-    )
-
-    # Descontar del stock en ubicación DML
-    ajustar_stock_ubicacion(repuesto['codigo_repuesto'], "DML", -repuesto['cantidad_utilizada'])
-
-    # Actualizar estadísticas
-    actualizar_estadistica_repuesto(repuesto['codigo_repuesto'], repuesto['cantidad_utilizada'])
-
-    db.commit()
-
-    # Verificar alerta de stock después de descontar
-    verificar_alerta_stock(repuesto['codigo_repuesto'])
-
-    log_action(user['id'], "PART_ARRIVED", "dml_repuestos", repuesto_id, None,
-              f"{repuesto['codigo_repuesto']}")
-
-    return jsonify({"success": True}), 200
-
-
 @dml_bp.route("/<int:ficha_id>/repuestos/mover-a-stock/<int:repuesto_id>", methods=["POST"])
 @login_required
 @role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
@@ -572,7 +510,7 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     # Actualizar estado a EN STOCK
     db.execute("""
         UPDATE dml_repuestos
-        SET en_stock = 1, en_falta = 0, estado_repuesto = 'COLOCADO'
+        SET en_stock = 1, en_falta = 0, estado_repuesto = 'EN STOCK'
         WHERE id = %s
     """, (repuesto_id,))
 
