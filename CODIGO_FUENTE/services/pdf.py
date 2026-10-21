@@ -4,6 +4,7 @@ from xml.sax.saxutils import escape as xml_escape
 
 from PIL import Image as PILImage
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm, inch
@@ -69,6 +70,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     cell_style_bold = ParagraphStyle('CellBold', parent=cell_style, fontName='Helvetica-Bold')
     parts_header_style = ParagraphStyle('PartsHeader', parent=cell_style_bold, fontSize=8.5)
     parts_cell_style = ParagraphStyle('PartsCell', parent=styles['Normal'], fontSize=8, leading=9.5)
+    rep_cell_style = ParagraphStyle('RepCell', parent=parts_cell_style, alignment=TA_CENTER)
 
     # ENCABEZADO: N° Ficha | número | INFORME DML SOBRE EL EQUIPO EN REVISION
     header_data = [[
@@ -251,9 +253,11 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         for rep in repuestos:
             rep_rows.append([
                 str(rep['cantidad_utilizada'] or 1),
-                rep['codigo_repuesto'] or "",
-                (rep['descripcion'] or '')[:25],
-                rep['estado_repuesto'] or "",
+                # Descripción completa, sin cortar: _cell() hace wrap y la fila
+                # crece lo que haga falta en vez de pisar la de abajo.
+                _cell(rep['codigo_repuesto'], rep_cell_style),
+                _cell(rep['descripcion'], rep_cell_style),
+                _cell(rep['estado_repuesto'], rep_cell_style),
                 "✓" if rep['en_stock'] else "",
                 "✗" if rep['en_falta'] else ""
             ])
