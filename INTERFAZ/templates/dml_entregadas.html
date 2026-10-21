@@ -65,7 +65,12 @@
                         <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-sm btn-info" title="Ver Ficha">
                             <i class="fas fa-eye"></i> Ver
                         </a>
-                        {% if not ficha.recibido_por %}
+                        {# #264: el acuse lo registra RAYPAC, no DML - ADMIN mantiene el
+                           acceso de excepción. Esta condición faltaba acá: el user_role in
+                           ['ADMIN', 'RAYPAC'] que ya existía en este archivo (columnas
+                           Contacto/Email, #109) es otro chequeo sin relación, no alcanzaba
+                           a este botón. #}
+                        {% if not ficha.recibido_por and user_role in ['ADMIN', 'RAYPAC'] %}
                         <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalAcuse{{ ficha.id }}" title="Registrar Acuse">
                             <i class="fas fa-check"></i> Acuse
                         </button>

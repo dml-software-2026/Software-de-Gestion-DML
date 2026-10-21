@@ -253,11 +253,16 @@
                 <i class="bi bi-lock-fill"></i> Cerrar Ficha <i class="bi bi-arrow-right"></i>
             </button>
         </form>
-        {% elif ficha.is_closed and not ficha.recibido_por and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'RAYPAC'] %}
+        {% elif ficha.is_closed and not ficha.recibido_por and get_current_user()['role'] in ['ADMIN', 'RAYPAC'] %}
         {# al cerrar la ficha, los botones de acción de arriba desaparecen
            (is_closed) y no quedaba ningún acceso al siguiente paso del flujo
            real ("Registrar Acuse" en /dml/entregadas) - había que saber que
-           esa pantalla existe. open_acuse abre directo el modal ahí. #}
+           esa pantalla existe. open_acuse abre directo el modal ahí.
+           #264: el acuse lo registra RAYPAC (quien recibe la máquina de
+           vuelta), no DML - mismo criterio que dml_entregadas.html, que ya
+           restringía el botón real del modal a ['ADMIN', 'RAYPAC']. DML_ST
+           se saca de la lista para no mostrar un acceso a un paso que no
+           puede completar. #}
         <a href="{{ url_for('dml.dml_entregadas', open_acuse=ficha.id) }}" class="btn btn-success">
             <i class="bi bi-clipboard-check"></i> Registrar Acuse <i class="bi bi-arrow-right"></i>
         </a>
