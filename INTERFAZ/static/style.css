@@ -241,3 +241,45 @@ table.table tbody td {
     max-height: 240px;
     overflow-y: auto;
 }
+
+/* Tracker de estado del flujo (#158) - franja de segmentos + label debajo
+   de cada uno, sin interacción (a diferencia de un wizard de pasos): solo
+   informa en qué tramo está un registro puntual. Ver _flow_tracker.html. */
+.dml-flow-tracker {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 1rem;
+}
+
+.dml-flow-step {
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+}
+
+.dml-flow-step-bar {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #e9ecef;
+    margin-bottom: .35rem;
+}
+
+.dml-flow-step-done .dml-flow-step-bar,
+.dml-flow-step-current .dml-flow-step-bar {
+    background-color: var(--bs-primary, #0d6efd);
+}
+
+.dml-flow-step-label {
+    font-size: .72rem;
+    line-height: 1.2;
+    color: #6c757d;
+}
+
+.dml-flow-step-done .dml-flow-step-label {
+    color: #495057;
+}
+
+.dml-flow-step-current .dml-flow-step-label {
+    color: #212529;
+    font-weight: 600;
+}

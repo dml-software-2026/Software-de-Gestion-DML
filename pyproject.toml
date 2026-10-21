@@ -23,3 +23,7 @@ ignore = ["DTZ", "S", "BLE", "PLW", "N", "SIM", "UP", "F841"]
 # inexistente. Pendiente de eliminar o reescribir (relacionado con #62 y #86).
 # Mientras tanto, silenciamos el warning para que CI no se caiga por esto.
 "CODIGO_FUENTE/blueprints/api.py" = ["F821"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -2,11 +2,13 @@
 
 {% block content %}
 <div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-start mb-3">
+  {# #200: mismo patrón de encabezado que raypac_view.html - título +
+     metadatos a la izquierda, acciones a la derecha. #}
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
     <div>
-      <h2 class="mb-1">Remito {{ envio.numero_remito }}</h2>
+      <h2 class="mb-1"><i class="bi bi-truck"></i> Remito {{ envio.numero_remito }}</h2>
       <p class="text-muted mb-1">Fecha envío: {{ envio.fecha_envio }}</p>
-      <p class="text-muted mb-0">Estado: 
+      <p class="text-muted mb-0">Estado:
         {% if envio.estado_envio == 'RECIBIDO' %}
         <span class="badge bg-success">Recibido en DML</span>
         {% else %}
@@ -61,27 +63,33 @@
   </div>
   {% endif %}
 
-  <div class="card">
-    <div class="card-header">Detalle de repuestos</div>
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0"><i class="bi bi-list-ul"></i> Detalle de repuestos</h5>
+    </div>
     <div class="card-body p-0">
-      <table class="table mb-0 align-middle">
-        <thead class="table-light">
-          <tr>
-            <th style="width: 20%">Código</th>
-            <th>Descripción</th>
-            <th style="width: 15%" class="text-center">Cantidad</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for det in detalles %}
-          <tr>
-            <td><strong>{{ det.codigo_repuesto }}</strong></td>
-            <td>{{ det.item or 'N/D' }}</td>
-            <td class="text-center">{{ det.cantidad }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {# Mobile: el scroll queda contenido en la tabla, no fuerza scroll
+         horizontal de toda la página (no lo tenía antes del #200). #}
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 20%">Código</th>
+              <th>Descripción</th>
+              <th style="width: 15%" class="text-center">Cantidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for det in detalles %}
+            <tr>
+              <td><strong>{{ det.codigo_repuesto }}</strong></td>
+              <td>{{ det.item or 'N/D' }}</td>
+              <td class="text-center">{{ det.cantidad }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>

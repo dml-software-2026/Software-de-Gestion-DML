@@ -1,0 +1,13 @@
+{# Tracker de estado del flujo (#158) - versión de solo lectura del wizard
+   de pasos de dml_edit.html (sin Siguiente/Atrás: acá no se navega, solo
+   se muestra en qué tramo está el registro). Cada página arma su propia
+   lista `flow_steps` con build_flow_steps() (CODIGO_FUENTE/services/flujo.py)
+   según su propio contexto - ver raypac_view()/ticket_view()/dml_view(). #}
+<div class="dml-flow-tracker">
+    {% for step in flow_steps %}
+    <div class="dml-flow-step dml-flow-step-{{ step.state }}">
+        <div class="dml-flow-step-bar"></div>
+        <div class="dml-flow-step-label">{{ step.label }}</div>
+    </div>
+    {% endfor %}
+</div>

@@ -38,6 +38,13 @@
             <span class="nav-text">RAYPAC</span>
           </a>
         </li>
+        {# Orden del navbar (#158) - sigue el flujo real: RAYPAC (ingreso)
+           -> Envíos (RAYPAC despacha la máquina, DML la recibe -
+           estado_envio_equipos en raypac.py) -> Tickets -> Fichas ST ->
+           Entregadas. El envío de vuelta (DML->RAYPAC, máquina reparada) no
+           pasa por acá - se registra directo en la ficha como "Remito de
+           Salida" (ver dml_edit.html). Stock queda al final, sin relación
+           con el recorrido de una máquina puntual. #}
         {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'RAYPAC', 'DML_REPUESTOS', 'DML_ST'] %}
         <li class="nav-item">
           <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'envios' else '' }}" href="{{ url_for('envios.envios_list') }}">
@@ -46,6 +53,12 @@
           </a>
         </li>
         {% endif %}
+        <li class="nav-item">
+          <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'tickets' else '' }}" href="{{ url_for('tickets.tickets_list') }}">
+            <i class="bi bi-ticket-perforated-fill"></i>
+            <span class="nav-text">Tickets</span>
+          </a>
+        </li>
         <li class="nav-item">
           <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'dml' and request.endpoint != 'dml.dml_entregadas' else '' }}" href="{{ url_for('dml.dml_list') }}">
             <i class="bi bi-wrench-adjustable"></i>
@@ -60,12 +73,6 @@
           </a>
         </li>
         {% endif %}
-        <li class="nav-item">
-          <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'tickets' else '' }}" href="{{ url_for('tickets.tickets_list') }}">
-            <i class="bi bi-ticket-perforated-fill"></i>
-            <span class="nav-text">Tickets</span>
-          </a>
-        </li>
         <li class="nav-item">
           <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'stock' else '' }}" href="{{ url_for('stock.stock_list') }}">
             <i class="bi bi-box2-fill"></i>

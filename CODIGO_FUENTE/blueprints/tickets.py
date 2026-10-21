@@ -9,6 +9,7 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.flujo import build_flow_steps
 from CODIGO_FUENTE.services.mail import send_mail
 from CODIGO_FUENTE.services.numeracion import generate_ticket_number
 
@@ -31,6 +32,9 @@ def ticket_nuevo(raypac_id):
     if not raypac['is_frozen']:
         flash("El ingreso RAYPAC debe estar freezado para crear un ticket.", "error")
         return redirect(url_for("raypac.raypac_view", id=raypac_id))
+    if raypac['estado_envio_equipos'] != 'RECIBIDO':
+        flash("Debe dar de alta el equipo en DML antes de crear el ticket.", "error")
+        return redirect(url_for("raypac.raypac_view", id=raypac_id))    
 
     # Verificar si ya existe ticket para este RAYPAC
     ticket_existente = db.execute(
@@ -194,6 +198,7 @@ def ticket_view(numero_ticket):
     ticket = db.execute("""
         SELECT t.*,
                f.numero_ficha, f.estado_reparacion, f.diagnostico_inicial, f.diagnostico_reparacion,
+               f.is_closed, f.fecha_entrega_cliente,
                r.cliente, r.numero_serie, r.modelo_maquina, r.comercial
         FROM tickets t
         LEFT JOIN dml_fichas f ON t.ficha_id = f.id
@@ -210,7 +215,22 @@ def ticket_view(numero_ticket):
         SELECT * FROM ticket_historial WHERE ticket_id = %s ORDER BY fecha DESC
     """, (ticket['id'],)).fetchall()
 
-    return render_template("ticket_view.html", ticket=ticket, historial=historial)
+    # #158: tracker de 4 pasos, mismo criterio que dml_view() - acá el
+    # ticket es la puerta de entrada, así que puede no tener ficha todavía
+    # (a diferencia de dml_view, donde el ticket siempre está hecho).
+    if ticket['fecha_entrega_cliente']:
+        current_step = 4
+    elif ticket['is_closed']:
+        current_step = 3
+    elif ticket['numero_ficha']:
+        current_step = 2
+    else:
+        current_step = 1
+    flow_steps = build_flow_steps(
+        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+    )
+
+    return render_template("ticket_view.html", ticket=ticket, historial=historial, flow_steps=flow_steps)
 
 
 @tickets_bp.route("/ticket/<numero_ticket>/print")

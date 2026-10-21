@@ -128,4 +128,18 @@
 </div>
 {% endfor %}
 
+{# #158: si se llega desde el botón "Registrar Acuse" de dml_view.html
+   (?open_acuse=<id>), abrir directo el modal de esa ficha en vez de que
+   el usuario tenga que volver a encontrar la fila en la tabla. #}
+{% if request.args.get('open_acuse') %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var modalEl = document.getElementById('modalAcuse{{ request.args.get("open_acuse") }}');
+    if (modalEl) {
+        new bootstrap.Modal(modalEl).show();
+    }
+});
+</script>
+{% endif %}
+
 {% endblock %}
