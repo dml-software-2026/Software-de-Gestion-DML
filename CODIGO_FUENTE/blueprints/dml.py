@@ -411,12 +411,6 @@ def agregar_repuesto(id):
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_edit", id=id))
 
-    # Validar cantidad máxima (15 repuestos)
-    count = db.execute("SELECT COUNT(*) as cnt FROM dml_repuestos WHERE ficha_id = %s", (id,)).fetchone()
-    if count['cnt'] >= 15:
-        flash("Máximo 15 repuestos por ficha.", "error")
-        return redirect(url_for("dml.dml_edit", id=id))
-
     codigo = request.form.get("codigo_repuesto", "").strip().upper()
     cantidad_utilizada = int(request.form.get("cantidad_utilizada", 1))
 
