@@ -194,7 +194,7 @@ def stock_edit(codigo):
                 WHERE codigo_repuesto = %s AND ubicacion = %s
             """, (cantidad, codigo, ubicacion))
             db.commit()
-               verificar_alerta_stock(codigo, ubicacion, cantidad_anterior=stock['cantidad'])
+            verificar_alerta_stock(codigo, ubicacion, cantidad_anterior=stock['cantidad'])
             log_action(user['id'], "UPDATE", "stock_ubicaciones", None,
                       f"Anterior: {stock['cantidad']}", f"Nuevo: {cantidad}")
 
