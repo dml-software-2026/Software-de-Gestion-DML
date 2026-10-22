@@ -866,7 +866,7 @@ def dml_registrar_acuse(id):
 
 @dml_bp.route("/<int:id>/pdf", methods=["GET"])
 @login_required
-@role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS", "RAYPAC")
 def descargar_ficha_pdf(id):
     """Genera y descarga el PDF de una ficha de reparación."""
     user = get_current_user()
