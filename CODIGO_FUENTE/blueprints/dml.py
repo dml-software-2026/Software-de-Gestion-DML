@@ -467,7 +467,7 @@ def agregar_repuesto(id):
 
     # Verificar alerta de stock después de descontar
     if en_stock:
-        verificar_alerta_stock(codigo)
+        verificar_alerta_stock(codigo, cantidad_anterior=stock['cantidad'])
 
     log_action(user['id'], "ADD_PART", "dml_repuestos", id, None,
               f"{codigo} x{cantidad_utilizada} ({estado_repuesto})")
@@ -518,6 +518,12 @@ def marcar_repuesto_llegada(id, repuesto_id):
     if not repuesto:
         return jsonify({"error": "Repuesto no encontrado"}), 404
 
+    stock_previo = db.execute(
+        "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = 'DML'",
+        (repuesto['codigo_repuesto'],)
+    ).fetchone()
+    cantidad_anterior = stock_previo['cantidad'] if stock_previo else None
+
     # Cambiar estado
     db.execute(
         "UPDATE dml_repuestos SET en_falta = 0, en_stock = 1, estado_repuesto = 'EN STOCK' WHERE id = %s",
@@ -533,7 +539,7 @@ def marcar_repuesto_llegada(id, repuesto_id):
     db.commit()
 
     # Verificar alerta de stock después de descontar
-    verificar_alerta_stock(repuesto['codigo_repuesto'])
+    verificar_alerta_stock(repuesto['codigo_repuesto'], cantidad_anterior=cantidad_anterior)
 
     log_action(user['id'], "PART_ARRIVED", "dml_repuestos", repuesto_id, None,
               f"{repuesto['codigo_repuesto']}")
@@ -599,6 +605,8 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     actualizar_estadistica_repuesto(repuesto['codigo_repuesto'], repuesto['cantidad_utilizada'])
 
     db.commit()
+
+    verificar_alerta_stock(repuesto['codigo_repuesto'], cantidad_anterior=stock['cantidad'])
 
     log_action(user['id'], "MOVER_REPUESTO_A_STOCK", "dml_repuestos", repuesto_id,
               "EN FALTA", f"EN STOCK - {repuesto['codigo_repuesto']}")

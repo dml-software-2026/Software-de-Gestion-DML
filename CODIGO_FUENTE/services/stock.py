@@ -3,6 +3,18 @@ from datetime import datetime
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.mail import send_mail
 
+NIVELES_CON_MAIL = ("NARANJA", "ROJO")
+
+
+def nivel_de_cantidad(qty):
+    """Única fuente de verdad de los umbrales (fijo en 2)."""
+    if qty == 0:
+        return "ROJO"
+    elif qty == 1:
+        return "NARANJA"
+    elif qty == 2:
+        return "AMARILLO"
+    return "OK"
 
 def check_stock_alert(codigo, ubicacion="DML"):
     """Verifica nivel de stock por ubicación y retorna estado de alerta."""
@@ -22,15 +34,7 @@ def check_stock_alert(codigo, ubicacion="DML"):
     if not stock:
         return "NO_EXISTE"
 
-    qty = stock['cantidad']
-    if qty == 0:
-        return "ROJO"  # Falta completamente
-    elif qty == 1:
-        return "NARANJA"  # Último repuesto
-    elif qty == 2:
-        return "AMARILLO"  # Pocos repuestos
-    else:
-        return "OK"
+    return nivel_de_cantidad(stock['cantidad'])
 
 
 def get_alert_badge(codigo, ubicacion="DML"):
@@ -73,7 +77,7 @@ def ajustar_stock_ubicacion(codigo_repuesto, ubicacion, delta):
         )
 
 
-def verificar_alerta_stock(codigo_repuesto, ubicacion="DML"):
+def verificar_alerta_stock(codigo_repuesto, ubicacion="DML", cantidad_anterior=None):
     """Verifica y registra alerta de stock por ubicación y dispara aviso si corresponde."""
     db = get_db()
     stock = db.execute(
@@ -102,22 +106,30 @@ def verificar_alerta_stock(codigo_repuesto, ubicacion="DML"):
     if not stock:
         return None
 
-    nivel_alerta = check_stock_alert(codigo_repuesto, stock['ubicacion'])
+    nivel_alerta = nivel_de_cantidad(stock['cantidad'])
     item_nombre = stock['item'] or codigo_repuesto
 
-    if nivel_alerta in ["ROJO", "NARANJA", "AMARILLO"]:
-        # Registrar alerta
-        db.execute("""
-            INSERT INTO stock_alertas (codigo_repuesto, item, cantidad_actual, nivel_alerta)
-            VALUES (%s, %s, %s, %s)
-        """, (codigo_repuesto, item_nombre, stock['cantidad'], nivel_alerta))
-        db.commit()
+    if nivel_alerta not in NIVELES_CON_MAIL:
+        return None
 
-        # Enviar email de alerta
-        enviar_alerta_stock(codigo_repuesto, item_nombre, stock['cantidad'], nivel_alerta, stock['ubicacion'])
+    # Solo avisar si el stock bajó y cambió de nivel
+    if cantidad_anterior is not None:
+        if stock['cantidad'] >= cantidad_anterior:
+            return None
+        if nivel_de_cantidad(cantidad_anterior) == nivel_alerta:
+                return None
 
-        return nivel_alerta
-    return None
+    # Registrar alerta
+    db.execute("""
+        INSERT INTO stock_alertas (codigo_repuesto, item, cantidad_actual, nivel_alerta)
+        VALUES (%s, %s, %s, %s)
+    """, (codigo_repuesto, item_nombre, stock['cantidad'], nivel_alerta))
+    db.commit()
+
+    # Enviar email de alerta
+    enviar_alerta_stock(codigo_repuesto, item_nombre, stock['cantidad'], nivel_alerta, stock['ubicacion'])
+
+    return nivel_alerta
 
 
 def enviar_alerta_stock(codigo, item, cantidad, nivel, ubicacion="DML"):
