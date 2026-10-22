@@ -461,7 +461,7 @@ def agregar_repuesto(id):
 
     # Verificar alerta de stock después de descontar
     if en_stock:
-        verificar_alerta_stock(codigo)
+        verificar_alerta_stock(codigo, cantidad_anterior=stock['cantidad'])
 
     log_action(user['id'], "ADD_PART", "dml_repuestos", id, None,
               f"{codigo} x{cantidad_utilizada} ({estado_repuesto})")
@@ -532,6 +532,8 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     actualizar_estadistica_repuesto(repuesto['codigo_repuesto'], repuesto['cantidad_utilizada'])
 
     db.commit()
+
+    verificar_alerta_stock(repuesto['codigo_repuesto'], cantidad_anterior=stock['cantidad'])
 
     log_action(user['id'], "MOVER_REPUESTO_A_STOCK", "dml_repuestos", repuesto_id,
               "EN FALTA", f"EN STOCK - {repuesto['codigo_repuesto']}")
