@@ -4,7 +4,6 @@ from io import BytesIO
 from flask import (
     Blueprint,
     flash,
-    jsonify,
     redirect,
     render_template,
     request,
@@ -252,7 +251,7 @@ def dml_view(id, readonly=False):
     else:
         current_step = 2
     flow_steps = build_flow_steps(
-        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+        ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
     return render_template("dml_view.html", ficha=ficha, raypac=raypac, partes=partes, repuestos=repuestos,
@@ -326,6 +325,7 @@ def dml_edit(id):
                 'EN REPARACIÓN': 1,
                 'EN REPARACION': 1,  # alias sin tilde, ver #44 - encoding legado en datos viejos
                 'A LA ESPERA DE REPUESTOS': 1,  # Mismo nivel que EN REPARACIÓN (puede ir y volver)
+                'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO': 1,  # #260 - idem, espera externa sin que DML pueda avanzar
                 'REPARACIÓN COMPLETADA': 2,
                 'MÁQUINA LISTA PARA RETIRAR': 3,
                 'MÁQUINA ENTREGADA': 4,
@@ -391,7 +391,7 @@ def dml_edit(id):
     else:
         current_step = 2
     flow_steps = build_flow_steps(
-        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+        ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
     return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps)
@@ -409,12 +409,6 @@ def agregar_repuesto(id):
     ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
-        return redirect(url_for("dml.dml_edit", id=id))
-
-    # Validar cantidad máxima (15 repuestos)
-    count = db.execute("SELECT COUNT(*) as cnt FROM dml_repuestos WHERE ficha_id = %s", (id,)).fetchone()
-    if count['cnt'] >= 15:
-        flash("Máximo 15 repuestos por ficha.", "error")
         return redirect(url_for("dml.dml_edit", id=id))
 
     codigo = request.form.get("codigo_repuesto", "").strip().upper()
@@ -480,73 +474,6 @@ def agregar_repuesto(id):
     return redirect(url_for("dml.dml_edit", id=id))
 
 
-@dml_bp.route("/<int:id>/marcar-falta/<int:repuesto_id>", methods=["POST"])
-@login_required
-@role_required("ADMIN", "DML_REPUESTOS")
-def marcar_repuesto_falta(id, repuesto_id):
-    db = get_db()
-
-    repuesto = db.execute(
-        "SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s",
-        (repuesto_id, id)
-    ).fetchone()
-
-    if not repuesto:
-        return jsonify({"error": "Repuesto no encontrado"}), 404
-
-    db.execute(
-        "UPDATE dml_repuestos SET en_falta = 1, en_stock = 0 WHERE id = %s",
-        (repuesto_id,)
-    )
-    db.commit()
-
-    return jsonify({"success": True}), 200
-
-
-@dml_bp.route("/<int:id>/marcar-llegada/<int:repuesto_id>", methods=["POST"])
-@login_required
-@role_required("ADMIN", "DML_REPUESTOS")
-def marcar_repuesto_llegada(id, repuesto_id):
-    db = get_db()
-    user = get_current_user()
-
-    repuesto = db.execute(
-        "SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s",
-        (repuesto_id, id)
-    ).fetchone()
-
-    if not repuesto:
-        return jsonify({"error": "Repuesto no encontrado"}), 404
-
-    stock_previo = db.execute(
-        "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = 'DML'",
-        (repuesto['codigo_repuesto'],)
-    ).fetchone()
-    cantidad_anterior = stock_previo['cantidad'] if stock_previo else None
-
-    # Cambiar estado
-    db.execute(
-        "UPDATE dml_repuestos SET en_falta = 0, en_stock = 1, estado_repuesto = 'EN STOCK' WHERE id = %s",
-        (repuesto_id,)
-    )
-
-    # Descontar del stock en ubicación DML
-    ajustar_stock_ubicacion(repuesto['codigo_repuesto'], "DML", -repuesto['cantidad_utilizada'])
-
-    # Actualizar estadísticas
-    actualizar_estadistica_repuesto(repuesto['codigo_repuesto'], repuesto['cantidad_utilizada'])
-
-    db.commit()
-
-    # Verificar alerta de stock después de descontar
-    verificar_alerta_stock(repuesto['codigo_repuesto'], cantidad_anterior=cantidad_anterior)
-
-    log_action(user['id'], "PART_ARRIVED", "dml_repuestos", repuesto_id, None,
-              f"{repuesto['codigo_repuesto']}")
-
-    return jsonify({"success": True}), 200
-
-
 @dml_bp.route("/<int:ficha_id>/repuestos/mover-a-stock/<int:repuesto_id>", methods=["POST"])
 @login_required
 @role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
@@ -583,7 +510,7 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     # Actualizar estado a EN STOCK
     db.execute("""
         UPDATE dml_repuestos
-        SET en_stock = 1, en_falta = 0, estado_repuesto = 'COLOCADO'
+        SET en_stock = 1, en_falta = 0, estado_repuesto = 'EN STOCK'
         WHERE id = %s
     """, (repuesto_id,))
 
@@ -872,7 +799,7 @@ def dml_close(id):
 
 @dml_bp.route("/<int:id>/acuse", methods=["POST"])
 @login_required
-@role_required("ADMIN", "DML_ST", "RAYPAC")
+@role_required("ADMIN", "RAYPAC")
 def dml_registrar_acuse(id):
     """Registra el acuse de recibo de una máquina entregada."""
     user = get_current_user()

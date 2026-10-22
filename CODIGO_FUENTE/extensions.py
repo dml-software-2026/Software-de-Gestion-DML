@@ -208,6 +208,18 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error creando tabla usuarios_notificaciones: {e}")
         db.rollback()
 
+    # Migración: el estado de repuesto 'COLOCADO' se eliminó (#277) - "Mover
+    # a Stock" ahora guarda 'EN STOCK'. Pasa los datos viejos al mismo valor
+    # para que el PDF de la ficha no muestre un estado que ya no existe.
+    try:
+        db.execute("UPDATE dml_repuestos SET estado_repuesto = 'EN STOCK' WHERE estado_repuesto = 'COLOCADO'")
+        db.commit()
+        print("[MIGRATION] ✅ Repuestos 'COLOCADO' pasados a 'EN STOCK'")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error migrando repuestos 'COLOCADO': {e}")
+        db.rollback()
+
     # Migración: Agregar campos de estado a envios_repuestos
     try:
         print("[MIGRATION] Verificando campos de estado en envios_repuestos...")
