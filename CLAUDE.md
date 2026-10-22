@@ -18,6 +18,69 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+- **Última actualización:** 2026-10-22, cierre de sesión (Facu cambia de
+  máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
+- **Ojo: el chat de esta sesión se borró a la mitad** (Facu lo cerró sin
+  querer). Lo de antes del corte se reconstruyó desde git/GitHub, no de
+  memoria - lo que figura acá abajo está verificado contra el repo, pero
+  puede faltar contexto de charlas que no dejaron rastro en código.
+- **El checkpoint del 10-08 (PR #272) nunca se mergeó** - este PR está
+  armado encima de esa rama (+ `dev` mergeado), así que lo incluye
+  completo (quedó como histórico más abajo). **Mergear este PR y cerrar
+  el #272 sin mergear** (queda redundante).
+- **Lo que pasó entre el 10-08 y hoy (verificado en GitHub):**
+  - 2026-10-21: Facu mergeó los 6 PRs del 10-08 (#266-#271) y el **#278**
+    (`#277`, eliminar el estado de repuesto COLOCADO). Se crearon el
+    **`#274`** (`dml_edit` acepta cualquier `estado_reparacion` sin
+    validar - **PR #281 abierto**, In review) y el **`#279`** (contadores
+    del inicio).
+  - 2 reglas de proceso nuevas que solo estaban en la memoria local de
+    una máquina, pasadas hoy a "Instrucciones de flujo de trabajo": **los
+    PRs los abre Claude Code** (`gh pr create --base dev`, Facu asigna
+    reviewer y mergea - pedido del 10-21) y **una tarea/un PR a la vez**
+    (sin tandas en paralelo ni ramas de integración - lección del 10-08,
+    nadie sabía después qué PR estaba probado).
+- **Tareas de hoy - 2 PRs abiertos, los 2 probados en vivo por Facu:**
+  1. **`#279` → PR #282** (`feature/279-inicio-accesos-en-vez-de-contadores`).
+     Los contadores del inicio se reemplazaron por tarjetas de acceso a
+     cada sección (mismo orden y visibilidad por rol que la navbar, salvo
+     RAYPAC para DML_REPUESTOS, que `raypac_list()` no deja entrar);
+     `index()` en `auth.py` ya no calcula nada. Acciones Rápidas de
+     RAYPAC/ADMIN al mismo estilo de tarjeta blanca, efecto hover
+     `.home-card`. Ícono propio `.bi-camion-fill` en `style.css` (camión
+     de costado relleno, Bootstrap Icons no trae uno - SVG por
+     `mask-image`): se probó sin ventana y con una línea divisoria
+     caja/cabina, a Facu le gustó más **con la ventanita en la cabina**,
+     así quedó.
+  2. **`#189` → PR #283** (`feature/189-ojito-password-login`). Ojito de
+     mostrar/ocultar contraseña en `login.html`. Diseño pedido por Facu:
+     **el ojo flota dentro del campo, a la derecha, sin caja/botón
+     alrededor, y solo el ícono reacciona** (gris → azul) - la primera
+     versión con `input-group` + botón con borde no le gustó. Solo login;
+     extenderlo a otros campos de contraseña es decisión aparte. El `#189`
+     no estaba en el kanban, se agregó (In review, XS).
+- **Kanban actualizado hoy:** `#279` y `#189` en In review.
+- **Próximo paso concreto:**
+  1. Facu: mergear este checkpoint (y cerrar #272 sin mergear), revisar y
+     mergear #281, #282, #283. Después de cada merge, **cerrar el issue a
+     mano** (`#274`, `#279`, `#189` - `Closes` no autocierra en `dev`).
+  2. Siguen sin decisión los hallazgos chicos del 10-08 (README de
+     `INTERFAZ/`, scripts con `sqlite3`, ficha `#501` con `%D3`).
+     `dml.db.bak` sigue sin trackear en esta máquina.
+  3. Candidatos chicos del board, sin asignar: **#259** (XS, número de
+     serie en vez de remito - alcance a aclarar), **#258** (popup de
+     campanita), **#171** (vista de estado para RAYPAC, Ready). Más
+     grandes: "Prioridades de Backlog" (`#57` lo tiene Ivo, `#47`, `#52`),
+     `#244`, `#170`, `#195`.
+- **Ambiente local de esta máquina:** usado hoy sin setup. Server
+  detenido al cerrar. La próxima sesión es en **otra máquina** - ver
+  "Setup de entorno local" si no está armado.
+- **Bloqueos:** ninguno.
+
+<details>
+<summary>Checkpoint anterior (2026-10-08) — histórico, dejado sin borrar por
+referencia</summary>
+
 - **Última actualización:** 2026-10-08, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
 - **Sesión de "sacarse tareas chicas de encima" - pedido explícito de Facu
@@ -230,6 +293,8 @@ asumir contexto de nada más.
   repetir el setup de entorno local de cero ahí (ver sección "Setup de
   entorno local" más abajo) si todavía no está armado.
 - **Bloqueos:** ninguno.
+
+</details>
 
 <details>
 <summary>Checkpoint anterior (2026-09-17) — histórico, dejado sin borrar por
@@ -1147,14 +1212,23 @@ probarlo, el fix va como commit nuevo en la misma rama (no hace falta rama nueva
 hace Facu desde GitHub — dejar PRs abiertos mientras se sigue probando no tiene
 ningún riesgo, no hace falta cancelarlos ni cerrarlos "por las dudas".
 
-**Los Pull Requests los abre Facu manualmente desde GitHub** (no desde la terminal).
-Cuando un cambio esté commiteado y pusheado y listo para convertirse en PR, Claude
-Code tiene que **avisarle explícitamente a Facu** — algo como: "Ya pusheé la rama
-`nombre-rama`, andá a GitHub y abrí el PR contra `dev`. Título sugerido: '...'.
-Descripción sugerida: '...' (con el `Closes #N` o `Refs #N` que corresponda)."
-No dar por hecho que el PR se abre solo ni asumir que ya está abierto. **Al confirmar
-que un PR con `Closes #N` quedó mergeado, cerrar ese issue a mano** (`gh issue close`)
-— ver el gotcha en "Branches y flujo de PRs", `Closes #N` no autocierra nada acá.
+**Los Pull Requests los abre Claude Code** (cambio pedido por Facu el 2026-10-21;
+antes los abría él a mano desde GitHub). Cuando la rama está probada y pusheada:
+`gh pr create --base dev` (siempre `--base dev` explícito, ver el gotcha de la base
+branch más abajo) con título, descripción completa (qué cambia, por qué, cómo
+probar) y el `Closes #N`/`Refs #N` que corresponda - y pasarle el link a Facu.
+Facu asigna reviewer y mergea; Claude Code nunca mergea. **Al confirmar que un PR
+con `Closes #N` quedó mergeado, cerrar ese issue a mano** (`gh issue close`) — ver
+el gotcha en "Branches y flujo de PRs", `Closes #N` no autocierra nada acá.
+
+**Una tarea / un PR a la vez** (pedido de Facu, 2026-10-19). Tomar una tarea del
+kanban → implementar → Facu prueba → PR → cerrada (o su estado anotado) → recién
+ahí la siguiente. Lo mismo al revisar PRs pendientes. Nada de tandas de PRs en
+paralelo ni ramas de integración local que mezclen varios PRs, salvo que Facu lo
+pida. Motivo: el 10-08 se hicieron 6 PRs en paralelo y para la sesión siguiente
+nadie sabía cuál estaba probado, cuál tenía problemas ni por qué no se habían
+mergeado. Si una prueba falla, anotarlo enseguida (comentario en el PR o
+checkpoint).
 
 **Antes de tocar cualquier rama:** seguir la rutina de sincronización de siempre —
 `git status` (si hay cambios sin commitear, resolverlos primero: `git diff` para ver
@@ -1172,7 +1246,7 @@ significativamente el estado de la tarea en curso (se prueba algo, se destraba u
 bloqueo, se decide el próximo paso), actualizar la sección "🔖 Checkpoint" al
 principio de este archivo con el estado real y el próximo paso concreto. Sigue el
 mismo flujo que cualquier cambio: rama chica (`docs/checkpoint-...`), commit, push,
-avisarle a Facu para que abra y mergee el PR contra `dev`.
+abrir el PR contra `dev` y pasarle el link a Facu para que lo mergee.
 
 **Bug o inconsistencia que no generamos nosotros: depende de qué tan grande sea**
 (criterio corregido por Facu el 2026-09-10 - la versión anterior de esta regla
