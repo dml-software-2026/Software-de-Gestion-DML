@@ -11,6 +11,7 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.avisos import marcar_visto, reiniciar_vistos
 from CODIGO_FUENTE.services.flujo import build_flow_steps
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
@@ -183,6 +184,9 @@ def raypac_view(id, readonly=False):
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
+    # Campanita de DML (#258): abrir el detalle saca la máquina de "sin ver"
+    marcar_visto(user, "MAQUINA", id)
+
     # Verificar si existe un ticket asociado
     ticket = db.execute("SELECT numero_ticket FROM tickets WHERE raypac_id = %s", (id,)).fetchone()
 
@@ -323,6 +327,9 @@ def raypac_freeze(id):
         END
     WHERE id = %s
 """, (numero_remito, id))
+    # Si se había desfreezado y vuelve a salir, es un envío nuevo para la
+    # campanita de DML (#258): se le vuelve a mostrar a todos.
+    reiniciar_vistos("MAQUINA", id)
     db.commit()
 
     log_action(user['id'], "FREEZE", "raypac_entries", id, None,

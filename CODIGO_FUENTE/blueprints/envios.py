@@ -10,6 +10,7 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.avisos import ids_sin_ver, marcar_visto
 from CODIGO_FUENTE.services.mail import get_destinatarios_activos, send_mail
 from CODIGO_FUENTE.services.stock import (
     actualizar_estado_alerta_stock,
@@ -105,6 +106,8 @@ def envios_list():
         envios_repuestos=envios_repuestos,
         envios_maquinas=envios_maquinas,
         mostrar_recibidos=mostrar_recibidos,
+        # #170: filas que este usuario todavía no vio (resaltadas en la tabla)
+        sin_ver={"MAQUINA": ids_sin_ver(user, "MAQUINA"), "REPUESTO": ids_sin_ver(user, "REPUESTO")},
     )
 @envios_bp.route("/new", methods=["GET", "POST"])
 @login_required
@@ -251,6 +254,8 @@ def envios_view(id):
     if not envio:
         flash("Envío no encontrado.", "error")
         return redirect(url_for("envios.envios_list"))
+    # Campanita de DML (#170): abrir el detalle saca el envío de "sin ver"
+    marcar_visto(get_current_user(), "REPUESTO", id)
     detalles = db.execute(
         """
         SELECT d.*, m.item
