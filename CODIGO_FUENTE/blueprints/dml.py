@@ -32,6 +32,21 @@ from CODIGO_FUENTE.services.stock import (
 
 dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
 
+# #274: estados que se pueden elegir desde el formulario de edición. Es la
+# única fuente de la lista: dml_edit.html arma el <select> a partir de esta
+# constante y dml_edit() rechaza cualquier valor que no esté acá (antes
+# guardaba cualquier texto, ej. "A LA ESPERA DE REVISI%D3N" de un POST
+# armado a mano). "MÁQUINA ENTREGADA" queda afuera a propósito (#157), el
+# único camino a ese estado es "Cerrar Ficha".
+ESTADOS_EDITABLES = [
+    'A LA ESPERA DE REVISIÓN',
+    'A LA ESPERA DE REPUESTOS',
+    'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO',  # #260
+    'EN REPARACIÓN',
+    'REPARACIÓN COMPLETADA',
+    'MÁQUINA LISTA PARA RETIRAR',
+]
+
 
 @dml_bp.route("")
 @login_required
@@ -317,6 +332,10 @@ def dml_edit(id):
                 flash("Para marcar la ficha como entregada, usá el botón 'Cerrar Ficha'.", "error")
                 return redirect(url_for("dml.dml_edit", id=id))
 
+            if estado not in ESTADOS_EDITABLES:
+                flash("Estado de reparación inválido. Elegí uno de la lista.", "error")
+                return redirect(url_for("dml.dml_edit", id=id))
+
             # Validación de flujo lógico de estados según documento David
             # Orden lógico: A LA ESPERA DE REVISIÓN → EN REPARACIÓN → [A LA ESPERA DE REPUESTOS] → MÁQUINA LISTA PARA RETIRAR → MÁQUINA ENTREGADA
             estados_orden = {
@@ -394,7 +413,8 @@ def dml_edit(id):
         ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
-    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps)
+    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps,
+                           estados_editables=ESTADOS_EDITABLES)
 
 
 # ======================== REPUESTOS ========================
