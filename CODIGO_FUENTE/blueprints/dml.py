@@ -32,6 +32,21 @@ from CODIGO_FUENTE.services.stock import (
 
 dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
 
+# #274: estados que se pueden elegir desde el formulario de edición. Es la
+# única fuente de la lista: dml_edit.html arma el <select> a partir de esta
+# constante y dml_edit() rechaza cualquier valor que no esté acá (antes
+# guardaba cualquier texto, ej. "A LA ESPERA DE REVISI%D3N" de un POST
+# armado a mano). "MÁQUINA ENTREGADA" queda afuera a propósito (#157), el
+# único camino a ese estado es "Cerrar Ficha".
+ESTADOS_EDITABLES = [
+    'A LA ESPERA DE REVISIÓN',
+    'A LA ESPERA DE REPUESTOS',
+    'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO',  # #260
+    'EN REPARACIÓN',
+    'REPARACIÓN COMPLETADA',
+    'MÁQUINA LISTA PARA RETIRAR',
+]
+
 
 @dml_bp.route("")
 @login_required
@@ -317,6 +332,10 @@ def dml_edit(id):
                 flash("Para marcar la ficha como entregada, usá el botón 'Cerrar Ficha'.", "error")
                 return redirect(url_for("dml.dml_edit", id=id))
 
+            if estado not in ESTADOS_EDITABLES:
+                flash("Estado de reparación inválido. Elegí uno de la lista.", "error")
+                return redirect(url_for("dml.dml_edit", id=id))
+
             # Validación de flujo lógico de estados según documento David
             # Orden lógico: A LA ESPERA DE REVISIÓN → EN REPARACIÓN → [A LA ESPERA DE REPUESTOS] → MÁQUINA LISTA PARA RETIRAR → MÁQUINA ENTREGADA
             estados_orden = {
@@ -394,7 +413,8 @@ def dml_edit(id):
         ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
-    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps)
+    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps,
+                           estados_editables=ESTADOS_EDITABLES)
 
 
 # ======================== REPUESTOS ========================
@@ -461,7 +481,7 @@ def agregar_repuesto(id):
 
     # Verificar alerta de stock después de descontar
     if en_stock:
-        verificar_alerta_stock(codigo)
+        verificar_alerta_stock(codigo, cantidad_anterior=stock['cantidad'])
 
     log_action(user['id'], "ADD_PART", "dml_repuestos", id, None,
               f"{codigo} x{cantidad_utilizada} ({estado_repuesto})")
@@ -532,6 +552,8 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     actualizar_estadistica_repuesto(repuesto['codigo_repuesto'], repuesto['cantidad_utilizada'])
 
     db.commit()
+
+    verificar_alerta_stock(repuesto['codigo_repuesto'], cantidad_anterior=stock['cantidad'])
 
     log_action(user['id'], "MOVER_REPUESTO_A_STOCK", "dml_repuestos", repuesto_id,
               "EN FALTA", f"EN STOCK - {repuesto['codigo_repuesto']}")
@@ -866,7 +888,7 @@ def dml_registrar_acuse(id):
 
 @dml_bp.route("/<int:id>/pdf", methods=["GET"])
 @login_required
-@role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS", "RAYPAC")
 def descargar_ficha_pdf(id):
     """Genera y descarga el PDF de una ficha de reparación."""
     user = get_current_user()

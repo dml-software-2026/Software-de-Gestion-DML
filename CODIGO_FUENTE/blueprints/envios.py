@@ -10,7 +10,7 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.services.mail import send_mail
+from CODIGO_FUENTE.services.mail import get_destinatarios_activos, send_mail
 from CODIGO_FUENTE.services.stock import (
     actualizar_estado_alerta_stock,
     ajustar_stock_ubicacion,
@@ -484,10 +484,6 @@ def _avisar_codigos_nuevos(envio, codigos_nuevos):
     """Mail a los destinatarios de Admin → Notificaciones por cada código
     que se dio de alta solo en la matriz al recibir un envío (#57)."""
     try:
-        db = get_db()
-        destinatarios = db.execute(
-            "SELECT email FROM usuarios_notificaciones WHERE activo = TRUE"
-        ).fetchall()
         items = "".join(f"<li><strong>{codigo}</strong> - {descripcion}</li>" for codigo, descripcion in codigos_nuevos)
         html_body = f"""
         <h3>Nuevos códigos de repuesto en la matriz</h3>
@@ -496,8 +492,8 @@ def _avisar_codigos_nuevos(envio, codigos_nuevos):
         <ul>{items}</ul>
         <p>Revisá que la descripción sea correcta desde la sección Stock.</p>
         """
-        for destinatario in destinatarios:
-            send_mail(destinatario["email"], f"Nuevo código de repuesto (remito {envio['numero_remito']})", html_body)
+        for email in get_destinatarios_activos():
+            send_mail(email, f"Nuevo código de repuesto (remito {envio['numero_remito']})", html_body)
     except Exception as e:
         print(f"Error enviando aviso de códigos nuevos: {e}")
 
@@ -594,11 +590,40 @@ def envios_freeze(id):
 
         log_action(user['id'], "FREEZE", "envios_repuestos", id, "PREPARACION", "ENVIADO")
 
+        _avisar_envio_despachado(envio)
         flash("🔒 Envío freezado y marcado como enviado. DML ya le puede dar ingreso.", "success")
     except Exception as e:
         db.rollback()
         flash(f"Error al marcar el envío como enviado: {e}", "error")
     return redirect(url_for("envios.envios_view", id=id))
+
+
+def _avisar_envio_despachado(envio):
+    """Aviso de nuevo envío a Notificaciones (#280). Se manda al freezar y no
+    al crear: hasta que sale de RAYPAC el envío todavía puede cambiar (#57).
+    Si falla, no rompe el freeze."""
+    try:
+        detalles = get_db().execute(
+            """SELECT d.codigo_repuesto, d.cantidad, COALESCE(m.item, d.descripcion, '') AS item
+               FROM envios_repuestos_detalles d
+               LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto
+               WHERE d.envio_id = %s
+               ORDER BY d.codigo_repuesto""",
+            (envio['id'],)
+        ).fetchall()
+        items_html = "".join(
+            f"<li>{d['codigo_repuesto']} - {d['item']} x {d['cantidad']}</li>" for d in detalles
+        )
+        html = f"""
+        <h3>📦 Nuevo envío de repuestos</h3>
+        <p>Remito: <strong>{envio['numero_remito']}</strong></p>
+        <p>Tipo de entrega: {envio['tipo_entrega']}</p>
+        <ul>{items_html}</ul>
+        """
+        for email in get_destinatarios_activos():
+            send_mail(email, f"📦 Nuevo envío {envio['numero_remito']}", html)
+    except Exception as e:
+        print(f"Error enviando aviso de nuevo envío: {e}")
 
 
 @envios_bp.route("/<int:id>/unfreeze", methods=["POST"])

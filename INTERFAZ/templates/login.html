@@ -23,8 +23,15 @@
           
           <div class="mb-4">
             <label for="password" class="form-label"><i class="bi bi-lock"></i> Contraseña</label>
-            <input type="password" class="form-control form-control-lg" id="password" name="password" 
-                   placeholder="Ingresa tu contraseña" required>
+            {# #189: ojito para mostrar/ocultar la contraseña. #}
+            <div class="password-wrapper">
+              <input type="password" class="form-control form-control-lg" id="password" name="password"
+                     placeholder="Ingresa tu contraseña" required>
+              <button type="button" class="password-toggle" id="toggle-password"
+                      aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
           </div>
 
           <button type="submit" class="btn btn-primary btn-lg w-100">
@@ -35,4 +42,17 @@
     </div>
   </div>
 </div>
+
+<script>
+  document.getElementById('toggle-password').addEventListener('click', function () {
+    const input = document.getElementById('password');
+    const mostrar = input.type === 'password';
+    const texto = mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña';
+    input.type = mostrar ? 'text' : 'password';
+    this.querySelector('i').className = mostrar ? 'bi bi-eye-slash' : 'bi bi-eye';
+    this.setAttribute('aria-pressed', mostrar);
+    this.setAttribute('aria-label', texto);
+    this.title = texto;
+  });
+</script>
 {% endblock %}
