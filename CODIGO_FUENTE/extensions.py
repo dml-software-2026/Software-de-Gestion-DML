@@ -23,10 +23,22 @@ class PgConnection:
 
     def __init__(self, conn):
         self._conn = conn
+        self._usada = False
 
     def execute(self, query, params=None):
-        cur = self._conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(query, params)
+        try:
+            cur = self._conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(query, params)
+        except (psycopg2.OperationalError, psycopg2.InterfaceError):
+            # #244: la conexión viene reusada del pool y pudo haberse cortado
+            # mientras estaba guardada. Si es la primera consulta del request
+            # no se hizo nada todavía, así que es seguro abrir otra y repetir.
+            if self._usada or not self._conn.closed:
+                raise
+            self._conn = _conectar()
+            cur = self._conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(query, params)
+        self._usada = True
         return cur
 
     def executescript(self, script):
