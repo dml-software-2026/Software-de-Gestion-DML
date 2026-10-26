@@ -260,6 +260,14 @@
             <a href="{{ url_for('dml.descargar_ficha_pdf', id=ficha.id) }}" class="btn btn-outline-secondary" target="_blank">
                 <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
             </a>
+
+            {# #171: el mismo PDF, por mail al usuario logueado #}
+            <form method="POST" action="{{ url_for('dml.enviar_ficha_pdf', id=ficha.id) }}" class="m-0"
+                  onsubmit="return confirmarAccion(event, 'Se va a enviar el PDF de esta ficha a {{ user_email }}. ¿Continuar?');">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-envelope"></i> Recibir PDF por mail
+                </button>
+            </form>
         </div>
     </div>
 

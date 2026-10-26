@@ -294,8 +294,8 @@ def dml_view(id, readonly=False):
     """, (id,)).fetchall()
 
     return render_template("dml_view.html", ficha=ficha, raypac=raypac, partes=partes, repuestos=repuestos,
-                           user_role=user['role'], readonly=readonly, flow_steps=flow_steps,
-                           historial=historial)
+                           user_role=user['role'], user_email=user['email'], readonly=readonly,
+                           flow_steps=flow_steps, historial=historial)
 
 
 @dml_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -940,3 +940,42 @@ def descargar_ficha_pdf(id):
     return send_file(BytesIO(pdf_bytes), mimetype='application/pdf',
                     as_attachment=True,
                     download_name=f"ficha_{ficha['numero_ficha']:07d}.pdf")
+
+
+@dml_bp.route("/<int:id>/enviar-pdf", methods=["POST"])
+@login_required
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS", "RAYPAC")
+def enviar_ficha_pdf(id):
+    """#171: manda el PDF de la ficha al mail del usuario logueado - mismos
+    roles que descargar_ficha_pdf(), para que RAYPAC lo reciba sin depender
+    de que alguien de DML se lo pase."""
+    user = get_current_user()
+    db = get_db()
+
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
+    if not ficha:
+        flash("Ficha no encontrada.", "error")
+        return redirect(url_for("dml.dml_list"))
+
+    pdf_bytes = generar_pdf_ficha(id)
+    if not pdf_bytes:
+        flash("No se pudo generar el PDF.", "error")
+        return redirect(url_for("dml.dml_view", id=id))
+
+    numero = f"{ficha['numero_ficha']:07d}"
+    html_body = f"""
+    <p>Hola{(' ' + user['nombre']) if user['nombre'] else ''},</p>
+    <p>Te adjuntamos la ficha de servicio técnico <strong>#{numero}</strong>
+    (estado actual: <strong>{ficha['estado_reparacion']}</strong>).</p>
+    <p>Sistema de Gestión DML</p>
+    """
+    enviado = send_mail(user['email'], f"Ficha DML #{numero}", html_body,
+                        attachments=[(f"ficha_{numero}.pdf", pdf_bytes)])
+
+    if enviado:
+        log_action(user['id'], "SEND_FICHA_PDF", "dml_fichas", id, None,
+                   f"Ficha #{ficha['numero_ficha']} a {user['email']}")
+        flash(f"Te enviamos el PDF de la ficha a {user['email']}.", "success")
+    else:
+        flash("No se pudo enviar el mail. Probá de nuevo más tarde o descargá el PDF.", "error")
+    return redirect(url_for("dml.dml_view", id=id))
