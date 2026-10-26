@@ -208,6 +208,26 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error creando tabla usuarios_notificaciones: {e}")
         db.rollback()
 
+    # Migración: Tabla dml_fichas_historial (#171) - cambios de estado de
+    # cada ficha, para el historial que ve RAYPAC en dml_view.
+    try:
+        print("[MIGRATION] Verificando tabla dml_fichas_historial...")
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS dml_fichas_historial (
+                id SERIAL PRIMARY KEY,
+                ficha_id INTEGER NOT NULL REFERENCES dml_fichas (id) ON DELETE CASCADE,
+                estado TEXT NOT NULL,
+                usuario_id INTEGER REFERENCES users (id),
+                fecha TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.commit()
+        print("[MIGRATION] ✅ Tabla dml_fichas_historial verificada")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error creando tabla dml_fichas_historial: {e}")
+        db.rollback()
+
     # Migración: el estado de repuesto 'COLOCADO' se eliminó (#277) - "Mover
     # a Stock" ahora guarda 'EN STOCK'. Pasa los datos viejos al mismo valor
     # para que el PDF de la ficha no muestre un estado que ya no existe.

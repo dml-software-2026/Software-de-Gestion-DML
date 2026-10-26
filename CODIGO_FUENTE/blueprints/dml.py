@@ -48,6 +48,16 @@ ESTADOS_EDITABLES = [
 ]
 
 
+def registrar_estado(db, ficha_id, estado, usuario_id):
+    """#171: deja asentado un cambio de estado_reparacion en el historial
+    de la ficha. No hace commit - va en la misma transacción que el UPDATE
+    del estado, así nunca queda uno sin el otro."""
+    db.execute(
+        "INSERT INTO dml_fichas_historial (ficha_id, estado, usuario_id) VALUES (%s, %s, %s)",
+        (ficha_id, estado, usuario_id),
+    )
+
+
 @dml_bp.route("")
 @login_required
 @permission_required(read_roles=["RAYPAC", "DML_REPUESTOS"], write_roles=["DML_ST"])
@@ -167,6 +177,8 @@ def dml_new(raypac_id):
 
             ficha_id = row['id']
 
+            registrar_estado(db, ficha_id, 'A LA ESPERA DE REVISIÓN', user['id'])
+
             # Actualizar ticket con el ficha_id
             db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
 
@@ -269,8 +281,21 @@ def dml_view(id, readonly=False):
         ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
+    # #171: historial de estados, del más reciente al más viejo.
+    historial = db.execute("""
+        -- La base (Supabase) guarda en UTC: se pasa a hora argentina acá
+        -- para que la hora que ve RAYPAC sea la real.
+        SELECT h.estado, h.fecha AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha,
+               u.nombre AS usuario
+        FROM dml_fichas_historial h
+        LEFT JOIN users u ON u.id = h.usuario_id
+        WHERE h.ficha_id = %s
+        ORDER BY h.fecha DESC, h.id DESC
+    """, (id,)).fetchall()
+
     return render_template("dml_view.html", ficha=ficha, raypac=raypac, partes=partes, repuestos=repuestos,
-                           user_role=user['role'], readonly=readonly, flow_steps=flow_steps)
+                           user_role=user['role'], readonly=readonly, flow_steps=flow_steps,
+                           historial=historial)
 
 
 @dml_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -372,6 +397,10 @@ def dml_edit(id):
                   estado, diagnostico_rep, observaciones,
                   n_ciclos, mecanizado, horas, numero_remito,
                   tecnico_resp, id))
+            # #171: solo si el estado cambió - guardar la ficha sin tocar el
+            # estado (ej. solo observaciones) no es un paso nuevo del historial.
+            if estado != ficha['estado_reparacion']:
+                registrar_estado(db, id, estado, user['id'])
             db.commit()
 
             # Actualizar partes
@@ -740,6 +769,7 @@ def dml_close(id):
             SET is_closed = TRUE, fecha_egreso = %s, estado_reparacion = 'MÁQUINA ENTREGADA'
             WHERE id = %s
         """, (fecha_egreso, id))
+        registrar_estado(db, id, 'MÁQUINA ENTREGADA', user['id'])
 
         # Cerrar el ticket asociado (ya cumplió su función de seguimiento)
         if ficha['numero_ticket']:
