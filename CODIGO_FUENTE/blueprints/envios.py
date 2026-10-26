@@ -106,14 +106,8 @@ def envios_list():
         envios_maquinas=envios_maquinas,
         mostrar_recibidos=mostrar_recibidos,
     )
-@envios_bp.route("/new", methods=["GET", "POST"])
-@login_required
-@role_required("ADMIN", "RAYPAC")
-def envios_new():
-    user = get_current_user()
-    db = get_db()
-
-    stock_raypac = db.execute(
+def _stock_raypac(db):
+    return db.execute(
         """
         SELECT m.codigo_repuesto, m.item, COALESCE(su.cantidad, 0) AS cantidad
         FROM matriz_repuestos m
@@ -122,112 +116,186 @@ def envios_new():
         """
     ).fetchall()
 
+
+def _envio_editable(envio):
+    """Un envío se edita mientras sigue en RAYPAC (#57): una vez freezado
+    (salió de RAYPAC) solo un ADMIN puede volverlo a preparación."""
+    return envio['estado_envio'] == 'PREPARACION' and not envio['is_frozen']
+
+
+def _leer_form_envio(db, stock, envio_id=None):
+    """Valida el form de envios_form.html (alta y edición).
+
+    Devuelve (numero_remito, tipo_entrega, seleccionados) o None si hay un
+    error, que ya queda flasheado. envio_id excluye al propio envío del
+    chequeo de remito duplicado al editar.
+    """
+    tipo_entrega = request.form.get("tipo_entrega", "REPUESTOS")
+
+    # OBLIGATORIO: Número de remito manual
+    numero_remito_input = (request.form.get("numero_remito") or "").strip()
+
+    if not numero_remito_input:
+        flash("⚠️ El número de remito es OBLIGATORIO para enviar repuestos.", "error")
+        return None
+
+    # Auto-completar formato si solo ingresa 4 dígitos (últimos)
+    if re.match(r'^\d{1,8}$', numero_remito_input):
+        # Autocompletar con el prefijo estándar 00001-, siempre 8 dígitos del lado derecho
+        ultimo = numero_remito_input.zfill(8)  # Rellenar con ceros a la izquierda hasta completar 8 dígitos
+        numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXXXXXX (8 dígitos)
+        flash(f"📋 Remito auto-completado: {numero_remito}", "info")
+    elif re.match(r'^\d{4,5}-\d{8}$', numero_remito_input):
+        numero_remito = numero_remito_input
+    else:
+        flash("⚠️ Formato de remito inválido. Ingresa solo los dígitos del remito (ej: 4222 o 2568) o el formato completo #####-######## (ej: 00001-00004222).", "error")
+        return None
+
+    # Verificar que no exista ya en envios_repuestos
+    existe = db.execute(
+        "SELECT id FROM envios_repuestos WHERE numero_remito = %s AND id <> %s",
+        (numero_remito, envio_id or 0)
+    ).fetchone()
+    if existe:
+        flash(f"⚠️ El número de remito {numero_remito} ya existe en otro envío de repuestos.", "error")
+        return None
+
+    # Verificar que no exista en raypac_entries
+    existe_raypac = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = %s", (numero_remito,)).fetchone()
+    if existe_raypac:
+        flash(f"⚠️ El número de remito {numero_remito} ya fue usado para enviar un equipo. Usa un remito diferente.", "error")
+        return None
+
+    seleccionados = []
+
+    # Procesar repuestos de la tabla principal
+    for row in stock:
+        qty_raw = (request.form.get(f"qty_{row['codigo_repuesto']}") or "0").strip()
+        try:
+            qty = int(qty_raw or 0)
+        except ValueError:
+            qty = 0
+        if qty > 0:
+            # Sin descripción propia: la de la matriz se lee con un JOIN al mostrarlo
+            seleccionados.append((row['codigo_repuesto'], None, qty))
+
+    # Procesar repuestos adicionales (no listados)
+    for key in request.form.keys():
+        if key.startswith('codigo_adicional_'):
+            idx = key.replace('codigo_adicional_', '')
+            codigo = request.form.get(f'codigo_adicional_{idx}', '').strip().upper()
+            descripcion = request.form.get(f'descripcion_adicional_{idx}', '').strip()
+            cantidad = request.form.get(f'cantidad_adicional_{idx}', '0').strip()
+
+            try:
+                qty = int(cantidad or 0)
+            except ValueError:
+                qty = 0
+
+            if codigo and qty > 0:
+                # Si no tiene descripción, buscarla en la matriz
+                if not descripcion:
+                    rep = db.execute("SELECT item FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,)).fetchone()
+                    descripcion = rep['item'] if rep else f"Repuesto {codigo}"
+
+                seleccionados.append((codigo, descripcion, qty))
+
+    if not seleccionados:
+        flash("Selecciona al menos un repuesto con cantidad mayor a 0.", "error")
+        return None
+
+    return numero_remito, tipo_entrega, seleccionados
+
+
+def _valores_desde_request(stock):
+    """Lo que el usuario ya había cargado, para no perderlo si el form vuelve con error."""
+    adicionales = []
+    for key in request.form.keys():
+        if key.startswith('codigo_adicional_'):
+            idx = key.replace('codigo_adicional_', '')
+            adicionales.append((
+                request.form.get(f'codigo_adicional_{idx}', ''),
+                request.form.get(f'descripcion_adicional_{idx}', ''),
+                request.form.get(f'cantidad_adicional_{idx}', ''),
+            ))
+    return {
+        "numero_remito": request.form.get("numero_remito", ""),
+        "cantidades": {
+            row['codigo_repuesto']: request.form.get(f"qty_{row['codigo_repuesto']}", "")
+            for row in stock
+        },
+        "adicionales": adicionales,
+    }
+
+
+def _valores_desde_envio(envio, detalles, stock):
+    """Precarga del form al editar: los códigos de la lista van a su renglón,
+    el resto a "Agregar Repuesto No Listado"."""
+    codigos_lista = {row['codigo_repuesto'] for row in stock}
+    cantidades = {}
+    adicionales = []
+    for det in detalles:
+        if det['codigo_repuesto'] in codigos_lista:
+            cantidades[det['codigo_repuesto']] = cantidades.get(det['codigo_repuesto'], 0) + det['cantidad']
+        else:
+            adicionales.append((det['codigo_repuesto'], det['descripcion'] or '', det['cantidad']))
+    return {"numero_remito": envio['numero_remito'], "cantidades": cantidades, "adicionales": adicionales}
+
+
+def _guardar_detalles(db, envio_id, seleccionados):
+    # IMPORTANTE: NO descontamos stock de RAYPAC (ellos no controlan stock desde este software)
+    for codigo, descripcion, qty in seleccionados:
+        db.execute(
+            "INSERT INTO envios_repuestos_detalles (envio_id, codigo_repuesto, cantidad, descripcion) VALUES (%s, %s, %s, %s)",
+            (envio_id, codigo, qty, descripcion)
+        )
+
+
+@envios_bp.route("/new", methods=["GET", "POST"])
+@login_required
+@role_required("ADMIN", "RAYPAC")
+def envios_new():
+    user = get_current_user()
+    db = get_db()
+    stock_raypac = _stock_raypac(db)
+
     if request.method == "POST":
         try:
-            # Tipo de entrega
-            tipo_entrega = request.form.get("tipo_entrega", "REPUESTOS")
-
-            # OBLIGATORIO: Número de remito manual
-            numero_remito_input = (request.form.get("numero_remito") or "").strip()
-
-            if not numero_remito_input:
-                flash("⚠️ El número de remito es OBLIGATORIO para enviar repuestos.", "error")
-                return render_template("envios_form.html", stock=stock_raypac)
-
-            # Auto-completar formato si solo ingresa 4 dígitos (últimos)
-            if re.match(r'^\d{1,8}$', numero_remito_input):
-                # Autocompletar con el prefijo estándar 00001-, siempre 8 dígitos del lado derecho
-                ultimo = numero_remito_input.zfill(8)  # Rellenar con ceros a la izquierda hasta completar 8 dígitos
-                numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXXXXXX (8 dígitos)
-                flash(f"📋 Remito auto-completado: {numero_remito}", "info")
-            elif re.match(r'^\d{4,5}-\d{8}$', numero_remito_input):
-                numero_remito = numero_remito_input
-            else:
-                flash("⚠️ Formato de remito inválido. Ingresa solo los dígitos del remito (ej: 4222 o 2568) o el formato completo #####-######## (ej: 00001-00004222).", "error")
-                return render_template("envios_form.html", stock=stock_raypac)
-
-            # Verificar que no exista ya en envios_repuestos
-            existe = db.execute("SELECT id FROM envios_repuestos WHERE numero_remito = %s", (numero_remito,)).fetchone()
-            if existe:
-                flash(f"⚠️ El número de remito {numero_remito} ya existe en otro envío de repuestos.", "error")
-                return render_template("envios_form.html", stock=stock_raypac)
-
-            # Verificar que no exista en raypac_entries
-            existe_raypac = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = %s", (numero_remito,)).fetchone()
-            if existe_raypac:
-                flash(f"⚠️ El número de remito {numero_remito} ya fue usado para enviar un equipo. Usa un remito diferente.", "error")
-                return render_template("envios_form.html", stock=stock_raypac)
-
-            seleccionados = []
-
-            # Procesar repuestos de la tabla principal
-            for row in stock_raypac:
-                qty_raw = (request.form.get(f"qty_{row['codigo_repuesto']}") or "0").strip()
-                try:
-                    qty = int(qty_raw or 0)
-                except ValueError:
-                    qty = 0
-                if qty > 0:
-                    # Sin descripción propia: la de la matriz se lee con un JOIN al mostrarlo
-                    seleccionados.append((row['codigo_repuesto'], None, qty))
-
-            # Procesar repuestos adicionales (no listados)
-            for key in request.form.keys():
-                if key.startswith('codigo_adicional_'):
-                    idx = key.replace('codigo_adicional_', '')
-                    codigo = request.form.get(f'codigo_adicional_{idx}', '').strip().upper()
-                    descripcion = request.form.get(f'descripcion_adicional_{idx}', '').strip()
-                    cantidad = request.form.get(f'cantidad_adicional_{idx}', '0').strip()
-
-                    try:
-                        qty = int(cantidad or 0)
-                    except ValueError:
-                        qty = 0
-
-                    if codigo and qty > 0:
-                        # Si no tiene descripción, buscarla en la matriz
-                        if not descripcion:
-                            rep = db.execute("SELECT item FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,)).fetchone()
-                            descripcion = rep['item'] if rep else f"Repuesto {codigo}"
-
-                        seleccionados.append((codigo, descripcion, qty))
-
-            if not seleccionados:
-                flash("Selecciona al menos un repuesto con cantidad mayor a 0.", "error")
-                return render_template("envios_form.html", stock=stock_raypac)
+            datos = _leer_form_envio(db, stock_raypac)
+            if not datos:
+                return render_template("envios_form.html", stock=stock_raypac, envio=None,
+                                       valores=_valores_desde_request(stock_raypac))
+            numero_remito, tipo_entrega, seleccionados = datos
 
             fecha_envio = datetime.now().strftime("%Y-%m-%d")
 
+            # Arranca en preparación y sin freezar (#57): RAYPAC lo puede
+            # corregir hasta que lo marca como enviado (envios_freeze).
             row = db.execute(
                 """INSERT INTO envios_repuestos
                    (numero_remito, fecha_envio, tipo_entrega, estado_envio, is_frozen)
-                   VALUES (%s, %s, %s, 'ENVIADO', TRUE)
+                   VALUES (%s, %s, %s, 'PREPARACION', FALSE)
                    RETURNING id""",
                 (numero_remito, fecha_envio, tipo_entrega)
             ).fetchone()
             envio_id = row['id']
-
-            # Guardar detalles del envío
-            # IMPORTANTE: NO descontamos stock de RAYPAC (ellos no controlan stock desde este software)
-            for codigo, descripcion, qty in seleccionados:
-                db.execute(
-                    "INSERT INTO envios_repuestos_detalles (envio_id, codigo_repuesto, cantidad, descripcion) VALUES (%s, %s, %s, %s)",
-                    (envio_id, codigo, qty, descripcion)
-                )
-
+            _guardar_detalles(db, envio_id, seleccionados)
             db.commit()
 
             log_action(user['id'], "CREATE", "envios_repuestos", envio_id, None,
                       f"Remito {numero_remito} con {len(seleccionados)} items")
 
-            flash(f"Envío generado: {numero_remito}", "success")
+            flash(f"Envío {numero_remito} guardado en preparación. Revisalo y, cuando salga de RAYPAC, "
+                  "tocá \"Freezar y marcar como enviado\".", "success")
             return redirect(url_for("envios.envios_view", id=envio_id))
         except Exception as e:
             db.rollback()
             flash(f"Error al generar envío: {e}", "error")
-            return render_template("envios_form.html", stock=stock_raypac)
+            return render_template("envios_form.html", stock=stock_raypac, envio=None,
+                                   valores=_valores_desde_request(stock_raypac))
 
-    return render_template("envios_form.html", stock=stock_raypac)
+    return render_template("envios_form.html", stock=stock_raypac, envio=None,
+                           valores={"numero_remito": "", "cantidades": {}, "adicionales": []})
 
 
 @envios_bp.route("/<int:id>")
@@ -249,10 +317,15 @@ def envios_view(id):
         """,
         (id,)
     ).fetchall()
+    rol = get_current_user()['role']
     recibido = envio['estado_envio'] == 'RECIBIDO' or bool(envio['fecha_recepcion_dml'])
-    puede_recibir = not recibido and get_current_user()['role'] in ('ADMIN', 'DML_REPUESTOS', 'DML_ST')
+    en_preparacion = _envio_editable(envio)
+    puede_recibir = not recibido and not en_preparacion and rol in ('ADMIN', 'DML_REPUESTOS', 'DML_ST')
     return render_template("envios_view.html", envio=envio, detalles=detalles,
-                           recibido=recibido, puede_recibir=puede_recibir)
+                           recibido=recibido, en_preparacion=en_preparacion,
+                           puede_recibir=puede_recibir,
+                           puede_editar=en_preparacion and rol in ('ADMIN', 'RAYPAC'),
+                           puede_desfreezar=envio['is_frozen'] and not recibido and rol == 'ADMIN')
 
 
 @envios_bp.route("/<int:id>/confirmar", methods=["POST"])
@@ -272,6 +345,11 @@ def envios_confirmar(id):
     if envio['estado_envio'] == 'RECIBIDO' or envio['fecha_recepcion_dml']:
         db.rollback()
         flash("El envío ya fue confirmado.", "warning")
+        return redirect(url_for("envios.envios_view", id=id))
+
+    if _envio_editable(envio):
+        db.rollback()
+        flash("El envío todavía está en preparación en RAYPAC: no se puede recibir hasta que lo marquen como enviado.", "warning")
         return redirect(url_for("envios.envios_view", id=id))
 
     detalles = db.execute(
@@ -428,95 +506,147 @@ def _avisar_codigos_nuevos(envio, codigos_nuevos):
 @login_required
 @role_required("ADMIN", "RAYPAC")
 def envios_edit(id):
-    """Editar envío congelado (solo corrección de errores)"""
+    """Editar un envío en preparación: remito y repuestos completos (#57)."""
     user = get_current_user()
     db = get_db()
 
-    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s", (id,)).fetchone()
+    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s FOR UPDATE", (id,)).fetchone()
     if not envio:
         flash("Envío no encontrado.", "error")
         return redirect(url_for("envios.envios_list"))
 
+    if not _envio_editable(envio):
+        db.rollback()
+        flash("Este envío ya salió de RAYPAC y está freezado. Para corregirlo, pedile a un ADMIN que lo desfreeze.", "warning")
+        return redirect(url_for("envios.envios_view", id=id))
+
+    stock_raypac = _stock_raypac(db)
+
     if request.method == "POST":
         try:
-            nuevo_remito = request.form.get("numero_remito", "").strip()
-
-            if not nuevo_remito:
-                flash("El número de remito es obligatorio.", "error")
-                return redirect(url_for("envios.envios_edit", id=id))
-
-            # Verificar que no exista otro envío con ese remito
-            existe = db.execute(
-                "SELECT id FROM envios_repuestos WHERE numero_remito = %s AND id != %s",
-                (nuevo_remito, id)
-            ).fetchone()
-
-            if existe:
-                flash(f"Ya existe otro envío con el remito {nuevo_remito}.", "error")
-                return redirect(url_for("envios.envios_edit", id=id))
+            datos = _leer_form_envio(db, stock_raypac, envio_id=id)
+            if not datos:
+                return render_template("envios_form.html", stock=stock_raypac, envio=envio,
+                                       valores=_valores_desde_request(stock_raypac))
+            numero_remito, tipo_entrega, seleccionados = datos
 
             db.execute(
-                "UPDATE envios_repuestos SET numero_remito = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (nuevo_remito, id)
+                """UPDATE envios_repuestos
+                   SET numero_remito = %s, tipo_entrega = %s, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = %s""",
+                (numero_remito, tipo_entrega, id)
             )
+            db.execute("DELETE FROM envios_repuestos_detalles WHERE envio_id = %s", (id,))
+            _guardar_detalles(db, id, seleccionados)
             db.commit()
 
             log_action(user['id'], "UPDATE", "envios_repuestos", id,
-                      f"Remito: {envio['numero_remito']} → {nuevo_remito}",
-                      "Corrección de remito")
+                       f"Remito {envio['numero_remito']}",
+                       f"Remito {numero_remito} con {len(seleccionados)} items")
 
-            flash(f"✅ Remito actualizado a: {nuevo_remito}", "success")
+            flash("✅ Envío actualizado.", "success")
             return redirect(url_for("envios.envios_view", id=id))
 
         except Exception as e:
             db.rollback()
             flash(f"Error al actualizar envío: {e}", "error")
-            return redirect(url_for("envios.envios_edit", id=id))
+            return render_template("envios_form.html", stock=stock_raypac, envio=envio,
+                                   valores=_valores_desde_request(stock_raypac))
 
     detalles = db.execute(
-        """SELECT d.*, m.item
-           FROM envios_repuestos_detalles d
-           LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto
-           WHERE d.envio_id = %s
-           ORDER BY d.codigo_repuesto""",
+        "SELECT * FROM envios_repuestos_detalles WHERE envio_id = %s ORDER BY id",
         (id,)
     ).fetchall()
+    db.rollback()  # libera el FOR UPDATE: en el GET no se escribe nada
 
-    return render_template("envios_edit.html", envio=envio, detalles=detalles)
+    return render_template("envios_form.html", stock=stock_raypac, envio=envio,
+                           valores=_valores_desde_envio(envio, detalles, stock_raypac))
+
+
+@envios_bp.route("/<int:id>/freeze", methods=["POST"])
+@login_required
+@role_required("ADMIN", "RAYPAC")
+def envios_freeze(id):
+    """El envío salió de RAYPAC: se freeza y DML ya le puede dar ingreso (#57)."""
+    user = get_current_user()
+    db = get_db()
+
+    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s FOR UPDATE", (id,)).fetchone()
+    if not envio:
+        flash("Envío no encontrado.", "error")
+        return redirect(url_for("envios.envios_list"))
+
+    if not _envio_editable(envio):
+        db.rollback()
+        flash("El envío ya estaba marcado como enviado.", "warning")
+        return redirect(url_for("envios.envios_view", id=id))
+
+    try:
+        # fecha_envio pasa a ser la de salida real, no la de cuando se cargó
+        db.execute(
+            """UPDATE envios_repuestos
+               SET is_frozen = TRUE, estado_envio = 'ENVIADO', fecha_envio = %s,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = %s""",
+            (datetime.now().strftime("%Y-%m-%d"), id)
+        )
+        db.commit()
+
+        log_action(user['id'], "FREEZE", "envios_repuestos", id, "PREPARACION", "ENVIADO")
+
+        flash("🔒 Envío freezado y marcado como enviado. DML ya le puede dar ingreso.", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Error al marcar el envío como enviado: {e}", "error")
+    return redirect(url_for("envios.envios_view", id=id))
 
 
 @envios_bp.route("/<int:id>/unfreeze", methods=["POST"])
 @login_required
 @role_required("ADMIN")
 def envios_unfreeze(id):
-    """Desfreezar envío definitivamente (solo ADMIN con código)"""
+    """Desfreezar un envío que volvió a RAYPAC antes de llegar a DML: vuelve a
+    preparación y RAYPAC lo puede corregir (solo ADMIN con código)."""
     user = get_current_user()
     db = get_db()
 
-    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s", (id,)).fetchone()
+    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s FOR UPDATE", (id,)).fetchone()
     if not envio:
         flash("Envío no encontrado.", "error")
         return redirect(url_for("envios.envios_list"))
+
+    # Recibido = el stock de DML ya se cargó con estos números: no se toca más
+    if envio['estado_envio'] == 'RECIBIDO' or envio['fecha_recepcion_dml']:
+        db.rollback()
+        flash("El envío ya fue recibido en DML y no se puede desfreezar.", "error")
+        return redirect(url_for("envios.envios_view", id=id))
+
+    if not envio['is_frozen']:
+        db.rollback()
+        flash("El envío no está freezado.", "warning")
+        return redirect(url_for("envios.envios_view", id=id))
 
     # Verificar código de desfreeze (últimos 4 dígitos del remito)
     codigo = request.form.get("unfreeze_code", "").strip()
     remito_digitos = envio['numero_remito'][-4:]
 
     if codigo != remito_digitos:
+        db.rollback()
         flash("❌ Código incorrecto. Ingresa los últimos 4 dígitos del remito.", "error")
         return redirect(url_for("envios.envios_view", id=id))
 
     try:
         db.execute(
-            "UPDATE envios_repuestos SET is_frozen = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+            """UPDATE envios_repuestos
+               SET is_frozen = FALSE, estado_envio = 'PREPARACION', updated_at = CURRENT_TIMESTAMP
+               WHERE id = %s""",
             (id,)
         )
         db.commit()
 
-        log_action(user['id'], "UNFREEZE", "envios_repuestos", id, None,
-                  "Envío descongelado por ADMIN")
+        log_action(user['id'], "UNFREEZE", "envios_repuestos", id, "ENVIADO", "PREPARACION")
 
-        flash("🔓 Envío descongelado correctamente.", "success")
+        flash("🔓 Envío desfreezado: volvió a preparación y RAYPAC ya lo puede corregir.", "success")
         return redirect(url_for("envios.envios_view", id=id))
 
     except Exception as e:
