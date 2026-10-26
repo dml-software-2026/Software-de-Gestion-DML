@@ -107,6 +107,21 @@
       <ul class="navbar-nav ms-auto">
         {% if session.get('user_id') and get_current_user() %}
         {% set current_user = get_current_user() %}
+        {# #170/#258: campanita con lo llegado de RAYPAC sin ver. Solo roles de
+           DML; el contenido lo carga el JS del final desde /api/avisos. #}
+        {% if current_user['role'] in ['ADMIN', 'DML_ST', 'DML_REPUESTOS'] %}
+        <li class="nav-item dropdown" id="avisos-campana">
+          <a class="nav-link nav-link-enhanced position-relative" href="#" role="button" data-bs-toggle="dropdown"
+             aria-expanded="false" aria-label="Novedades de RAYPAC" title="Novedades de RAYPAC">
+            <i class="bi bi-bell-fill"></i>
+            <span class="nav-text d-lg-none">Novedades</span>
+            <span id="avisos-badge" class="badge rounded-pill bg-danger d-none">0</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end shadow" id="avisos-lista" style="width: min(22rem, 90vw);">
+            <li><span class="dropdown-item-text text-muted small">Cargando…</span></li>
+          </ul>
+        </li>
+        {% endif %}
         <li class="nav-item dropdown">
           <a class="nav-link nav-link-enhanced dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
             <i class="bi bi-person-circle"></i>
@@ -174,7 +189,114 @@
   </div>
 </div>
 
+{# #258: popup cuando llega algo nuevo de RAYPAC con la app abierta #}
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="avisos-toast" class="toast" role="status" aria-live="polite" aria-atomic="true">
+    <div class="toast-header">
+      <i class="bi bi-bell-fill text-primary me-2"></i>
+      <strong class="me-auto">Novedades de RAYPAC</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+    </div>
+    <div class="toast-body">
+      <div id="avisos-toast-texto"></div>
+      <a id="avisos-toast-link" class="btn btn-sm btn-primary mt-2" href="#">Ver</a>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% if session.get('user_id') %}
+<script>
+// Campanita de DML (#170/#258). Consulta /api/avisos al cargar y cada
+// minuto; si apareció algo que este navegador todavía no había mostrado,
+// abre un popup. Lo "ya mostrado" vive en localStorage solo para no repetir
+// el popup en cada página; el "visto" real es por usuario en la base y se
+// marca al abrir el detalle.
+(function () {
+  const campana = document.getElementById('avisos-campana');
+  if (!campana) return;
+  const badge = document.getElementById('avisos-badge');
+  const lista = document.getElementById('avisos-lista');
+  const CLAVE = 'avisos_mostrados_{{ session.get("user_id") }}';
+
+  function leerMostrados() {
+    try { return new Set(JSON.parse(localStorage.getItem(CLAVE) || '[]')); } catch (e) { return null; }
+  }
+  function guardarMostrados(claves) {
+    try { localStorage.setItem(CLAVE, JSON.stringify(claves)); } catch (e) { /* sin storage: sin popup */ }
+  }
+
+  function itemTexto(texto, clase) {
+    const li = document.createElement('li');
+    const span = document.createElement('span');
+    span.className = 'dropdown-item-text ' + (clase || '');
+    span.textContent = texto;
+    li.appendChild(span);
+    return li;
+  }
+
+  function render(avisos) {
+    badge.textContent = avisos.length > 99 ? '99+' : avisos.length;
+    badge.classList.toggle('d-none', avisos.length === 0);
+
+    lista.replaceChildren();
+    lista.appendChild(itemTexto('Llegó de RAYPAC y todavía no lo abriste', 'small fw-bold text-muted'));
+    if (avisos.length === 0) {
+      lista.appendChild(itemTexto('No hay novedades.', 'text-muted'));
+      return;
+    }
+    avisos.forEach(function (aviso) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.className = 'dropdown-item text-wrap';
+      a.href = aviso.url;
+      const icono = document.createElement('i');
+      icono.className = 'bi me-2 ' + (aviso.tipo === 'MAQUINA' ? 'bi-box-seam-fill text-primary' : 'bi-tools text-success');
+      const titulo = document.createElement('strong');
+      titulo.textContent = aviso.titulo;
+      const detalle = document.createElement('div');
+      detalle.className = 'small text-muted';
+      detalle.textContent = aviso.detalle + (aviso.fecha ? ' · ' + aviso.fecha : '');
+      a.append(icono, titulo, detalle);
+      li.appendChild(a);
+      lista.appendChild(li);
+    });
+  }
+
+  function avisarNuevos(avisos) {
+    const mostrados = leerMostrados();
+    if (mostrados === null) return;
+    const nuevos = avisos.filter(function (a) { return !mostrados.has(a.clave); });
+    guardarMostrados(avisos.map(function (a) { return a.clave; }));
+    if (nuevos.length === 0) return;
+
+    document.getElementById('avisos-toast-texto').textContent = nuevos.length === 1
+      ? nuevos[0].titulo + ' (' + nuevos[0].detalle + ')'
+      : 'Llegaron ' + nuevos.length + ' novedades de RAYPAC.';
+    document.getElementById('avisos-toast-link').href = nuevos[0].url;
+    bootstrap.Toast.getOrCreateInstance(document.getElementById('avisos-toast'), { autohide: false }).show();
+  }
+
+  function actualizar() {
+    fetch('{{ url_for("api.avisos_api") }}', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) {
+        // Sesión vencida: login_required redirige al login (HTML), no es JSON
+        const tipo = r.headers.get('content-type') || '';
+        return r.ok && tipo.indexOf('application/json') !== -1 ? r.json() : null;
+      })
+      .then(function (data) {
+        if (!data) return;
+        render(data.avisos);
+        avisarNuevos(data.avisos);
+      })
+      .catch(function () { /* sin red: se reintenta en el próximo minuto */ });
+  }
+
+  actualizar();
+  setInterval(actualizar, 60000);
+})();
+</script>
+{% endif %}
 <script>
 function get_current_user() {
   // Función auxiliar para JavaScript si es necesaria

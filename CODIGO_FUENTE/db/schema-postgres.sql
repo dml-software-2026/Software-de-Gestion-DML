@@ -91,7 +91,19 @@ CREATE TABLE usuarios_notificaciones (
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
 );
- 
+
+-- Campanita de DML (#170/#258): qué máquina o envío de repuestos llegado de
+-- RAYPAC ya vio cada usuario. tipo = 'MAQUINA' (raypac_entries.id) o
+-- 'REPUESTO' (envios_repuestos.id). Sin fila = todavía no lo vio.
+CREATE TABLE avisos_vistos (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    tipo TEXT NOT NULL,
+    ref_id INTEGER NOT NULL,
+    visto_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, tipo, ref_id)
+);
+
 -- Depende de matriz_repuestos
 CREATE TABLE stock_dml (
     id SERIAL PRIMARY KEY,

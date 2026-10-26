@@ -208,6 +208,23 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error creando tabla usuarios_notificaciones: {e}")
         db.rollback()
 
+    # Migración: Tabla avisos_vistos (campanita de DML, #170/#258)
+    try:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS avisos_vistos (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                tipo TEXT NOT NULL,
+                ref_id INTEGER NOT NULL,
+                visto_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, tipo, ref_id)
+            )
+        """)
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error creando tabla avisos_vistos: {e}")
+        db.rollback()
+
     # Migración: Tabla dml_fichas_historial (#171) - cambios de estado de
     # cada ficha, para el historial que ve RAYPAC en dml_view.
     try:
