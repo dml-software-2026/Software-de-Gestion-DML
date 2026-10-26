@@ -9,40 +9,43 @@
       <h2 class="mb-1"><i class="bi bi-truck"></i> Remito {{ envio.numero_remito }}</h2>
       <p class="text-muted mb-1">Fecha envío: {{ envio.fecha_envio }}</p>
       <p class="text-muted mb-0">Estado:
-        {% if envio.estado_envio == 'RECIBIDO' %}
+        {% if recibido %}
         <span class="badge bg-success">Recibido en DML</span>
+        {% elif en_preparacion %}
+        <span class="badge bg-info text-dark">En preparación en RAYPAC</span>
         {% else %}
         <span class="badge bg-warning text-dark">En tránsito</span>
         {% endif %}
       </p>
-      {% if envio.is_frozen %}
+      {% if envio.is_frozen and not recibido %}
       <p class="text-muted mb-0">
-        <i class="bi bi-lock-fill"></i> <strong>Congelado</strong>
-        {% if session.get('user_id') and session.get('role') in ['ADMIN', 'RAYPAC'] %}
-        - Se puede editar para correcciones
-        {% endif %}
+        <i class="bi bi-lock-fill"></i> <strong>Freezado</strong> - salió de RAYPAC. Para corregirlo, un ADMIN tiene que desfreezarlo.
       </p>
       {% endif %}
     </div>
     <div class="text-end">
       <a class="btn btn-outline-secondary" href="{{ url_for('envios.envios_list') }}">Volver al listado</a>
-      
-      {% if session.get('user_id') and session.get('role') in ['ADMIN', 'RAYPAC'] %}
-        {% if envio.is_frozen %}
-        <!-- Modo congelado: permitir editar para correcciones -->
-        <a href="{{ url_for('envios.envios_edit', id=envio.id) }}" class="btn btn-warning">
-          <i class="bi bi-pencil"></i> Editar (Corregir errores)
-        </a>
-        
-        {% if session.get('role') == 'ADMIN' %}
-        <!-- Solo ADMIN puede desfreezar definitivamente -->
-        <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#unfreezeModal">
-          <i class="bi bi-unlock"></i> Desfreezar Definitivamente
+
+      {# #57: mientras está en preparación RAYPAC lo edita libremente; al
+         salir de RAYPAC se freeza y recién ahí DML lo puede recibir. #}
+      {% if puede_editar %}
+      <a href="{{ url_for('envios.envios_edit', id=envio.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-pencil"></i> Editar
+      </a>
+      <form method="POST" action="{{ url_for('envios.envios_freeze', id=envio.id) }}" class="d-inline"
+            onsubmit="return confirmarAccion(event, '¿El envío ya salió de RAYPAC? Una vez freezado no se puede editar: si vuelve a RAYPAC antes de llegar a DML, un ADMIN tiene que desfreezarlo.');">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-lock"></i> Freezar y marcar como enviado
         </button>
-        {% endif %}
-        {% endif %}
+      </form>
       {% endif %}
-      
+
+      {% if puede_desfreezar %}
+      <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#unfreezeModal">
+        <i class="bi bi-unlock"></i> Desfreezar
+      </button>
+      {% endif %}
+
       {# Botón de recepción: mostrar si NO ha sido recibido. Los campos
          "Recibido" de la tabla pertenecen a este form vía form="recepcion-form". #}
       {% if puede_recibir %}
@@ -60,6 +63,15 @@
   <div class="alert alert-info">
     <i class="bi bi-info-circle"></i> Contá los repuestos recibidos y corregí la columna <strong>Recibido</strong>
     si algo no coincide con el remito. El stock se carga con lo recibido.
+  </div>
+  {% elif en_preparacion %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Este envío todavía no salió de RAYPAC.
+    {% if puede_editar %}
+    Revisalo y, cuando salga, tocá <strong>Freezar y marcar como enviado</strong>.
+    {% else %}
+    DML le va a poder dar ingreso cuando RAYPAC lo marque como enviado.
+    {% endif %}
   </div>
   {% endif %}
 
@@ -164,8 +176,9 @@ function confirmarRecepcion(event) {
       <form method="POST" action="{{ url_for('envios.envios_unfreeze', id=envio.id) }}">
         <div class="modal-body">
           <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle"></i> <strong>Acción sensible:</strong> 
-            Desfreezar permitirá modificaciones completas al envío.
+            <i class="bi bi-exclamation-triangle"></i> <strong>Acción sensible:</strong>
+            usalo solo si el envío volvió a RAYPAC antes de llegar a DML. Vuelve a "En preparación"
+            y RAYPAC lo puede corregir; después hay que volver a freezarlo.
           </div>
           <div class="mb-3">
             <label for="unfreeze_code" class="form-label">Código de verificación</label>

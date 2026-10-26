@@ -29,6 +29,8 @@
         <span class="badge bg-success">Recibido</span>
         {% elif envio.estado_envio == 'ENVIADO' %}
         <span class="badge bg-warning text-dark">En Tránsito</span>
+        {% elif envio.estado_envio == 'PREPARACION' %}
+        <span class="badge bg-info text-dark">En preparación</span>
         {% else %}
         <span class="badge bg-secondary">Pendiente</span>
         {% endif %}
