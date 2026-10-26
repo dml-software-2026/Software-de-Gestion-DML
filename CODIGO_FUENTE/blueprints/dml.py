@@ -48,6 +48,16 @@ ESTADOS_EDITABLES = [
 ]
 
 
+def registrar_estado(db, ficha_id, estado, usuario_id):
+    """#171: deja asentado un cambio de estado_reparacion en el historial
+    de la ficha. No hace commit - va en la misma transacción que el UPDATE
+    del estado, así nunca queda uno sin el otro."""
+    db.execute(
+        "INSERT INTO dml_fichas_historial (ficha_id, estado, usuario_id) VALUES (%s, %s, %s)",
+        (ficha_id, estado, usuario_id),
+    )
+
+
 @dml_bp.route("")
 @login_required
 @permission_required(read_roles=["RAYPAC", "DML_REPUESTOS"], write_roles=["DML_ST"])
@@ -167,6 +177,8 @@ def dml_new(raypac_id):
 
             ficha_id = row['id']
 
+            registrar_estado(db, ficha_id, 'A LA ESPERA DE REVISIÓN', user['id'])
+
             # Actualizar ticket con el ficha_id
             db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
 
@@ -269,8 +281,21 @@ def dml_view(id, readonly=False):
         ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
+    # #171: historial de estados, del más reciente al más viejo.
+    historial = db.execute("""
+        -- La base (Supabase) guarda en UTC: se pasa a hora argentina acá
+        -- para que la hora que ve RAYPAC sea la real.
+        SELECT h.estado, h.fecha AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha,
+               u.nombre AS usuario
+        FROM dml_fichas_historial h
+        LEFT JOIN users u ON u.id = h.usuario_id
+        WHERE h.ficha_id = %s
+        ORDER BY h.fecha DESC, h.id DESC
+    """, (id,)).fetchall()
+
     return render_template("dml_view.html", ficha=ficha, raypac=raypac, partes=partes, repuestos=repuestos,
-                           user_role=user['role'], readonly=readonly, flow_steps=flow_steps)
+                           user_role=user['role'], user_email=user['email'], readonly=readonly,
+                           flow_steps=flow_steps, historial=historial)
 
 
 @dml_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -372,6 +397,10 @@ def dml_edit(id):
                   estado, diagnostico_rep, observaciones,
                   n_ciclos, mecanizado, horas, numero_remito,
                   tecnico_resp, id))
+            # #171: solo si el estado cambió - guardar la ficha sin tocar el
+            # estado (ej. solo observaciones) no es un paso nuevo del historial.
+            if estado != ficha['estado_reparacion']:
+                registrar_estado(db, id, estado, user['id'])
             db.commit()
 
             # Actualizar partes
@@ -742,6 +771,7 @@ def dml_close(id):
             SET is_closed = TRUE, fecha_egreso = %s, estado_reparacion = 'MÁQUINA ENTREGADA'
             WHERE id = %s
         """, (fecha_egreso, id))
+        registrar_estado(db, id, 'MÁQUINA ENTREGADA', user['id'])
 
         # Cerrar el ticket asociado (ya cumplió su función de seguimiento)
         if ficha['numero_ticket']:
@@ -910,3 +940,42 @@ def descargar_ficha_pdf(id):
     return send_file(BytesIO(pdf_bytes), mimetype='application/pdf',
                     as_attachment=True,
                     download_name=f"ficha_{ficha['numero_ficha']:07d}.pdf")
+
+
+@dml_bp.route("/<int:id>/enviar-pdf", methods=["POST"])
+@login_required
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS", "RAYPAC")
+def enviar_ficha_pdf(id):
+    """#171: manda el PDF de la ficha al mail del usuario logueado - mismos
+    roles que descargar_ficha_pdf(), para que RAYPAC lo reciba sin depender
+    de que alguien de DML se lo pase."""
+    user = get_current_user()
+    db = get_db()
+
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
+    if not ficha:
+        flash("Ficha no encontrada.", "error")
+        return redirect(url_for("dml.dml_list"))
+
+    pdf_bytes = generar_pdf_ficha(id)
+    if not pdf_bytes:
+        flash("No se pudo generar el PDF.", "error")
+        return redirect(url_for("dml.dml_view", id=id))
+
+    numero = f"{ficha['numero_ficha']:07d}"
+    html_body = f"""
+    <p>Hola{(' ' + user['nombre']) if user['nombre'] else ''},</p>
+    <p>Te adjuntamos la ficha de servicio técnico <strong>#{numero}</strong>
+    (estado actual: <strong>{ficha['estado_reparacion']}</strong>).</p>
+    <p>Sistema de Gestión DML</p>
+    """
+    enviado = send_mail(user['email'], f"Ficha DML #{numero}", html_body,
+                        attachments=[(f"ficha_{numero}.pdf", pdf_bytes)])
+
+    if enviado:
+        log_action(user['id'], "SEND_FICHA_PDF", "dml_fichas", id, None,
+                   f"Ficha #{ficha['numero_ficha']} a {user['email']}")
+        flash(f"Te enviamos el PDF de la ficha a {user['email']}.", "success")
+    else:
+        flash("No se pudo enviar el mail. Probá de nuevo más tarde o descargá el PDF.", "error")
+    return redirect(url_for("dml.dml_view", id=id))
