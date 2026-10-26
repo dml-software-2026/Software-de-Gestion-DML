@@ -170,7 +170,7 @@ def tickets_list():
         query += " AND (t.estado IS NULL OR t.estado != 'CERRADO')"
 
     if buscar:
-        query += " AND (t.numero_ticket LIKE %s OR t.numero_serie LIKE %s)"
+        query += " AND (t.numero_ticket ILIKE %s OR t.numero_serie ILIKE %s)"
         params.extend([f"%{buscar}%", f"%{buscar}%"])
 
     if estado:
