@@ -179,7 +179,12 @@ def _leer_form_envio(db, stock, envio_id=None):
             # Sin descripción propia: la de la matriz se lee con un JOIN al mostrarlo
             seleccionados.append((row['codigo_repuesto'], None, qty))
 
-    # Procesar repuestos adicionales (no listados)
+    # Procesar repuestos adicionales (no listados). Un código que ya está en
+    # la lista (= en la matriz) o repetido acá partiría el mismo repuesto en
+    # varios renglones del envío (#285): se rechaza, mismo control que el
+    # popup de envios_form.html por si se saltea el JS.
+    codigos_lista = {row['codigo_repuesto'] for row in stock}
+    codigos_adicionales = set()
     for key in request.form.keys():
         if key.startswith('codigo_adicional_'):
             idx = key.replace('codigo_adicional_', '')
@@ -192,13 +197,18 @@ def _leer_form_envio(db, stock, envio_id=None):
             except ValueError:
                 qty = 0
 
-            if codigo and qty > 0:
-                # Si no tiene descripción, buscarla en la matriz
-                if not descripcion:
-                    rep = db.execute("SELECT item FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,)).fetchone()
-                    descripcion = rep['item'] if rep else f"Repuesto {codigo}"
+            if not codigo:
+                continue
+            if codigo in codigos_lista:
+                flash(f"⚠️ El código {codigo} ya existe en la lista de repuestos: cargá la cantidad en su renglón, no como repuesto no listado.", "error")
+                return None
+            if codigo in codigos_adicionales:
+                flash(f"⚠️ El código {codigo} está repetido en los repuestos no listados: cargalo una sola vez con la cantidad total.", "error")
+                return None
+            codigos_adicionales.add(codigo)
 
-                seleccionados.append((codigo, descripcion, qty))
+            if qty > 0:
+                seleccionados.append((codigo, descripcion or f"Repuesto {codigo}", qty))
 
     if not seleccionados:
         flash("Selecciona al menos un repuesto con cantidad mayor a 0.", "error")

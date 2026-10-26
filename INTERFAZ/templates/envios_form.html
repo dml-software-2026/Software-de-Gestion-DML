@@ -11,7 +11,7 @@
   <p class="text-muted">Selecciona las cantidades a despachar desde RAYPAC hacia DML.</p>
   {% endif %}
 
-  <form method="POST">
+  <form method="POST" id="envio-form">
     <!-- Tipo de Entrega -->
     <div class="card mb-4" style="border-left: 4px solid #17a2b8;">
       <div class="card-body">
@@ -131,7 +131,76 @@
       `;
       container.appendChild(newRow);
     }
+
+    // #285: un código "no listado" que ya está en la lista, o repetido entre
+    // los no listados, partiría el mismo repuesto en varios renglones del
+    // envío. Se avisa al salir del campo y se bloquea el envío del form
+    // (el backend repite el control en _leer_form_envio).
+    const codigosLista = new Set({{ stock | map(attribute='codigo_repuesto') | list | tojson }});
+
+    function camposCodigoAdicional() {
+      return Array.from(document.querySelectorAll('#repuestos-adicionales input[name^="codigo_adicional_"]'));
+    }
+
+    function errorCodigoAdicional(input) {
+      const codigo = input.value.trim().toUpperCase();
+      if (!codigo) return null;
+      if (codigosLista.has(codigo)) {
+        return 'El código ' + codigo + ' ya existe en la lista de repuestos. Cargá la cantidad en su renglón de la tabla de arriba.';
+      }
+      // Solo contra los anteriores: el primero que aparece queda como válido
+      const campos = camposCodigoAdicional();
+      const repetido = campos.slice(0, campos.indexOf(input)).some(function (otro) {
+        return otro.value.trim().toUpperCase() === codigo;
+      });
+      if (repetido) {
+        return 'El código ' + codigo + ' ya está cargado como repuesto no listado. Cargalo una sola vez con la cantidad total.';
+      }
+      return null;
+    }
+
+    function avisarCodigo(input, mensaje) {
+      document.getElementById('codigoExistenteBody').textContent = mensaje;
+      const modalEl = document.getElementById('codigoExistenteModal');
+      modalEl.addEventListener('hidden.bs.modal', function () { input.focus(); }, { once: true });
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    document.getElementById('repuestos-adicionales').addEventListener('change', function (e) {
+      const input = e.target;
+      if (!input.name || !input.name.startsWith('codigo_adicional_')) return;
+      const error = errorCodigoAdicional(input);
+      input.classList.toggle('is-invalid', !!error);
+      if (error) avisarCodigo(input, error);
+    });
+
+    document.getElementById('envio-form').addEventListener('submit', function (e) {
+      for (const input of camposCodigoAdicional()) {
+        const error = errorCodigoAdicional(input);
+        input.classList.toggle('is-invalid', !!error);
+        if (error) {
+          e.preventDefault();
+          avisarCodigo(input, error);
+          return;
+        }
+      }
+    });
     </script>
+
+    <div class="modal fade" id="codigoExistenteModal" tabindex="-1" aria-labelledby="codigoExistenteLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="codigoExistenteLabel"><i class="bi bi-exclamation-triangle-fill text-warning"></i> Código ya cargado</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body" id="codigoExistenteBody"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendido</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="d-flex justify-content-between align-items-center">
       {% if envio %}
