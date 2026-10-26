@@ -10,7 +10,7 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.services.mail import send_mail
+from CODIGO_FUENTE.services.mail import get_destinatarios_activos, send_mail
 from CODIGO_FUENTE.services.stock import (
     actualizar_estado_alerta_stock,
     ajustar_stock_ubicacion,
@@ -219,7 +219,19 @@ def envios_new():
 
             log_action(user['id'], "CREATE", "envios_repuestos", envio_id, None,
                       f"Remito {numero_remito} con {len(seleccionados)} items")
-
+            # Aviso de nuevo envío (si falla, no debe romper la creación)
+            try:
+                items_html = "".join(f"<li>{c} - {i} x {q}</li>" for c, i, q in seleccionados)
+                html = f"""
+                <h3>📦 Nuevo envío de repuestos</h3>
+                <p>Remito: <strong>{numero_remito}</strong></p>
+                <p>Tipo de entrega: {tipo_entrega}</p>
+                <ul>{items_html}</ul>
+                """
+                for email in get_destinatarios_activos():
+                    send_mail(email, f"📦 Nuevo envío {numero_remito}", html)
+            except Exception as e:
+                print(f"Error enviando aviso de nuevo envío: {e}")
             flash(f"Envío generado: {numero_remito}", "success")
             return redirect(url_for("envios.envios_view", id=envio_id))
         except Exception as e:
