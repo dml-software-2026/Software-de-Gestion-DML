@@ -349,6 +349,20 @@ CREATE TABLE ticket_historial (
     FOREIGN KEY (usuario_id) REFERENCES users (id)
 );
  
+-- #171: cada cambio de estado_reparacion de una ficha, para mostrarle
+-- a RAYPAC por qué estados pasó la máquina. Se registra desde dml_new(),
+-- dml_edit() y dml_close() - las fichas anteriores a esta tabla no tienen
+-- historial (los cambios viejos nunca se guardaron).
+CREATE TABLE dml_fichas_historial (
+    id SERIAL PRIMARY KEY,
+    ficha_id INTEGER NOT NULL,
+    estado TEXT NOT NULL,
+    usuario_id INTEGER,
+    fecha TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ficha_id) REFERENCES dml_fichas (id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES users (id)
+);
+
 -- FK circular: dml_fichas.ticket_id -> tickets(id)
 -- (tickets no existía todavía cuando se creó dml_fichas)
 ALTER TABLE dml_fichas ADD CONSTRAINT fk_dml_fichas_ticket_id

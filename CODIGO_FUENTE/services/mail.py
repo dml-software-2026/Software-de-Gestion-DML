@@ -1,3 +1,4 @@
+import base64
 import sys
 import traceback
 
@@ -5,8 +6,12 @@ import resend
 from flask import current_app
 
 
-def send_mail(to_email, subject, html_body):
-    """Envía mail vía Resend. Devuelve True/False, nunca rompe la request."""
+def send_mail(to_email, subject, html_body, attachments=None):
+    """Envía mail vía Resend. Devuelve True/False, nunca rompe la request.
+
+    attachments (opcional, #171): lista de (nombre_archivo, bytes), ej.
+    [("ficha_0000504.pdf", pdf_bytes)]. Resend los recibe en base64.
+    """
     try:
         if not to_email or not to_email.strip():
             print("⚠️ Email destinatario vacío, saltando envío", file=sys.stderr, flush=True)
@@ -23,13 +28,20 @@ def send_mail(to_email, subject, html_body):
             subject = f"[DEV → {to_email}] {subject}"
             to_email = redirect
 
-        resend.api_key = api_key
-        resend.Emails.send({
+        params = {
             "from": current_app.config["MAIL_FROM"],
             "to": [to_email.strip()],
             "subject": subject,
             "html": html_body,
-        })
+        }
+        if attachments:
+            params["attachments"] = [
+                {"filename": nombre, "content": base64.b64encode(contenido).decode("ascii")}
+                for nombre, contenido in attachments
+            ]
+
+        resend.api_key = api_key
+        resend.Emails.send(params)
         print(f"✅ Mail enviado a {to_email}", file=sys.stderr, flush=True)
         return True
     except Exception as e:

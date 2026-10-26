@@ -93,6 +93,30 @@
         </div>
     </div>
 
+    <!-- HISTORIAL DE ESTADOS (#171): por qué estados pasó la máquina, del
+         más reciente al más viejo. Mismos colores que el badge de arriba. -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="bi bi-list-check"></i> Historial de Estados</h5>
+        </div>
+        <div class="card-body">
+            {% if historial %}
+            <ul class="list-group list-group-flush">
+                {% for h in historial %}
+                {% set h_style = estado_color.get(h.estado, {'bg': '#6c757d', 'border': '#6c757d', 'text': '#ffffff'}) %}
+                <li class="list-group-item d-flex flex-wrap align-items-center gap-2 px-0">
+                    <span class="text-muted text-nowrap"><i class="bi bi-calendar-event"></i> {{ h.fecha.strftime('%d/%m/%Y %H:%M') }}</span>
+                    <span class="badge text-wrap text-start" style="background-color: {{ h_style.bg }}; border: 1px solid {{ h_style.border }}; color: {{ h_style.text }};">{{ h.estado }}</span>
+                    {% if h.usuario %}<small class="text-muted">por {{ h.usuario }}</small>{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted fst-italic mb-0">Esta ficha no tiene cambios de estado registrados (el historial se guarda a partir de esta versión del sistema).</p>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- ESTADO DEL EQUIPO (PARTES) -->
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-secondary text-white">
@@ -236,6 +260,14 @@
             <a href="{{ url_for('dml.descargar_ficha_pdf', id=ficha.id) }}" class="btn btn-outline-secondary" target="_blank">
                 <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
             </a>
+
+            {# #171: el mismo PDF, por mail al usuario logueado #}
+            <form method="POST" action="{{ url_for('dml.enviar_ficha_pdf', id=ficha.id) }}" class="m-0"
+                  onsubmit="return confirmarAccion(event, 'Se va a enviar el PDF de esta ficha a {{ user_email }}. ¿Continuar?');">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-envelope"></i> Recibir PDF por mail
+                </button>
+            </form>
         </div>
     </div>
 
