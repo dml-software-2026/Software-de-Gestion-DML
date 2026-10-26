@@ -190,6 +190,8 @@ CREATE TABLE envios_repuestos_detalles (
     envio_id INTEGER NOT NULL,
     codigo_repuesto TEXT NOT NULL,
     cantidad INTEGER NOT NULL,
+    descripcion TEXT,             -- la que escribe RAYPAC si el repuesto no está en la matriz (#57)
+    cantidad_recibida INTEGER,    -- lo que DML contó al recibir; NULL hasta la recepción (#57)
     FOREIGN KEY (envio_id) REFERENCES envios_repuestos (id) ON DELETE CASCADE
 );
  

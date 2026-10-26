@@ -168,7 +168,8 @@ def envios_new():
                 except ValueError:
                     qty = 0
                 if qty > 0:
-                    seleccionados.append((row['codigo_repuesto'], row['item'], qty))
+                    # Sin descripción propia: la de la matriz se lee con un JOIN al mostrarlo
+                    seleccionados.append((row['codigo_repuesto'], None, qty))
 
             # Procesar repuestos adicionales (no listados)
             for key in request.form.keys():
@@ -208,10 +209,10 @@ def envios_new():
 
             # Guardar detalles del envío
             # IMPORTANTE: NO descontamos stock de RAYPAC (ellos no controlan stock desde este software)
-            for codigo, item, qty in seleccionados:
+            for codigo, descripcion, qty in seleccionados:
                 db.execute(
-                    "INSERT INTO envios_repuestos_detalles (envio_id, codigo_repuesto, cantidad) VALUES (%s, %s, %s)",
-                    (envio_id, codigo, qty)
+                    "INSERT INTO envios_repuestos_detalles (envio_id, codigo_repuesto, cantidad, descripcion) VALUES (%s, %s, %s, %s)",
+                    (envio_id, codigo, qty, descripcion)
                 )
 
             db.commit()
@@ -248,7 +249,10 @@ def envios_view(id):
         """,
         (id,)
     ).fetchall()
-    return render_template("envios_view.html", envio=envio, detalles=detalles)
+    recibido = envio['estado_envio'] == 'RECIBIDO' or bool(envio['fecha_recepcion_dml'])
+    puede_recibir = not recibido and get_current_user()['role'] in ('ADMIN', 'DML_REPUESTOS', 'DML_ST')
+    return render_template("envios_view.html", envio=envio, detalles=detalles,
+                           recibido=recibido, puede_recibir=puede_recibir)
 
 
 @envios_bp.route("/<int:id>/confirmar", methods=["POST"])
@@ -257,44 +261,81 @@ def envios_view(id):
 def envios_confirmar(id):
     user = get_current_user()
     db = get_db()
-    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s", (id,)).fetchone()
+    # FOR UPDATE: si llegan dos confirmaciones a la vez (doble click, dos
+    # personas), la segunda espera a que termine la primera y ya lo ve
+    # RECIBIDO - sin esto el stock se sumaría dos veces.
+    envio = db.execute("SELECT * FROM envios_repuestos WHERE id = %s FOR UPDATE", (id,)).fetchone()
     if not envio:
         flash("Envío no encontrado.", "error")
         return redirect(url_for("envios.envios_list"))
-    # Verificar si ya fue recibido
-    try:
-        estado_envio = envio['estado_envio']
-    except (KeyError, TypeError):
-        estado_envio = None
 
-    # Acceso directo sin .get() para sqlite3.Row
-    fecha_recepcion_actual = envio['fecha_recepcion_dml'] if 'fecha_recepcion_dml' in envio.keys() else None
-
-    if estado_envio == 'RECIBIDO' or fecha_recepcion_actual:
+    if envio['estado_envio'] == 'RECIBIDO' or envio['fecha_recepcion_dml']:
+        db.rollback()
         flash("El envío ya fue confirmado.", "warning")
         return redirect(url_for("envios.envios_view", id=id))
 
     detalles = db.execute(
-        "SELECT d.*, m.item FROM envios_repuestos_detalles d LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto WHERE d.envio_id = %s",
+        """SELECT d.*, m.item
+           FROM envios_repuestos_detalles d
+           LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto
+           WHERE d.envio_id = %s
+           ORDER BY d.codigo_repuesto""",
         (id,)
     ).fetchall()
     if not detalles:
+        db.rollback()
         flash("No hay detalles de repuestos para este envío.", "error")
         return redirect(url_for("envios.envios_view", id=id))
 
-    try:
-        fecha_recepcion = datetime.now().strftime("%Y-%m-%d")
+    # Cantidad que DML contó de cada renglón (#57). El campo viene precargado
+    # con la del remito; si falta (form viejo) se toma esa misma.
+    recibidos = {}
+    for det in detalles:
+        valor = (request.form.get(f"recibido_{det['id']}") or str(det['cantidad'])).strip()
+        try:
+            recibidos[det['id']] = int(valor)
+        except ValueError:
+            recibidos[det['id']] = -1
+        if recibidos[det['id']] < 0:
+            db.rollback()
+            flash(f"Cantidad recibida inválida para {det['codigo_repuesto']}.", "error")
+            return redirect(url_for("envios.envios_view", id=id))
 
-        # Actualizar stock DML con los repuestos recibidos
+    try:
+        codigos_nuevos = []
+
+        # Todo en una sola transacción: si un renglón falla no se suma nada
+        # (antes cada renglón se commiteaba por separado y un error a mitad
+        # de camino dejaba stock cargado con el envío todavía "en tránsito").
         for det in detalles:
             codigo = det['codigo_repuesto']
-            qty = det['cantidad']
+            qty = recibidos[det['id']]
 
-            # Agregar a stock de DML
-            ajustar_stock_ubicacion(codigo, "DML", qty)
-            actualizar_estado_alerta_stock(codigo)
+            if qty > 0 and det['item'] is None:
+                # Repuesto no listado: se da de alta en la matriz con la
+                # descripción que cargó RAYPAC, si no stock_ubicaciones lo
+                # rechaza por la FK.
+                numero = db.execute("SELECT COALESCE(MAX(numero), 0) + 1 AS n FROM matriz_repuestos").fetchone()['n']
+                descripcion = det['descripcion'] or f"Repuesto {codigo}"
+                nuevo = db.execute(
+                    """INSERT INTO matriz_repuestos
+                       (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
+                       VALUES (%s, %s, %s, 0, 0, 'DML')
+                       ON CONFLICT (codigo_repuesto) DO NOTHING
+                       RETURNING id""",
+                    (numero, codigo, descripcion)
+                ).fetchone()
+                if nuevo:
+                    codigos_nuevos.append((codigo, descripcion))
 
-        # Marcar envío como recibido
+            if qty > 0:
+                ajustar_stock_ubicacion(codigo, "DML", qty)
+
+            db.execute(
+                "UPDATE envios_repuestos_detalles SET cantidad_recibida = %s WHERE id = %s",
+                (qty, det['id'])
+            )
+
         db.execute(
             """UPDATE envios_repuestos
                SET estado_envio = 'RECIBIDO',
@@ -302,39 +343,85 @@ def envios_confirmar(id):
                    usuario_recepcion_id = %s,
                    updated_at = CURRENT_TIMESTAMP
                WHERE id = %s""",
-            (fecha_recepcion, user['id'], id)
+            (datetime.now().strftime("%Y-%m-%d"), user['id'], id)
         )
         db.commit()
-
-        log_action(user['id'], "CONFIRM", "envios_repuestos", id, None, "Recepción en DML")
-
-        # Aviso a RAYPAC de recepción
-        try:
-            lineas = """
-            <ul>
-            %s
-            </ul>
-            """ % "\n".join([
-                f"<li>{det['codigo_repuesto']} - {det['item'] or ''} x {det['cantidad']}</li>" for det in detalles
-            ])
-            html_body = f"""
-            <h3>Confirmación de recepción de repuestos</h3>
-            <p>Remito: <strong>{envio['numero_remito']}</strong></p>
-            <p>Fecha recepción: {datetime.now().strftime('%Y-%m-%d')}</p>
-            <p>Detalle:</p>
-            {lineas}
-            <p>Los repuestos fueron cargados en stock DML.</p>
-            """
-            send_mail("raypac@dml.local", f"Recepción remito {envio['numero_remito']} en DML", html_body)
-        except Exception as e:
-            print(f"Error enviando mail de recepción a Raypac: {e}")
-
-        flash("Envío confirmado y stock actualizado.", "success")
-        return redirect(url_for("envios.envios_view", id=id))
     except Exception as e:
         db.rollback()
         flash(f"Error al confirmar envío: {e}", "error")
         return redirect(url_for("envios.envios_view", id=id))
+
+    # A partir de acá la recepción ya está guardada: lo que falle (alertas,
+    # mails) solo se loguea, no deshace nada.
+    for codigo in {det['codigo_repuesto'] for det in detalles}:
+        try:
+            actualizar_estado_alerta_stock(codigo)
+        except Exception as e:
+            db.rollback()
+            print(f"Error actualizando alerta de stock de {codigo}: {e}")
+
+    diferencias = [det for det in detalles if recibidos[det['id']] != det['cantidad']]
+    log_action(user['id'], "CONFIRM", "envios_repuestos", id, None,
+               f"Recepción en DML ({len(diferencias)} diferencias con el remito)")
+
+    _avisar_recepcion_a_raypac(envio, detalles, recibidos)
+    if codigos_nuevos:
+        _avisar_codigos_nuevos(envio, codigos_nuevos)
+        for codigo, descripcion in codigos_nuevos:
+            flash(f"Se dio de alta el código nuevo {codigo} ({descripcion}) en la matriz de repuestos.", "info")
+
+    if diferencias:
+        flash(f"Envío recibido con {len(diferencias)} diferencia(s) respecto del remito. "
+              "El stock se cargó con lo recibido.", "warning")
+    else:
+        flash("Envío confirmado y stock actualizado.", "success")
+    return redirect(url_for("envios.envios_view", id=id))
+
+
+def _avisar_recepcion_a_raypac(envio, detalles, recibidos):
+    """Mail a RAYPAC con lo recibido, marcando las diferencias con el remito."""
+    try:
+        lineas = []
+        for det in detalles:
+            descripcion = det['item'] or det['descripcion'] or ''
+            recibido = recibidos[det['id']]
+            linea = f"{det['codigo_repuesto']} - {descripcion}: remito {det['cantidad']}, recibido {recibido}"
+            if recibido != det['cantidad']:
+                linea = f"<strong style='color:#b02a37'>{linea} (DIFERENCIA)</strong>"
+            lineas.append(f"<li>{linea}</li>")
+        html_body = f"""
+        <h3>Confirmación de recepción de repuestos</h3>
+        <p>Remito: <strong>{envio['numero_remito']}</strong></p>
+        <p>Fecha recepción: {datetime.now().strftime('%Y-%m-%d')}</p>
+        <p>Detalle:</p>
+        <ul>{''.join(lineas)}</ul>
+        <p>Los repuestos fueron cargados en stock DML con las cantidades recibidas.</p>
+        """
+        send_mail("raypac@dml.local", f"Recepción remito {envio['numero_remito']} en DML", html_body)
+    except Exception as e:
+        print(f"Error enviando mail de recepción a Raypac: {e}")
+
+
+def _avisar_codigos_nuevos(envio, codigos_nuevos):
+    """Mail a los destinatarios de Admin → Notificaciones por cada código
+    que se dio de alta solo en la matriz al recibir un envío (#57)."""
+    try:
+        db = get_db()
+        destinatarios = db.execute(
+            "SELECT email FROM usuarios_notificaciones WHERE activo = TRUE"
+        ).fetchall()
+        items = "".join(f"<li><strong>{codigo}</strong> - {descripcion}</li>" for codigo, descripcion in codigos_nuevos)
+        html_body = f"""
+        <h3>Nuevos códigos de repuesto en la matriz</h3>
+        <p>Al recibir el remito <strong>{envio['numero_remito']}</strong> llegaron repuestos que
+        no estaban en la matriz y se dieron de alta automáticamente:</p>
+        <ul>{items}</ul>
+        <p>Revisá que la descripción sea correcta desde la sección Stock.</p>
+        """
+        for destinatario in destinatarios:
+            send_mail(destinatario["email"], f"Nuevo código de repuesto (remito {envio['numero_remito']})", html_body)
+    except Exception as e:
+        print(f"Error enviando aviso de códigos nuevos: {e}")
 
 
 @envios_bp.route("/<int:id>/edit", methods=["GET", "POST"])

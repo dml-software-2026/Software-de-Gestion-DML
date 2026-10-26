@@ -43,7 +43,7 @@
                                 {% for det in detalles %}
                                 <tr>
                                     <td><strong>{{ det.codigo_repuesto }}</strong></td>
-                                    <td>{{ det.item or 'Sin descripción' }}</td>
+                                    <td>{{ det.item or det.descripcion or 'Sin descripción' }}</td>
                                     <td class="text-center">{{ det.cantidad }}</td>
                                 </tr>
                                 {% endfor %}
