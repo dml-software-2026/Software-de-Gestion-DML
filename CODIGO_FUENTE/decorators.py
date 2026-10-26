@@ -1,17 +1,31 @@
 from functools import wraps
 
-from flask import flash, redirect, session, url_for
+from flask import flash, g, redirect, session, url_for
 from werkzeug.security import check_password_hash
 
 from CODIGO_FUENTE.extensions import get_db
 
 
 def get_current_user():
+    """Usuario logueado, o None.
+
+    #244: se consulta una sola vez por request y se guarda en flask.g. Antes
+    cada llamada era una consulta nueva y una página hacía 12-15 (base.html
+    la llama varias veces, más los decoradores y la vista) - con la base en
+    Supabase cada una es un viaje por red. Se guarda junto con el user_id
+    para que si la sesión cambia en el mismo request (login/logout) se
+    vuelva a consultar en vez de devolver el usuario anterior.
+    """
     uid = session.get("user_id")
     if not uid:
         return None
+    cache = g.get("_current_user")
+    if cache is not None and cache[0] == uid:
+        return cache[1]
     db = get_db()
-    return db.execute("SELECT * FROM users WHERE id = %s", (uid,)).fetchone()
+    user = db.execute("SELECT * FROM users WHERE id = %s", (uid,)).fetchone()
+    g._current_user = (uid, user)
+    return user
 
 
 def get_current_user_jinja():
