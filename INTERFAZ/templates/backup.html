@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Backup de datos{% endblock %}
+
+{% block content %}
+{# #52: copia de la base fuera de Supabase, pedido de David. #}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="bi bi-database-down"></i> Backup de datos</h3>
+                </div>
+                <div class="card-body">
+                    <p>
+                        Descarga una copia completa de los datos del sistema (ingresos, tickets, fichas,
+                        stock, envíos, usuarios) en un archivo <code>.zip</code>, para guardarla
+                        fuera del servidor: en una PC de la empresa, un disco externo o un Drive.
+                    </p>
+                    <ul class="mb-3">
+                        <li><strong>Planillas (carpeta <code>csv</code>):</strong> una por tabla, se abren con Excel.</li>
+                        <li><strong><code>backup.sql</code>:</strong> sirve para restaurar el sistema completo si hiciera falta.</li>
+                    </ul>
+
+                    <div class="alert alert-warning d-flex gap-2 align-items-start" role="alert">
+                        <i class="bi bi-shield-lock-fill"></i>
+                        <div>El archivo tiene datos de clientes y las contraseñas (cifradas) de los usuarios. Guardalo en un lugar seguro y no lo compartas.</div>
+                    </div>
+
+                    <p class="text-muted mb-3">
+                        <i class="bi bi-clock-history"></i>
+                        {% if ultimo %}
+                        Último backup descargado: <strong>{{ ultimo.fecha.strftime('%d/%m/%Y %H:%M') }}</strong>
+                        {% if ultimo.nombre or ultimo.email %}por {{ ultimo.nombre or ultimo.email }}{% endif %}
+                        {% else %}
+                        Todavía no se descargó ningún backup.
+                        {% endif %}
+                    </p>
+
+                    <a href="{{ url_for('admin.backup_descargar') }}" class="btn btn-primary">
+                        <i class="bi bi-download"></i> Descargar backup
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

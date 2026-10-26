@@ -1,8 +1,9 @@
 import csv
 import os
 import sys
+from io import BytesIO
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from werkzeug.security import generate_password_hash
 
 from CODIGO_FUENTE.config import BASE_DIR
@@ -13,6 +14,7 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.backup import generar_backup_zip
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -334,3 +336,41 @@ def usuario_toggle(id):
     estado_texto = "activado" if nuevo_estado else "desactivado"
     flash(f"Usuario {estado_texto} correctamente.", "success")
     return redirect(url_for("admin.usuarios_list"))
+
+
+# ======================== BACKUP (#52) ========================
+
+@admin_bp.route("/backup")
+@login_required
+@role_required("ADMIN")
+def backup():
+    db = get_db()
+    # Última descarga, para que se note si hace mucho que nadie hace backup.
+    # log_action guarda la acción real como "[BACKUP] ..." en new_value.
+    ultimo = db.execute("""
+        SELECT l.fecha_hora AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha, u.nombre, u.email
+        FROM logs_auditoria l
+        LEFT JOIN users u ON u.id = l.id_usuario
+        WHERE l.tabla_afectada = 'backup'
+        ORDER BY l.fecha_hora DESC
+        LIMIT 1
+    """).fetchone()
+    return render_template("backup.html", ultimo=ultimo)
+
+
+@admin_bp.route("/backup/descargar")
+@login_required
+@role_required("ADMIN")
+def backup_descargar():
+    user = get_current_user()
+    db = get_db()
+    try:
+        nombre, contenido = generar_backup_zip(db)
+    except Exception as e:
+        print(f"❌ Error generando backup: {type(e).__name__}: {e!s}", file=sys.stderr, flush=True)
+        flash("No se pudo generar el backup. Avisá al equipo de desarrollo.", "error")
+        return redirect(url_for("admin.backup"))
+
+    log_action(user['id'], "BACKUP", "backup", None, None, nombre)
+    return send_file(BytesIO(contenido), mimetype="application/zip",
+                     as_attachment=True, download_name=nombre)
