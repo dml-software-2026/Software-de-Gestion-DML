@@ -248,6 +248,18 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error agregando campos de estado: {e}")
         db.rollback()
 
+    # Migración: verificación por renglón al recibir un envío (#57).
+    # descripcion = la que escribe RAYPAC para un repuesto no listado (antes se
+    # perdía); cantidad_recibida = lo que DML contó al recibir (NULL mientras
+    # el envío no se haya recibido).
+    try:
+        db.execute("ALTER TABLE envios_repuestos_detalles ADD COLUMN IF NOT EXISTS descripcion TEXT")
+        db.execute("ALTER TABLE envios_repuestos_detalles ADD COLUMN IF NOT EXISTS cantidad_recibida INTEGER")
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando columnas a envios_repuestos_detalles: {e}")
+        db.rollback()
+
     # Migración: Agregar campos de acuse de recibo a dml_fichas
     try:
         print("[MIGRATION] Verificando campos de acuse de recibo...")

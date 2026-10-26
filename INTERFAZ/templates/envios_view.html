@@ -43,19 +43,25 @@
         {% endif %}
       {% endif %}
       
-      {# Botón de recepción: mostrar si NO ha sido recibido #}
-      {% if session.get('role') in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] %}
-        {% if (not envio.estado_envio or envio.estado_envio != 'RECIBIDO') and not envio.fecha_recepcion_dml %}
-      <form method="POST" action="{{ url_for('envios.envios_confirmar', id=envio.id) }}" class="d-inline"
-            onsubmit="return confirmarAccion(event, '¿Confirmar que todos los repuestos fueron recibidos correctamente según el remito?');">
+      {# Botón de recepción: mostrar si NO ha sido recibido. Los campos
+         "Recibido" de la tabla pertenecen a este form vía form="recepcion-form". #}
+      {% if puede_recibir %}
+      <form id="recepcion-form" method="POST" action="{{ url_for('envios.envios_confirmar', id=envio.id) }}" class="d-inline"
+            onsubmit="return confirmarRecepcion(event);">
         <button type="submit" class="btn btn-success">
           <i class="bi bi-check-circle"></i> Dar Ingreso en DML
         </button>
       </form>
-        {% endif %}
       {% endif %}
     </div>
   </div>
+
+  {% if puede_recibir %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Contá los repuestos recibidos y corregí la columna <strong>Recibido</strong>
+    si algo no coincide con el remito. El stock se carga con lo recibido.
+  </div>
+  {% endif %}
 
   {% if envio.fecha_recepcion_dml %}
   <div class="alert alert-success">
@@ -76,15 +82,44 @@
             <tr>
               <th style="width: 20%">Código</th>
               <th>Descripción</th>
-              <th style="width: 15%" class="text-center">Cantidad</th>
+              <th style="width: 15%" class="text-center">{{ 'Remito' if (puede_recibir or recibido) else 'Cantidad' }}</th>
+              {% if puede_recibir or recibido %}
+              <th style="width: 15%" class="text-center">Recibido</th>
+              {% endif %}
             </tr>
           </thead>
           <tbody>
             {% for det in detalles %}
-            <tr>
+            {% set con_diferencia = recibido and det.cantidad_recibida is not none and det.cantidad_recibida != det.cantidad %}
+            <tr class="{{ 'table-warning' if con_diferencia else '' }}">
               <td><strong>{{ det.codigo_repuesto }}</strong></td>
-              <td>{{ det.item or 'N/D' }}</td>
+              <td>
+                {{ det.item or det.descripcion or 'N/D' }}
+                {% if not det.item %}
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border">No listado</span>
+                {% endif %}
+              </td>
               <td class="text-center">{{ det.cantidad }}</td>
+              {% if puede_recibir %}
+              <td class="text-center">
+                <input type="number" min="0" step="1" required form="recepcion-form"
+                       class="form-control form-control-sm text-center mx-auto js-recibido"
+                       style="max-width: 6rem"
+                       name="recibido_{{ det.id }}" value="{{ det.cantidad }}"
+                       data-remito="{{ det.cantidad }}" aria-label="Recibido de {{ det.codigo_repuesto }}">
+              </td>
+              {% elif recibido %}
+              <td class="text-center">
+                {% if det.cantidad_recibida is none %}
+                <span class="text-muted">—</span>
+                {% elif con_diferencia %}
+                <strong class="text-danger">{{ det.cantidad_recibida }}</strong>
+                <i class="bi bi-exclamation-triangle-fill text-danger" title="No coincide con el remito"></i>
+                {% else %}
+                {{ det.cantidad_recibida }}
+                {% endif %}
+              </td>
+              {% endif %}
             </tr>
             {% endfor %}
           </tbody>
@@ -93,6 +128,28 @@
     </div>
   </div>
 </div>
+
+{% if puede_recibir %}
+<script>
+// Marca en vivo los renglones que no coinciden con el remito (#57).
+document.querySelectorAll('.js-recibido').forEach(function (input) {
+  input.addEventListener('input', function () {
+    const distinto = input.value !== '' && Number(input.value) !== Number(input.dataset.remito);
+    input.closest('tr').classList.toggle('table-warning', distinto);
+  });
+});
+
+function confirmarRecepcion(event) {
+  const diferencias = Array.from(document.querySelectorAll('.js-recibido'))
+    .filter(function (i) { return Number(i.value) !== Number(i.dataset.remito); }).length;
+  const mensaje = diferencias === 0
+    ? '¿Confirmar que todos los repuestos fueron recibidos según el remito?'
+    : 'Hay ' + diferencias + ' renglón(es) que no coinciden con el remito. '
+      + 'El stock se va a cargar con las cantidades recibidas y RAYPAC recibirá el detalle. ¿Confirmar igual?';
+  return confirmarAccion(event, mensaje);
+}
+</script>
+{% endif %}
 
 <!-- Modal de desfreeze (solo ADMIN) -->
 <div class="modal fade" id="unfreezeModal" tabindex="-1" aria-labelledby="unfreezeModalLabel" aria-hidden="true">
