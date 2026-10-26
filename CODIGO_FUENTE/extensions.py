@@ -1,4 +1,6 @@
 import sys
+import threading
+import time
 
 import psycopg2
 from flask import current_app, g
@@ -21,10 +23,22 @@ class PgConnection:
 
     def __init__(self, conn):
         self._conn = conn
+        self._usada = False
 
     def execute(self, query, params=None):
-        cur = self._conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(query, params)
+        try:
+            cur = self._conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(query, params)
+        except (psycopg2.OperationalError, psycopg2.InterfaceError):
+            # #244: la conexión viene reusada del pool y pudo haberse cortado
+            # mientras estaba guardada. Si es la primera consulta del request
+            # no se hizo nada todavía, así que es seguro abrir otra y repetir.
+            if self._usada or not self._conn.closed:
+                raise
+            self._conn = _conectar()
+            cur = self._conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(query, params)
+        self._usada = True
         return cur
 
     def executescript(self, script):
@@ -51,17 +65,90 @@ class PgConnection:
         return getattr(self._conn, name)
 
 
+# #244: pool de conexiones. Antes se abría una conexión nueva a la base en
+# cada request y se cerraba al terminar - con Render en Oregon y Supabase en
+# São Paulo, abrir una conexión (TCP + cifrado + login a Postgres) tarda más
+# de 1 s. Ahora, al terminar el request, la conexión se guarda y el próximo
+# la reusa.
+#
+# Pool propio en vez de psycopg2.pool: el de psycopg2 solo guarda tantas
+# conexiones como su mínimo (y las abre todas de entrada), y si se llena
+# tira error en vez de abrir una más.
+_libres = []  # [(conexión, momento en que se devolvió)]
+_libres_lock = threading.Lock()
+_MAX_LIBRES = 5
+# Una conexión que estuvo guardada más que esto se prueba con un SELECT 1
+# antes de usarla: Supabase o la red pueden haberla cortado mientras tanto.
+_PING_SI_QUIETA_SEG = 60
+
+
+def _conectar():
+    return psycopg2.connect(
+        current_app.config["DATABASE_URL"],
+        # Avisos del sistema operativo para detectar conexiones muertas en
+        # vez de quedarse esperando.
+        keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3,
+    )
+
+
+def _conexion_sana(conn, devuelta):
+    if conn.closed:
+        return False
+    if time.monotonic() - devuelta < _PING_SI_QUIETA_SEG:
+        return True
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        conn.rollback()
+        return True
+    except psycopg2.Error:
+        return False
+
+
+def _tomar_conexion():
+    while True:
+        with _libres_lock:
+            if not _libres:
+                break
+            conn, devuelta = _libres.pop()
+        if _conexion_sana(conn, devuelta):
+            return conn
+        try:
+            conn.close()
+        except psycopg2.Error:
+            pass
+    return _conectar()
+
+
+def _devolver_conexion(conn):
+    try:
+        if not conn.closed:
+            # Igual que antes al cerrar la conexión: lo que no se commiteó se
+            # descarta, y no queda una transacción abierta para el próximo.
+            conn.rollback()
+    except psycopg2.Error:
+        pass
+    if not conn.closed:
+        with _libres_lock:
+            if len(_libres) < _MAX_LIBRES:
+                _libres.append((conn, time.monotonic()))
+                return
+    try:
+        conn.close()
+    except psycopg2.Error:
+        pass
+
+
 def get_db():
     if "db" not in g:
-        raw_conn = psycopg2.connect(current_app.config["DATABASE_URL"])
-        g.db = PgConnection(raw_conn)
+        g.db = PgConnection(_tomar_conexion())
     return g.db
 
 
 def close_db(exception=None):
     db = g.pop("db", None)
     if db is not None:
-        db.close()
+        _devolver_conexion(db._conn)
 
 
 def _columnas_de(db, tabla):
