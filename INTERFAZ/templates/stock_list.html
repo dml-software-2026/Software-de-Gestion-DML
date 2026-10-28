@@ -26,21 +26,11 @@
                 </div>
             </div>
             
-            {% if user.role in ['ADMIN', 'RAYPAC', 'DML_ST'] and not readonly %}
-            <div class="d-flex gap-2 mb-3">
+            {# Los códigos nuevos los da de alta solo DML, no RAYPAC (pedido de David). #}
+            {% if user.role in ['ADMIN', 'DML_ST', 'DML_REPUESTOS'] %}
+            <div class="d-flex flex-wrap gap-2 mb-3">
                 <a href="{{ url_for('stock.stock_new', ubicacion=ubicacion) }}" class="btn btn-success">+ Nuevo Repuesto</a>
-                {% if user.role in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] %}
                 <a href="{{ url_for('estadisticas.estadisticas') }}" class="btn btn-info">📊 Estadísticas de uso</a>
-                {% endif %}
-            </div>
-            {% elif user.role in ['DML_ST', 'DML_REPUESTOS'] and readonly or user.role == 'DML_REPUESTOS' %}
-            <div class="d-flex gap-2 mb-3">
-                <a href="{{ url_for('estadisticas.estadisticas') }}" class="btn btn-info">📊 Estadísticas de uso</a>
-                {% if user.role == 'DML_REPUESTOS' %}
-                <div class="alert alert-info py-2 mb-0 ms-3">
-                    <i class="bi bi-eye"></i> <strong>Modo Solo Lectura:</strong> Puedes ver stock y estadísticas, sin editar.
-                </div>
-                {% endif %}
             </div>
             {% endif %}
             
