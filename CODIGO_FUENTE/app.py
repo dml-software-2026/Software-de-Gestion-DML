@@ -20,7 +20,7 @@ from CODIGO_FUENTE.blueprints.stock import stock_bp
 from CODIGO_FUENTE.blueprints.tickets import tickets_bp
 from CODIGO_FUENTE.config import BASE_DIR, Config
 from CODIGO_FUENTE.decorators import get_current_user_jinja
-from CODIGO_FUENTE.extensions import close_db, init_db, preparar_base
+from CODIGO_FUENTE.extensions import close_db, get_db, init_db, preparar_base
 from CODIGO_FUENTE.services.stock import get_alert_badge
 
 # Nivel configurable por entorno: en Render se puede setear LOG_LEVEL=DEBUG
@@ -61,6 +61,16 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(estadisticas_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(notificaciones_bp)
+
+
+@app.route("/health")
+def health():
+    try:
+        get_db().execute("SELECT 1").fetchone()
+        return {"status": "ok"}, 200
+    except Exception:
+        logger.exception("Health check falló")
+        return {"status": "error"}, 500
 
 @app.before_request
 def apply_migrations():
