@@ -74,7 +74,8 @@ def stock_list(readonly=False):
 
 @stock_bp.route("/new", methods=["GET", "POST"])
 @login_required
-@role_required("ADMIN", "DML_ST", "RAYPAC")
+# Los códigos nuevos los da de alta solo DML, no RAYPAC (pedido de David).
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
 def stock_new():
     user = get_current_user()
     db = get_db()
