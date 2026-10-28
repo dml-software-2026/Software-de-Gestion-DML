@@ -500,8 +500,9 @@ def envios_confirmar(id):
                f"Recepción en DML ({len(diferencias)} diferencias con el remito)")
 
     _avisar_recepcion_a_raypac(envio, detalles, recibidos)
+    # Sin mail de "código nuevo": el alta la acaba de revisar alguien de DML
+    # en esta misma pantalla, el aviso no le contaba nada nuevo.
     if codigos_nuevos:
-        _avisar_codigos_nuevos(envio, codigos_nuevos)
         for codigo, descripcion in codigos_nuevos:
             flash(f"Se dio de alta el código nuevo {codigo} ({descripcion}) en la matriz de repuestos.", "info")
 
@@ -535,23 +536,6 @@ def _avisar_recepcion_a_raypac(envio, detalles, recibidos):
         send_mail("raypac@dml.local", f"Recepción remito {envio['numero_remito']} en DML", html_body)
     except Exception as e:
         print(f"Error enviando mail de recepción a Raypac: {e}")
-
-
-def _avisar_codigos_nuevos(envio, codigos_nuevos):
-    """Mail a los destinatarios de Admin → Notificaciones por cada código
-    que DML dio de alta en la matriz al recibir un envío (#57)."""
-    try:
-        items = "".join(f"<li><strong>{codigo}</strong> - {descripcion}</li>" for codigo, descripcion in codigos_nuevos)
-        html_body = f"""
-        <h3>Nuevos códigos de repuesto en la matriz</h3>
-        <p>Al recibir el remito <strong>{envio['numero_remito']}</strong> llegaron repuestos que
-        no estaban en la matriz y DML los dio de alta:</p>
-        <ul>{items}</ul>
-        """
-        for email in get_destinatarios_activos():
-            send_mail(email, f"Nuevo código de repuesto (remito {envio['numero_remito']})", html_body)
-    except Exception as e:
-        print(f"Error enviando aviso de códigos nuevos: {e}")
 
 
 @envios_bp.route("/<int:id>/edit", methods=["GET", "POST"])
