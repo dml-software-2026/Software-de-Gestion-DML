@@ -9,53 +9,75 @@
       <h2 class="mb-1"><i class="bi bi-truck"></i> Remito {{ envio.numero_remito }}</h2>
       <p class="text-muted mb-1">Fecha envío: {{ envio.fecha_envio }}</p>
       <p class="text-muted mb-0">Estado:
-        {% if envio.estado_envio == 'RECIBIDO' %}
+        {% if recibido %}
         <span class="badge bg-success">Recibido en DML</span>
+        {% elif en_preparacion %}
+        <span class="badge bg-info text-dark">En preparación en RAYPAC</span>
         {% else %}
         <span class="badge bg-warning text-dark">En tránsito</span>
         {% endif %}
       </p>
-      {% if envio.is_frozen %}
+      {% if envio.is_frozen and not recibido %}
       <p class="text-muted mb-0">
-        <i class="bi bi-lock-fill"></i> <strong>Congelado</strong>
-        {% if session.get('user_id') and session.get('role') in ['ADMIN', 'RAYPAC'] %}
-        - Se puede editar para correcciones
-        {% endif %}
+        <i class="bi bi-lock-fill"></i> <strong>Freezado</strong> - salió de RAYPAC. Para corregirlo, un ADMIN tiene que desfreezarlo.
       </p>
       {% endif %}
     </div>
     <div class="text-end">
       <a class="btn btn-outline-secondary" href="{{ url_for('envios.envios_list') }}">Volver al listado</a>
-      
-      {% if session.get('user_id') and session.get('role') in ['ADMIN', 'RAYPAC'] %}
-        {% if envio.is_frozen %}
-        <!-- Modo congelado: permitir editar para correcciones -->
-        <a href="{{ url_for('envios.envios_edit', id=envio.id) }}" class="btn btn-warning">
-          <i class="bi bi-pencil"></i> Editar (Corregir errores)
-        </a>
-        
-        {% if session.get('role') == 'ADMIN' %}
-        <!-- Solo ADMIN puede desfreezar definitivamente -->
-        <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#unfreezeModal">
-          <i class="bi bi-unlock"></i> Desfreezar Definitivamente
+
+      {# #57: mientras está en preparación RAYPAC lo edita libremente; al
+         salir de RAYPAC se freeza y recién ahí DML lo puede recibir. #}
+      {% if puede_editar %}
+      <a href="{{ url_for('envios.envios_edit', id=envio.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-pencil"></i> Editar
+      </a>
+      <form method="POST" action="{{ url_for('envios.envios_freeze', id=envio.id) }}" class="d-inline"
+            onsubmit="return confirmarAccion(event, '¿El envío ya salió de RAYPAC? Una vez freezado no se puede editar: si vuelve a RAYPAC antes de llegar a DML, un ADMIN tiene que desfreezarlo.');">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-lock"></i> Freezar y marcar como enviado
         </button>
-        {% endif %}
-        {% endif %}
+      </form>
       {% endif %}
-      
-      {# Botón de recepción: mostrar si NO ha sido recibido #}
-      {% if session.get('role') in ['ADMIN', 'DML_REPUESTOS', 'DML_ST'] %}
-        {% if (not envio.estado_envio or envio.estado_envio != 'RECIBIDO') and not envio.fecha_recepcion_dml %}
-      <form method="POST" action="{{ url_for('envios.envios_confirmar', id=envio.id) }}" class="d-inline"
-            onsubmit="return confirmarAccion(event, '¿Confirmar que todos los repuestos fueron recibidos correctamente según el remito?');">
+
+      {% if puede_desfreezar %}
+      <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#unfreezeModal">
+        <i class="bi bi-unlock"></i> Desfreezar
+      </button>
+      {% endif %}
+
+      {# Botón de recepción: mostrar si NO ha sido recibido. Los campos
+         "Recibido" de la tabla pertenecen a este form vía form="recepcion-form". #}
+      {% if puede_recibir %}
+      <form id="recepcion-form" method="POST" action="{{ url_for('envios.envios_confirmar', id=envio.id) }}" class="d-inline"
+            onsubmit="return confirmarRecepcion(event);">
         <button type="submit" class="btn btn-success">
           <i class="bi bi-check-circle"></i> Dar Ingreso en DML
         </button>
       </form>
-        {% endif %}
       {% endif %}
     </div>
   </div>
+
+  {% if puede_recibir %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Contá los repuestos recibidos y corregí la columna <strong>Recibido</strong>
+    si algo no coincide con el remito. El stock se carga con lo recibido.
+    {% if detalles | selectattr('item', 'none') | list %}
+    <br><i class="bi bi-plus-circle"></i> Los repuestos <strong>no listados</strong> se dan de alta en el stock con el código
+    y la descripción de la tabla: revisalos antes de confirmar. Si uno no llegó o no lo querés dar de alta, poné 0 en Recibido.
+    {% endif %}
+  </div>
+  {% elif en_preparacion %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Este envío todavía no salió de RAYPAC.
+    {% if puede_editar %}
+    Revisalo y, cuando salga, tocá <strong>Freezar y marcar como enviado</strong>.
+    {% else %}
+    DML le va a poder dar ingreso cuando RAYPAC lo marque como enviado.
+    {% endif %}
+  </div>
+  {% endif %}
 
   {% if envio.fecha_recepcion_dml %}
   <div class="alert alert-success">
@@ -76,15 +98,62 @@
             <tr>
               <th style="width: 20%">Código</th>
               <th>Descripción</th>
-              <th style="width: 15%" class="text-center">Cantidad</th>
+              <th style="width: 15%" class="text-center">{{ 'Remito' if (puede_recibir or recibido) else 'Cantidad' }}</th>
+              {% if puede_recibir or recibido %}
+              <th style="width: 15%" class="text-center">Recibido</th>
+              {% endif %}
             </tr>
           </thead>
           <tbody>
             {% for det in detalles %}
-            <tr>
+            {% set con_diferencia = recibido and det.cantidad_recibida is not none and det.cantidad_recibida != det.cantidad %}
+            <tr class="{{ 'table-warning' if con_diferencia else '' }}">
+              {% if puede_recibir and not det.item %}
+              {# No listado: DML revisa código y descripción antes de que se
+                 den de alta (los códigos nuevos los crea DML, no RAYPAC). #}
+              <td>
+                <input type="text" form="recepcion-form" class="form-control form-control-sm js-nuevo-codigo"
+                       style="min-width: 8rem"
+                       name="codigo_{{ det.id }}" value="{{ det.codigo_repuesto }}"
+                       data-recibido="recibido_{{ det.id }}" aria-label="Código del repuesto no listado">
+              </td>
+              <td>
+                <input type="text" form="recepcion-form" class="form-control form-control-sm js-nueva-descripcion"
+                       style="min-width: 10rem"
+                       name="descripcion_{{ det.id }}" value="{{ det.descripcion or '' }}"
+                       placeholder="Descripción" aria-label="Descripción del repuesto no listado">
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border mt-1">No listado · revisar antes de dar de alta</span>
+              </td>
+              {% else %}
               <td><strong>{{ det.codigo_repuesto }}</strong></td>
-              <td>{{ det.item or 'N/D' }}</td>
+              <td>
+                {{ det.item or det.descripcion or 'N/D' }}
+                {% if not det.item %}
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border">No listado</span>
+                {% endif %}
+              </td>
+              {% endif %}
               <td class="text-center">{{ det.cantidad }}</td>
+              {% if puede_recibir %}
+              <td class="text-center">
+                <input type="number" min="0" step="1" required form="recepcion-form"
+                       class="form-control form-control-sm text-center mx-auto js-recibido"
+                       style="max-width: 6rem"
+                       name="recibido_{{ det.id }}" value="{{ det.cantidad }}"
+                       data-remito="{{ det.cantidad }}" aria-label="Recibido de {{ det.codigo_repuesto }}">
+              </td>
+              {% elif recibido %}
+              <td class="text-center">
+                {% if det.cantidad_recibida is none %}
+                <span class="text-muted">—</span>
+                {% elif con_diferencia %}
+                <strong class="text-danger">{{ det.cantidad_recibida }}</strong>
+                <i class="bi bi-exclamation-triangle-fill text-danger" title="No coincide con el remito"></i>
+                {% else %}
+                {{ det.cantidad_recibida }}
+                {% endif %}
+              </td>
+              {% endif %}
             </tr>
             {% endfor %}
           </tbody>
@@ -93,6 +162,48 @@
     </div>
   </div>
 </div>
+
+{% if puede_recibir %}
+<script>
+// Marca en vivo los renglones que no coinciden con el remito (#57).
+document.querySelectorAll('.js-recibido').forEach(function (input) {
+  input.addEventListener('input', function () {
+    const distinto = input.value !== '' && Number(input.value) !== Number(input.dataset.remito);
+    input.closest('tr').classList.toggle('table-warning', distinto);
+  });
+});
+
+function confirmarRecepcion(event) {
+  const diferencias = Array.from(document.querySelectorAll('.js-recibido'))
+    .filter(function (i) { return Number(i.value) !== Number(i.dataset.remito); }).length;
+  let mensaje = diferencias === 0
+    ? '¿Confirmar que todos los repuestos fueron recibidos según el remito?'
+    : 'Hay ' + diferencias + ' renglón(es) que no coinciden con el remito. '
+      + 'El stock se va a cargar con las cantidades recibidas y RAYPAC recibirá el detalle. ¿Confirmar igual?';
+
+  // No listados que se van a dar de alta (los que tienen algo recibido).
+  const nuevos = [];
+  for (const input of document.querySelectorAll('.js-nuevo-codigo')) {
+    const recibido = document.querySelector('[name="' + input.dataset.recibido + '"]');
+    if (Number(recibido.value) === 0) continue;
+    const descripcion = input.closest('tr').querySelector('.js-nueva-descripcion');
+    const vacio = !input.value.trim() ? input : (!descripcion.value.trim() ? descripcion : null);
+    if (vacio) {
+      event.preventDefault();
+      vacio.setCustomValidity('Completalo para dar de alta el repuesto, o poné 0 en Recibido.');
+      vacio.reportValidity();
+      vacio.addEventListener('input', function () { vacio.setCustomValidity(''); }, { once: true });
+      return false;
+    }
+    nuevos.push(input.value.trim() + ' (' + descripcion.value.trim() + ')');
+  }
+  if (nuevos.length) {
+    mensaje += ' Se van a dar de alta en el stock: ' + nuevos.join(', ') + '.';
+  }
+  return confirmarAccion(event, mensaje);
+}
+</script>
+{% endif %}
 
 <!-- Modal de desfreeze (solo ADMIN) -->
 <div class="modal fade" id="unfreezeModal" tabindex="-1" aria-labelledby="unfreezeModalLabel" aria-hidden="true">
@@ -107,8 +218,9 @@
       <form method="POST" action="{{ url_for('envios.envios_unfreeze', id=envio.id) }}">
         <div class="modal-body">
           <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle"></i> <strong>Acción sensible:</strong> 
-            Desfreezar permitirá modificaciones completas al envío.
+            <i class="bi bi-exclamation-triangle"></i> <strong>Acción sensible:</strong>
+            usalo solo si el envío volvió a RAYPAC antes de llegar a DML. Vuelve a "En preparación"
+            y RAYPAC lo puede corregir; después hay que volver a freezarlo.
           </div>
           <div class="mb-3">
             <label for="unfreeze_code" class="form-label">Código de verificación</label>

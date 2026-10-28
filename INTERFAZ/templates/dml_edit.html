@@ -104,11 +104,13 @@
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Estado de la Reparación:</label>
                         <select name="estado_reparacion" class="js-select-enhance" required>
-                            <option value="A LA ESPERA DE REVISIÓN" {% if ficha.estado_reparacion == 'A LA ESPERA DE REVISIÓN' %}selected{% endif %}>A LA ESPERA DE REVISIÓN</option>
-                            <option value="A LA ESPERA DE REPUESTOS" {% if ficha.estado_reparacion == 'A LA ESPERA DE REPUESTOS' %}selected{% endif %}>A LA ESPERA DE REPUESTOS</option>
-                            <option value="EN REPARACIÓN" {% if ficha.estado_reparacion in ('EN REPARACIÓN', 'EN REPARACION') %}selected{% endif %}>EN REPARACIÓN</option>
-                            <option value="REPARACIÓN COMPLETADA" {% if ficha.estado_reparacion == 'REPARACIÓN COMPLETADA' %}selected{% endif %}>REPARACIÓN COMPLETADA</option>
-                            <option value="MÁQUINA LISTA PARA RETIRAR" {% if ficha.estado_reparacion == 'MÁQUINA LISTA PARA RETIRAR' %}selected{% endif %}>MÁQUINA LISTA PARA RETIRAR</option>
+                            {# #274: la lista sale de ESTADOS_EDITABLES (dml.py), la misma que valida el
+                               backend al guardar. #260 (presupuesto) tiene el mismo nivel que EN REPARACIÓN/
+                               A LA ESPERA DE REPUESTOS en estados_orden - puede ir y volver entre esos tres.
+                               'EN REPARACION' sin tilde es un alias legado (#44). #}
+                            {% for e in estados_editables %}
+                            <option value="{{ e }}" {% if ficha.estado_reparacion == e or (e == 'EN REPARACIÓN' and ficha.estado_reparacion == 'EN REPARACION') %}selected{% endif %}>{{ e }}</option>
+                            {% endfor %}
                             {# #157: "MÁQUINA ENTREGADA" sacada del desplegable a proposito - el unico
                                camino a ese estado tiene que ser el boton "Cerrar Ficha" (dml_view.html),
                                que corre el checklist completo (repuestos/partes, cierre de ticket, mail)
@@ -150,7 +152,7 @@
         </div>
         <div class="card-body">
             {% if repuestos %}
-            <h6 class="mb-3">Repuestos Registrados ({{ repuestos|length }}/15):</h6>
+            <h6 class="mb-3">Repuestos Registrados ({{ repuestos|length }}):</h6>
             <div class="d-flex flex-column gap-2 mb-3">
                 {% for repuesto in repuestos %}
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 rounded-3 border-start border-4

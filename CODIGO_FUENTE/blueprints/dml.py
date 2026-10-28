@@ -4,7 +4,6 @@ from io import BytesIO
 from flask import (
     Blueprint,
     flash,
-    jsonify,
     redirect,
     render_template,
     request,
@@ -32,6 +31,31 @@ from CODIGO_FUENTE.services.stock import (
 )
 
 dml_bp = Blueprint("dml", __name__, url_prefix="/dml")
+
+# #274: estados que se pueden elegir desde el formulario de edición. Es la
+# única fuente de la lista: dml_edit.html arma el <select> a partir de esta
+# constante y dml_edit() rechaza cualquier valor que no esté acá (antes
+# guardaba cualquier texto, ej. "A LA ESPERA DE REVISI%D3N" de un POST
+# armado a mano). "MÁQUINA ENTREGADA" queda afuera a propósito (#157), el
+# único camino a ese estado es "Cerrar Ficha".
+ESTADOS_EDITABLES = [
+    'A LA ESPERA DE REVISIÓN',
+    'A LA ESPERA DE REPUESTOS',
+    'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO',  # #260
+    'EN REPARACIÓN',
+    'REPARACIÓN COMPLETADA',
+    'MÁQUINA LISTA PARA RETIRAR',
+]
+
+
+def registrar_estado(db, ficha_id, estado, usuario_id):
+    """#171: deja asentado un cambio de estado_reparacion en el historial
+    de la ficha. No hace commit - va en la misma transacción que el UPDATE
+    del estado, así nunca queda uno sin el otro."""
+    db.execute(
+        "INSERT INTO dml_fichas_historial (ficha_id, estado, usuario_id) VALUES (%s, %s, %s)",
+        (ficha_id, estado, usuario_id),
+    )
 
 
 @dml_bp.route("")
@@ -153,6 +177,8 @@ def dml_new(raypac_id):
 
             ficha_id = row['id']
 
+            registrar_estado(db, ficha_id, 'A LA ESPERA DE REVISIÓN', user['id'])
+
             # Actualizar ticket con el ficha_id
             db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
 
@@ -252,11 +278,24 @@ def dml_view(id, readonly=False):
     else:
         current_step = 2
     flow_steps = build_flow_steps(
-        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+        ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
+    # #171: historial de estados, del más reciente al más viejo.
+    historial = db.execute("""
+        -- La base (Supabase) guarda en UTC: se pasa a hora argentina acá
+        -- para que la hora que ve RAYPAC sea la real.
+        SELECT h.estado, h.fecha AT TIME ZONE 'America/Argentina/Buenos_Aires' AS fecha,
+               u.nombre AS usuario
+        FROM dml_fichas_historial h
+        LEFT JOIN users u ON u.id = h.usuario_id
+        WHERE h.ficha_id = %s
+        ORDER BY h.fecha DESC, h.id DESC
+    """, (id,)).fetchall()
+
     return render_template("dml_view.html", ficha=ficha, raypac=raypac, partes=partes, repuestos=repuestos,
-                           user_role=user['role'], readonly=readonly, flow_steps=flow_steps)
+                           user_role=user['role'], user_email=user['email'], readonly=readonly,
+                           flow_steps=flow_steps, historial=historial)
 
 
 @dml_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -318,6 +357,10 @@ def dml_edit(id):
                 flash("Para marcar la ficha como entregada, usá el botón 'Cerrar Ficha'.", "error")
                 return redirect(url_for("dml.dml_edit", id=id))
 
+            if estado not in ESTADOS_EDITABLES:
+                flash("Estado de reparación inválido. Elegí uno de la lista.", "error")
+                return redirect(url_for("dml.dml_edit", id=id))
+
             # Validación de flujo lógico de estados según documento David
             # Orden lógico: A LA ESPERA DE REVISIÓN → EN REPARACIÓN → [A LA ESPERA DE REPUESTOS] → MÁQUINA LISTA PARA RETIRAR → MÁQUINA ENTREGADA
             estados_orden = {
@@ -326,6 +369,7 @@ def dml_edit(id):
                 'EN REPARACIÓN': 1,
                 'EN REPARACION': 1,  # alias sin tilde, ver #44 - encoding legado en datos viejos
                 'A LA ESPERA DE REPUESTOS': 1,  # Mismo nivel que EN REPARACIÓN (puede ir y volver)
+                'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO': 1,  # #260 - idem, espera externa sin que DML pueda avanzar
                 'REPARACIÓN COMPLETADA': 2,
                 'MÁQUINA LISTA PARA RETIRAR': 3,
                 'MÁQUINA ENTREGADA': 4,
@@ -353,6 +397,10 @@ def dml_edit(id):
                   estado, diagnostico_rep, observaciones,
                   n_ciclos, mecanizado, horas, numero_remito,
                   tecnico_resp, id))
+            # #171: solo si el estado cambió - guardar la ficha sin tocar el
+            # estado (ej. solo observaciones) no es un paso nuevo del historial.
+            if estado != ficha['estado_reparacion']:
+                registrar_estado(db, id, estado, user['id'])
             db.commit()
 
             # Actualizar partes
@@ -391,10 +439,11 @@ def dml_edit(id):
     else:
         current_step = 2
     flow_steps = build_flow_steps(
-        ["Ticket creado", "Ficha en reparación", "Entregada", "Acuse registrado"], current_step
+        ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
 
-    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps)
+    return render_template("dml_edit.html", ficha=ficha, partes=partes, repuestos=repuestos, flow_steps=flow_steps,
+                           estados_editables=ESTADOS_EDITABLES)
 
 
 # ======================== REPUESTOS ========================
@@ -409,12 +458,6 @@ def agregar_repuesto(id):
     ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
-        return redirect(url_for("dml.dml_edit", id=id))
-
-    # Validar cantidad máxima (15 repuestos)
-    count = db.execute("SELECT COUNT(*) as cnt FROM dml_repuestos WHERE ficha_id = %s", (id,)).fetchone()
-    if count['cnt'] >= 15:
-        flash("Máximo 15 repuestos por ficha.", "error")
         return redirect(url_for("dml.dml_edit", id=id))
 
     codigo = request.form.get("codigo_repuesto", "").strip().upper()
@@ -467,7 +510,7 @@ def agregar_repuesto(id):
 
     # Verificar alerta de stock después de descontar
     if en_stock:
-        verificar_alerta_stock(codigo)
+        verificar_alerta_stock(codigo, cantidad_anterior=stock['cantidad'])
 
     log_action(user['id'], "ADD_PART", "dml_repuestos", id, None,
               f"{codigo} x{cantidad_utilizada} ({estado_repuesto})")
@@ -478,67 +521,6 @@ def agregar_repuesto(id):
         flash(f"Repuesto '{codigo}' agregado (⚠️ NO hay stock disponible - marcado EN FALTA).", "warning")
 
     return redirect(url_for("dml.dml_edit", id=id))
-
-
-@dml_bp.route("/<int:id>/marcar-falta/<int:repuesto_id>", methods=["POST"])
-@login_required
-@role_required("ADMIN", "DML_REPUESTOS")
-def marcar_repuesto_falta(id, repuesto_id):
-    db = get_db()
-
-    repuesto = db.execute(
-        "SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s",
-        (repuesto_id, id)
-    ).fetchone()
-
-    if not repuesto:
-        return jsonify({"error": "Repuesto no encontrado"}), 404
-
-    db.execute(
-        "UPDATE dml_repuestos SET en_falta = 1, en_stock = 0 WHERE id = %s",
-        (repuesto_id,)
-    )
-    db.commit()
-
-    return jsonify({"success": True}), 200
-
-
-@dml_bp.route("/<int:id>/marcar-llegada/<int:repuesto_id>", methods=["POST"])
-@login_required
-@role_required("ADMIN", "DML_REPUESTOS")
-def marcar_repuesto_llegada(id, repuesto_id):
-    db = get_db()
-    user = get_current_user()
-
-    repuesto = db.execute(
-        "SELECT * FROM dml_repuestos WHERE id = %s AND ficha_id = %s",
-        (repuesto_id, id)
-    ).fetchone()
-
-    if not repuesto:
-        return jsonify({"error": "Repuesto no encontrado"}), 404
-
-    # Cambiar estado
-    db.execute(
-        "UPDATE dml_repuestos SET en_falta = 0, en_stock = 1, estado_repuesto = 'EN STOCK' WHERE id = %s",
-        (repuesto_id,)
-    )
-
-    # Descontar del stock en ubicación DML
-    ajustar_stock_ubicacion(repuesto['codigo_repuesto'], "DML", -repuesto['cantidad_utilizada'])
-
-    # Actualizar estadísticas
-    actualizar_estadistica_repuesto(repuesto['codigo_repuesto'], repuesto['cantidad_utilizada'])
-
-    db.commit()
-
-    # Verificar alerta de stock después de descontar
-    verificar_alerta_stock(repuesto['codigo_repuesto'])
-
-    log_action(user['id'], "PART_ARRIVED", "dml_repuestos", repuesto_id, None,
-              f"{repuesto['codigo_repuesto']}")
-
-    return jsonify({"success": True}), 200
 
 
 @dml_bp.route("/<int:ficha_id>/repuestos/mover-a-stock/<int:repuesto_id>", methods=["POST"])
@@ -577,7 +559,7 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     # Actualizar estado a EN STOCK
     db.execute("""
         UPDATE dml_repuestos
-        SET en_stock = 1, en_falta = 0, estado_repuesto = 'COLOCADO'
+        SET en_stock = 1, en_falta = 0, estado_repuesto = 'EN STOCK'
         WHERE id = %s
     """, (repuesto_id,))
 
@@ -599,6 +581,8 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
     actualizar_estadistica_repuesto(repuesto['codigo_repuesto'], repuesto['cantidad_utilizada'])
 
     db.commit()
+
+    verificar_alerta_stock(repuesto['codigo_repuesto'], cantidad_anterior=stock['cantidad'])
 
     log_action(user['id'], "MOVER_REPUESTO_A_STOCK", "dml_repuestos", repuesto_id,
               "EN FALTA", f"EN STOCK - {repuesto['codigo_repuesto']}")
@@ -787,6 +771,7 @@ def dml_close(id):
             SET is_closed = TRUE, fecha_egreso = %s, estado_reparacion = 'MÁQUINA ENTREGADA'
             WHERE id = %s
         """, (fecha_egreso, id))
+        registrar_estado(db, id, 'MÁQUINA ENTREGADA', user['id'])
 
         # Cerrar el ticket asociado (ya cumplió su función de seguimiento)
         if ficha['numero_ticket']:
@@ -864,7 +849,7 @@ def dml_close(id):
 
 @dml_bp.route("/<int:id>/acuse", methods=["POST"])
 @login_required
-@role_required("ADMIN", "DML_ST", "RAYPAC")
+@role_required("ADMIN", "RAYPAC")
 def dml_registrar_acuse(id):
     """Registra el acuse de recibo de una máquina entregada."""
     user = get_current_user()
@@ -933,7 +918,7 @@ def dml_registrar_acuse(id):
 
 @dml_bp.route("/<int:id>/pdf", methods=["GET"])
 @login_required
-@role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS", "RAYPAC")
 def descargar_ficha_pdf(id):
     """Genera y descarga el PDF de una ficha de reparación."""
     user = get_current_user()
@@ -955,3 +940,42 @@ def descargar_ficha_pdf(id):
     return send_file(BytesIO(pdf_bytes), mimetype='application/pdf',
                     as_attachment=True,
                     download_name=f"ficha_{ficha['numero_ficha']:07d}.pdf")
+
+
+@dml_bp.route("/<int:id>/enviar-pdf", methods=["POST"])
+@login_required
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS", "RAYPAC")
+def enviar_ficha_pdf(id):
+    """#171: manda el PDF de la ficha al mail del usuario logueado - mismos
+    roles que descargar_ficha_pdf(), para que RAYPAC lo reciba sin depender
+    de que alguien de DML se lo pase."""
+    user = get_current_user()
+    db = get_db()
+
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
+    if not ficha:
+        flash("Ficha no encontrada.", "error")
+        return redirect(url_for("dml.dml_list"))
+
+    pdf_bytes = generar_pdf_ficha(id)
+    if not pdf_bytes:
+        flash("No se pudo generar el PDF.", "error")
+        return redirect(url_for("dml.dml_view", id=id))
+
+    numero = f"{ficha['numero_ficha']:07d}"
+    html_body = f"""
+    <p>Hola{(' ' + user['nombre']) if user['nombre'] else ''},</p>
+    <p>Te adjuntamos la ficha de servicio técnico <strong>#{numero}</strong>
+    (estado actual: <strong>{ficha['estado_reparacion']}</strong>).</p>
+    <p>Sistema de Gestión DML</p>
+    """
+    enviado = send_mail(user['email'], f"Ficha DML #{numero}", html_body,
+                        attachments=[(f"ficha_{numero}.pdf", pdf_bytes)])
+
+    if enviado:
+        log_action(user['id'], "SEND_FICHA_PDF", "dml_fichas", id, None,
+                   f"Ficha #{ficha['numero_ficha']} a {user['email']}")
+        flash(f"Te enviamos el PDF de la ficha a {user['email']}.", "success")
+    else:
+        flash("No se pudo enviar el mail. Probá de nuevo más tarde o descargá el PDF.", "error")
+    return redirect(url_for("dml.dml_view", id=id))

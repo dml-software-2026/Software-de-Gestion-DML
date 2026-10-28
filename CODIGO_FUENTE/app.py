@@ -20,7 +20,7 @@ from CODIGO_FUENTE.blueprints.stock import stock_bp
 from CODIGO_FUENTE.blueprints.tickets import tickets_bp
 from CODIGO_FUENTE.config import BASE_DIR, Config
 from CODIGO_FUENTE.decorators import get_current_user_jinja
-from CODIGO_FUENTE.extensions import close_db, init_db, migrate_db
+from CODIGO_FUENTE.extensions import close_db, get_db, init_db, preparar_base
 from CODIGO_FUENTE.services.stock import get_alert_badge
 
 # Nivel configurable por entorno: en Render se puede setear LOG_LEVEL=DEBUG
@@ -62,25 +62,27 @@ app.register_blueprint(estadisticas_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(notificaciones_bp)
 
+
+@app.route("/health")
+def health():
+    try:
+        get_db().execute("SELECT 1").fetchone()
+        return {"status": "ok"}, 200
+    except Exception:
+        logger.exception("Health check falló")
+        return {"status": "error"}, 500
+
 @app.before_request
 def apply_migrations():
     """Aplica migraciones de BD al iniciar la app."""
     if not hasattr(app, '_migrations_applied'):
+        # #244: antes acá se decidía entre init_db() y migrate_db() según si
+        # existía el archivo dml.db (resto de la era SQLite: en Render nunca
+        # existe, así que corría la inicialización completa en cada arranque)
+        # y después se volvía a correr el seed. Ahora preparar_base() hace
+        # migraciones + seed una sola vez, y solo si cambió su código.
         try:
-            # Si la BD no existe, crearla (init_db incluye seed automático)
-            db_path = app.config["DATABASE"]
-            if not os.path.exists(db_path):
-                logger.info("Base de datos no encontrada. Inicializando...")
-                init_db()
-            else:
-                # Si existe, aplicar migraciones
-                migrate_db()
-
-            # Verificar/crear usuarios siempre, exista o no la base
-            from CODIGO_FUENTE.extensions import get_db
-            from CODIGO_FUENTE.services.seed import load_seed_data
-            load_seed_data(get_db())
-
+            preparar_base()
         except Exception:
             logger.exception("Error en migraciones")
         app._migrations_applied = True
@@ -89,14 +91,7 @@ def apply_migrations():
 if __name__ == "__main__":
     # Inicializar BD si no existe
     with app.app_context():
-        db_path = app.config["DATABASE"]
-        if not os.path.exists(db_path):
-            logger.info("Creando base de datos...")
-            init_db()
-            logger.info("Base de datos creada exitosamente")
-        else:
-            # Aplicar migraciones a BD existente
-            migrate_db()
+        preparar_base()
 
     if len(sys.argv) > 1 and sys.argv[1] == "init-db":
         with app.app_context():

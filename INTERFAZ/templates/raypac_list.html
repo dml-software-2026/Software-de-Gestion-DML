@@ -148,6 +148,13 @@
                     {% endif %}
                     <td>
                         <a href="{{ url_for('raypac.raypac_view', id=entry.id) }}" class="btn btn-sm btn-info">Ver</a>
+                        {# #265: RAYPAC no ve la columna "Ficha ST", así que no
+                           tenía cómo llegar a la ficha desde su listado. #}
+                        {% if user_role == 'RAYPAC' and entry.ficha_id %}
+                        <a href="{{ url_for('dml.dml_view', id=entry.ficha_id) }}" class="btn btn-sm btn-outline-info text-nowrap">
+                            <i class="bi bi-file-earmark-text"></i> Ficha #{{ '%07d' % entry.numero_ficha }}
+                        </a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

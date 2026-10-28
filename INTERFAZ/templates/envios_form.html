@@ -2,10 +2,16 @@
 
 {% block content %}
 <div class="container mt-4">
+  {# Mismo form para alta y edición (#57): envio = None en el alta. #}
+  {% if envio %}
+  <h2 class="mb-3">Editar envío - Remito {{ envio.numero_remito }}</h2>
+  <p class="text-muted">El envío sigue en preparación: podés cambiar el remito y los repuestos hasta marcarlo como enviado.</p>
+  {% else %}
   <h2 class="mb-3">Nuevo envío</h2>
   <p class="text-muted">Selecciona las cantidades a despachar desde RAYPAC hacia DML.</p>
+  {% endif %}
 
-  <form method="POST">
+  <form method="POST" id="envio-form">
     <!-- Tipo de Entrega -->
     <div class="card mb-4" style="border-left: 4px solid #17a2b8;">
       <div class="card-body">
@@ -32,6 +38,7 @@
           <div class="col-md-6">
             <label for="numero_remito" class="form-label fw-bold">Remito RAYPAC <span class="text-danger">*</span></label>
             <input type="text" class="form-control form-control-lg" id="numero_remito" name="numero_remito" 
+                   value="{{ valores.numero_remito }}"
                    placeholder="Ej: 4222 (últimos 4 dígitos) o 00001-04222 (completo)" required>
             <small class="text-muted">
               Puedes ingresar solo los últimos 4 dígitos y el sistema auto-completará el formato.
@@ -62,7 +69,8 @@
           <td>{{ row.item }}</td>
           <td>
             <input type="number" min="0" step="1"
-                   class="form-control" name="qty_{{ row.codigo_repuesto }}" placeholder="0">
+                   class="form-control" name="qty_{{ row.codigo_repuesto }}" placeholder="0"
+                   value="{{ valores.cantidades.get(row.codigo_repuesto, '') }}">
           </td>
         </tr>
         {% endfor %}
@@ -74,25 +82,37 @@
       </tbody>
     </table>
 
+    {# Los códigos nuevos los da de alta solo DML (pedido de David): RAYPAC
+       manda únicamente repuestos de la lista. #}
+    {% if get_current_user().role == 'RAYPAC' %}
+    <div class="alert alert-info mb-4">
+      <i class="bi bi-info-circle"></i> ¿El repuesto no está en la lista? Pedile a DML que lo dé de alta en su stock
+      y después cargalo en este envío.
+    </div>
+    {% else %}
     <!-- Agregar repuestos no listados -->
     <div class="card mb-4 border-success">
       <div class="card-header bg-success text-white">
         <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Agregar Repuesto No Listado</h5>
       </div>
       <div class="card-body">
-        <p class="text-muted">Si el repuesto no está en la lista superior, puedes agregarlo manualmente:</p>
+        <p class="text-muted">Si el repuesto no está en la lista superior, puedes agregarlo manualmente.
+          DML revisa el código y la descripción al recibir el envío y lo da de alta en su stock.</p>
+        {% set adicionales = valores.adicionales or [('', '', '')] %}
         <div id="repuestos-adicionales">
+          {% for codigo, descripcion, cantidad in adicionales %}
           <div class="row mb-2 repuesto-adicional">
             <div class="col-md-5">
-              <input type="text" class="form-control" name="codigo_adicional_1" placeholder="Código del repuesto">
+              <input type="text" class="form-control" name="codigo_adicional_{{ loop.index }}" placeholder="Código del repuesto" value="{{ codigo }}">
             </div>
             <div class="col-md-5">
-              <input type="text" class="form-control" name="descripcion_adicional_1" placeholder="Descripción (opcional)">
+              <input type="text" class="form-control" name="descripcion_adicional_{{ loop.index }}" placeholder="Descripción (opcional)" value="{{ descripcion }}">
             </div>
             <div class="col-md-2">
-              <input type="number" min="1" step="1" class="form-control" name="cantidad_adicional_1" placeholder="Cant.">
+              <input type="number" min="1" step="1" class="form-control" name="cantidad_adicional_{{ loop.index }}" placeholder="Cant." value="{{ cantidad }}">
             </div>
           </div>
+          {% endfor %}
         </div>
         <button type="button" class="btn btn-sm btn-outline-success" onclick="agregarFilaRepuesto()">
           <i class="bi bi-plus"></i> Agregar otro
@@ -101,7 +121,7 @@
     </div>
 
     <script>
-    let contadorRepuestos = 1;
+    let contadorRepuestos = {{ adicionales|length }};
     function agregarFilaRepuesto() {
       contadorRepuestos++;
       const container = document.getElementById('repuestos-adicionales');
@@ -120,11 +140,86 @@
       `;
       container.appendChild(newRow);
     }
+
+    // #285: un código "no listado" que ya está en la lista, o repetido entre
+    // los no listados, partiría el mismo repuesto en varios renglones del
+    // envío. Se avisa al salir del campo y se bloquea el envío del form
+    // (el backend repite el control en _leer_form_envio).
+    const codigosLista = new Set({{ stock | map(attribute='codigo_repuesto') | list | tojson }});
+
+    function camposCodigoAdicional() {
+      return Array.from(document.querySelectorAll('#repuestos-adicionales input[name^="codigo_adicional_"]'));
+    }
+
+    function errorCodigoAdicional(input) {
+      const codigo = input.value.trim().toUpperCase();
+      if (!codigo) return null;
+      if (codigosLista.has(codigo)) {
+        return 'El código ' + codigo + ' ya existe en la lista de repuestos. Cargá la cantidad en su renglón de la tabla de arriba.';
+      }
+      // Solo contra los anteriores: el primero que aparece queda como válido
+      const campos = camposCodigoAdicional();
+      const repetido = campos.slice(0, campos.indexOf(input)).some(function (otro) {
+        return otro.value.trim().toUpperCase() === codigo;
+      });
+      if (repetido) {
+        return 'El código ' + codigo + ' ya está cargado como repuesto no listado. Cargalo una sola vez con la cantidad total.';
+      }
+      return null;
+    }
+
+    function avisarCodigo(input, mensaje) {
+      document.getElementById('codigoExistenteBody').textContent = mensaje;
+      const modalEl = document.getElementById('codigoExistenteModal');
+      modalEl.addEventListener('hidden.bs.modal', function () { input.focus(); }, { once: true });
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    document.getElementById('repuestos-adicionales').addEventListener('change', function (e) {
+      const input = e.target;
+      if (!input.name || !input.name.startsWith('codigo_adicional_')) return;
+      const error = errorCodigoAdicional(input);
+      input.classList.toggle('is-invalid', !!error);
+      if (error) avisarCodigo(input, error);
+    });
+
+    document.getElementById('envio-form').addEventListener('submit', function (e) {
+      for (const input of camposCodigoAdicional()) {
+        const error = errorCodigoAdicional(input);
+        input.classList.toggle('is-invalid', !!error);
+        if (error) {
+          e.preventDefault();
+          avisarCodigo(input, error);
+          return;
+        }
+      }
+    });
     </script>
 
+    <div class="modal fade" id="codigoExistenteModal" tabindex="-1" aria-labelledby="codigoExistenteLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="codigoExistenteLabel"><i class="bi bi-exclamation-triangle-fill text-warning"></i> Código ya cargado</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body" id="codigoExistenteBody"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendido</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="d-flex justify-content-between align-items-center">
+      {% if envio %}
+      <a class="btn btn-outline-secondary" href="{{ url_for('envios.envios_view', id=envio.id) }}"><i class="bi bi-arrow-left"></i> Cancelar</a>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Guardar cambios</button>
+      {% else %}
       <a class="btn btn-outline-secondary" href="{{ url_for('envios.envios_list') }}">Volver</a>
-      <button type="submit" class="btn btn-primary"><i class="bi bi-truck"></i> Generar envío</button>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Guardar envío</button>
+      {% endif %}
     </div>
   </form>
 </div>

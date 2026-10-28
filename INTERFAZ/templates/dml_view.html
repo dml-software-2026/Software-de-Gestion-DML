@@ -26,6 +26,7 @@
                     'EN REPARACIÓN': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                     'EN REPARACION': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                     'A LA ESPERA DE REPUESTOS': {'bg': '#fd7e14', 'border': '#fd7e14', 'text': '#000000'},
+                    'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO': {'bg': '#fd7e14', 'border': '#fd7e14', 'text': '#000000'},
                     'REPARACIÓN COMPLETADA': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                     'MÁQUINA LISTA PARA RETIRAR': {'bg': '#ffc107', 'border': '#ffc107', 'text': '#000000'},
                     'MÁQUINA ENTREGADA': {'bg': '#28a745', 'border': '#28a745', 'text': '#ffffff'}
@@ -89,6 +90,30 @@
                     {% endif %}
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- HISTORIAL DE ESTADOS (#171): por qué estados pasó la máquina, del
+         más reciente al más viejo. Mismos colores que el badge de arriba. -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="bi bi-list-check"></i> Historial de Estados</h5>
+        </div>
+        <div class="card-body">
+            {% if historial %}
+            <ul class="list-group list-group-flush">
+                {% for h in historial %}
+                {% set h_style = estado_color.get(h.estado, {'bg': '#6c757d', 'border': '#6c757d', 'text': '#ffffff'}) %}
+                <li class="list-group-item d-flex flex-wrap align-items-center gap-2 px-0">
+                    <span class="text-muted text-nowrap"><i class="bi bi-calendar-event"></i> {{ h.fecha.strftime('%d/%m/%Y %H:%M') }}</span>
+                    <span class="badge text-wrap text-start" style="background-color: {{ h_style.bg }}; border: 1px solid {{ h_style.border }}; color: {{ h_style.text }};">{{ h.estado }}</span>
+                    {% if h.usuario %}<small class="text-muted">por {{ h.usuario }}</small>{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted fst-italic mb-0">Esta ficha no tiene cambios de estado registrados (el historial se guarda a partir de esta versión del sistema).</p>
+            {% endif %}
         </div>
     </div>
 
@@ -235,6 +260,14 @@
             <a href="{{ url_for('dml.descargar_ficha_pdf', id=ficha.id) }}" class="btn btn-outline-secondary" target="_blank">
                 <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
             </a>
+
+            {# #171: el mismo PDF, por mail al usuario logueado #}
+            <form method="POST" action="{{ url_for('dml.enviar_ficha_pdf', id=ficha.id) }}" class="m-0"
+                  onsubmit="return confirmarAccion(event, 'Se va a enviar el PDF de esta ficha a {{ user_email }}. ¿Continuar?');">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-envelope"></i> Recibir PDF por mail
+                </button>
+            </form>
         </div>
     </div>
 
@@ -253,11 +286,16 @@
                 <i class="bi bi-lock-fill"></i> Cerrar Ficha <i class="bi bi-arrow-right"></i>
             </button>
         </form>
-        {% elif ficha.is_closed and not ficha.recibido_por and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'RAYPAC'] %}
+        {% elif ficha.is_closed and not ficha.recibido_por and get_current_user()['role'] in ['ADMIN', 'RAYPAC'] %}
         {# al cerrar la ficha, los botones de acción de arriba desaparecen
            (is_closed) y no quedaba ningún acceso al siguiente paso del flujo
            real ("Registrar Acuse" en /dml/entregadas) - había que saber que
-           esa pantalla existe. open_acuse abre directo el modal ahí. #}
+           esa pantalla existe. open_acuse abre directo el modal ahí.
+           #264: el acuse lo registra RAYPAC (quien recibe la máquina de
+           vuelta), no DML - mismo criterio que dml_entregadas.html, que ya
+           restringía el botón real del modal a ['ADMIN', 'RAYPAC']. DML_ST
+           se saca de la lista para no mostrar un acceso a un paso que no
+           puede completar. #}
         <a href="{{ url_for('dml.dml_entregadas', open_acuse=ficha.id) }}" class="btn btn-success">
             <i class="bi bi-clipboard-check"></i> Registrar Acuse <i class="bi bi-arrow-right"></i>
         </a>

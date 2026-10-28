@@ -1,8 +1,12 @@
+import hashlib
+import os
 import sys
+import threading
+import time
 
 import psycopg2
 from flask import current_app, g
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import RealDictCursor, execute_values
 
 
 class PgConnection:
@@ -21,10 +25,22 @@ class PgConnection:
 
     def __init__(self, conn):
         self._conn = conn
+        self._usada = False
 
     def execute(self, query, params=None):
-        cur = self._conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(query, params)
+        try:
+            cur = self._conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(query, params)
+        except (psycopg2.OperationalError, psycopg2.InterfaceError):
+            # #244: la conexión viene reusada del pool y pudo haberse cortado
+            # mientras estaba guardada. Si es la primera consulta del request
+            # no se hizo nada todavía, así que es seguro abrir otra y repetir.
+            if self._usada or not self._conn.closed:
+                raise
+            self._conn = _conectar()
+            cur = self._conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(query, params)
+        self._usada = True
         return cur
 
     def executescript(self, script):
@@ -51,17 +67,90 @@ class PgConnection:
         return getattr(self._conn, name)
 
 
+# #244: pool de conexiones. Antes se abría una conexión nueva a la base en
+# cada request y se cerraba al terminar - con Render en Oregon y Supabase en
+# São Paulo, abrir una conexión (TCP + cifrado + login a Postgres) tarda más
+# de 1 s. Ahora, al terminar el request, la conexión se guarda y el próximo
+# la reusa.
+#
+# Pool propio en vez de psycopg2.pool: el de psycopg2 solo guarda tantas
+# conexiones como su mínimo (y las abre todas de entrada), y si se llena
+# tira error en vez de abrir una más.
+_libres = []  # [(conexión, momento en que se devolvió)]
+_libres_lock = threading.Lock()
+_MAX_LIBRES = 5
+# Una conexión que estuvo guardada más que esto se prueba con un SELECT 1
+# antes de usarla: Supabase o la red pueden haberla cortado mientras tanto.
+_PING_SI_QUIETA_SEG = 60
+
+
+def _conectar():
+    return psycopg2.connect(
+        current_app.config["DATABASE_URL"],
+        # Avisos del sistema operativo para detectar conexiones muertas en
+        # vez de quedarse esperando.
+        keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3,
+    )
+
+
+def _conexion_sana(conn, devuelta):
+    if conn.closed:
+        return False
+    if time.monotonic() - devuelta < _PING_SI_QUIETA_SEG:
+        return True
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        conn.rollback()
+        return True
+    except psycopg2.Error:
+        return False
+
+
+def _tomar_conexion():
+    while True:
+        with _libres_lock:
+            if not _libres:
+                break
+            conn, devuelta = _libres.pop()
+        if _conexion_sana(conn, devuelta):
+            return conn
+        try:
+            conn.close()
+        except psycopg2.Error:
+            pass
+    return _conectar()
+
+
+def _devolver_conexion(conn):
+    try:
+        if not conn.closed:
+            # Igual que antes al cerrar la conexión: lo que no se commiteó se
+            # descarta, y no queda una transacción abierta para el próximo.
+            conn.rollback()
+    except psycopg2.Error:
+        pass
+    if not conn.closed:
+        with _libres_lock:
+            if len(_libres) < _MAX_LIBRES:
+                _libres.append((conn, time.monotonic()))
+                return
+    try:
+        conn.close()
+    except psycopg2.Error:
+        pass
+
+
 def get_db():
     if "db" not in g:
-        raw_conn = psycopg2.connect(current_app.config["DATABASE_URL"])
-        g.db = PgConnection(raw_conn)
+        g.db = PgConnection(_tomar_conexion())
     return g.db
 
 
 def close_db(exception=None):
     db = g.pop("db", None)
     if db is not None:
-        db.close()
+        _devolver_conexion(db._conn)
 
 
 def _columnas_de(db, tabla):
@@ -177,8 +266,12 @@ def migrate_db():
             "SADEPAN", "SEDAPIC", "SOTIC", "STEL S.A.", "TIGRE ARG.",
             "TIGRE ARGENTINA", "VIDRIERIA ARG.", "VITOPEL",
         ]
-        for nombre in clientes_iniciales:
-            db.execute("INSERT INTO clientes (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING", (nombre,))
+        # Una sola consulta para los 39 (antes era un INSERT por cliente).
+        execute_values(
+            db.cursor(),
+            "INSERT INTO clientes (nombre) VALUES %s ON CONFLICT (nombre) DO NOTHING",
+            [(nombre,) for nombre in clientes_iniciales],
+        )
 
         db.commit()
         print("[MIGRATION] ✅ Tabla clientes verificada y semilla cargada")
@@ -208,6 +301,55 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error creando tabla usuarios_notificaciones: {e}")
         db.rollback()
 
+    # Migración: Tabla avisos_vistos (campanita de DML, #170/#258)
+    try:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS avisos_vistos (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                tipo TEXT NOT NULL,
+                ref_id INTEGER NOT NULL,
+                visto_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, tipo, ref_id)
+            )
+        """)
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error creando tabla avisos_vistos: {e}")
+        db.rollback()
+
+    # Migración: Tabla dml_fichas_historial (#171) - cambios de estado de
+    # cada ficha, para el historial que ve RAYPAC en dml_view.
+    try:
+        print("[MIGRATION] Verificando tabla dml_fichas_historial...")
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS dml_fichas_historial (
+                id SERIAL PRIMARY KEY,
+                ficha_id INTEGER NOT NULL REFERENCES dml_fichas (id) ON DELETE CASCADE,
+                estado TEXT NOT NULL,
+                usuario_id INTEGER REFERENCES users (id),
+                fecha TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.commit()
+        print("[MIGRATION] ✅ Tabla dml_fichas_historial verificada")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error creando tabla dml_fichas_historial: {e}")
+        db.rollback()
+
+    # Migración: el estado de repuesto 'COLOCADO' se eliminó (#277) - "Mover
+    # a Stock" ahora guarda 'EN STOCK'. Pasa los datos viejos al mismo valor
+    # para que el PDF de la ficha no muestre un estado que ya no existe.
+    try:
+        db.execute("UPDATE dml_repuestos SET estado_repuesto = 'EN STOCK' WHERE estado_repuesto = 'COLOCADO'")
+        db.commit()
+        print("[MIGRATION] ✅ Repuestos 'COLOCADO' pasados a 'EN STOCK'")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error migrando repuestos 'COLOCADO': {e}")
+        db.rollback()
+
     # Migración: Agregar campos de estado a envios_repuestos
     try:
         print("[MIGRATION] Verificando campos de estado en envios_repuestos...")
@@ -234,6 +376,18 @@ def migrate_db():
 
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error agregando campos de estado: {e}")
+        db.rollback()
+
+    # Migración: verificación por renglón al recibir un envío (#57).
+    # descripcion = la que escribe RAYPAC para un repuesto no listado (antes se
+    # perdía); cantidad_recibida = lo que DML contó al recibir (NULL mientras
+    # el envío no se haya recibido).
+    try:
+        db.execute("ALTER TABLE envios_repuestos_detalles ADD COLUMN IF NOT EXISTS descripcion TEXT")
+        db.execute("ALTER TABLE envios_repuestos_detalles ADD COLUMN IF NOT EXISTS cantidad_recibida INTEGER")
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando columnas a envios_repuestos_detalles: {e}")
         db.rollback()
 
     # Migración: Agregar campos de acuse de recibo a dml_fichas
@@ -354,6 +508,49 @@ def migrate_db():
     # épica, hay que reemplazarlo por un mecanismo real (reset manual desde
     # admin, o seed solo si el usuario no existe todavía) en vez de
     # sobreescribir el hash en cada arranque del server.
+
+
+def _huella_migraciones():
+    """Huella de los archivos que definen migraciones y datos iniciales:
+    cambia sola cuando alguien toca migrate_db() o el seed."""
+    h = hashlib.sha256()
+    base = os.path.dirname(os.path.abspath(__file__))
+    for archivo in ("extensions.py", os.path.join("services", "seed.py")):
+        with open(os.path.join(base, archivo), "rb") as f:
+            h.update(f.read().replace(bytes([13, 10]), bytes([10])))  # CRLF -> LF
+    return h.hexdigest()
+
+
+def preparar_base():
+    """Migraciones + datos iniciales, solo si cambiaron desde la última vez.
+
+    #244: antes se corrían completas en el primer request de cada arranque
+    (~63 consultas; en Render, con la base en São Paulo, más de 10 s para el
+    primero que entraba). Como son idempotentes, alcanza con correrlas
+    cuando cambia el código que las define: se guarda la huella de esos
+    archivos en app_meta y si coincide se saltean.
+    """
+    from CODIGO_FUENTE.services.seed import load_seed_data
+
+    db = get_db()
+    db.execute("CREATE TABLE IF NOT EXISTS app_meta (clave TEXT PRIMARY KEY, valor TEXT)")
+    db.commit()
+    huella = _huella_migraciones()
+    guardada = db.execute("SELECT valor FROM app_meta WHERE clave = 'migraciones'").fetchone()
+    if guardada and guardada["valor"] == huella:
+        print("[MIGRATIONS] Sin cambios desde el último arranque, se saltean", file=sys.stderr, flush=True)
+        return False
+
+    migrate_db()
+    load_seed_data(db)
+    db.commit()
+    db.execute(
+        """INSERT INTO app_meta (clave, valor) VALUES ('migraciones', %s)
+           ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor""",
+        (huella,),
+    )
+    db.commit()
+    return True
 
 
 def init_db():

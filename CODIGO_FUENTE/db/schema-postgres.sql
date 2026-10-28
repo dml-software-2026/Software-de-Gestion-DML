@@ -91,7 +91,19 @@ CREATE TABLE usuarios_notificaciones (
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
 );
- 
+
+-- Campanita de DML (#170/#258): qué máquina o envío de repuestos llegado de
+-- RAYPAC ya vio cada usuario. tipo = 'MAQUINA' (raypac_entries.id) o
+-- 'REPUESTO' (envios_repuestos.id). Sin fila = todavía no lo vio.
+CREATE TABLE avisos_vistos (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    tipo TEXT NOT NULL,
+    ref_id INTEGER NOT NULL,
+    visto_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, tipo, ref_id)
+);
+
 -- Depende de matriz_repuestos
 CREATE TABLE stock_dml (
     id SERIAL PRIMARY KEY,
@@ -190,6 +202,8 @@ CREATE TABLE envios_repuestos_detalles (
     envio_id INTEGER NOT NULL,
     codigo_repuesto TEXT NOT NULL,
     cantidad INTEGER NOT NULL,
+    descripcion TEXT,             -- la que escribe RAYPAC si el repuesto no está en la matriz (#57)
+    cantidad_recibida INTEGER,    -- lo que DML contó al recibir; NULL hasta la recepción (#57)
     FOREIGN KEY (envio_id) REFERENCES envios_repuestos (id) ON DELETE CASCADE
 );
  
@@ -335,6 +349,20 @@ CREATE TABLE ticket_historial (
     FOREIGN KEY (usuario_id) REFERENCES users (id)
 );
  
+-- #171: cada cambio de estado_reparacion de una ficha, para mostrarle
+-- a RAYPAC por qué estados pasó la máquina. Se registra desde dml_new(),
+-- dml_edit() y dml_close() - las fichas anteriores a esta tabla no tienen
+-- historial (los cambios viejos nunca se guardaron).
+CREATE TABLE dml_fichas_historial (
+    id SERIAL PRIMARY KEY,
+    ficha_id INTEGER NOT NULL,
+    estado TEXT NOT NULL,
+    usuario_id INTEGER,
+    fecha TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ficha_id) REFERENCES dml_fichas (id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES users (id)
+);
+
 -- FK circular: dml_fichas.ticket_id -> tickets(id)
 -- (tickets no existía todavía cuando se creó dml_fichas)
 ALTER TABLE dml_fichas ADD CONSTRAINT fk_dml_fichas_ticket_id

@@ -130,16 +130,16 @@
             {% if user_role == 'ADMIN' %}
             <form method="POST" action="{{ url_for('raypac.raypac_unfreeze', id=entry.id) }}" class="d-inline">
                 <div class="input-group input-group-sm" style="max-width: 420px;">
-                    <input type="text" name="unfreeze_code" class="form-control" placeholder="Últimos 8 dígitos del remito" maxlength="8" pattern="\d{8}" required>
+                    <input type="text" name="unfreeze_code" class="form-control" placeholder="Código de desfreeze" maxlength="8" required>
                     <button type="submit" class="btn btn-warning"><i class="bi bi-unlock"></i> Desfreezar Definitivamente</button>
                 </div>
-                <small class="text-muted d-block mt-1"><i class="bi bi-exclamation-triangle"></i> Solo para cambios importantes (requiere validación)</small>
+                <small class="text-muted d-block mt-1"><i class="bi bi-exclamation-triangle"></i> Solo para cambios importantes. Código: {{ codigo_desfreeze_ayuda }}.</small>
             </form>
             {% else %}
             <small class="text-muted"><em>Solo ADMIN puede desfreezar definitivamente</em></small>
             {% endif %}
             {% else %}
-            <p class="mb-0"><i class="bi bi-unlock text-warning"></i> <strong>Pendiente de Freezar</strong> - Requiere N° de Remito para envío a ST</p>
+            <p class="mb-0"><i class="bi bi-unlock text-warning"></i> <strong>Pendiente de Freezar</strong> - Se envía a ST con el N° de serie como remito</p>
             {% endif %}
         </div>
     </div>
@@ -152,12 +152,10 @@
                 <i class="bi bi-pencil"></i> Editar
             </a>
 
-            <form method="POST" action="{{ url_for('raypac.raypac_freeze', id=entry.id) }}" class="flex-grow-1" style="min-width: 260px;">
-                <div class="input-group" style="max-width: 360px;">
-                    <input type="text" name="numero_remito" class="form-control" placeholder="Ej: 4222 o 2568" pattern="[0-9]{1,8}" maxlength="8" required title="Ingresa solo los dígitos del remito (Ej: 4222 o 2568). El sistema completará hasta 8 dígitos con ceros a la izquierda">
-                    <button type="submit" class="btn btn-success"><i class="bi bi-lock"></i> Freezar y Enviar a ST</button>
-                </div>
-                <small class="text-muted d-block mt-1">💡 Ingresá los dígitos del remito, sin ceros a la izquierda (Ej: 4222 → 00001-00004222, o 2568 → 00001-00002568)</small>
+            {# #259: el remito es el N° de serie de la máquina, ya no se carga a mano #}
+            <form method="POST" action="{{ url_for('raypac.raypac_freeze', id=entry.id) }}" class="m-0">
+                <button type="submit" class="btn btn-success"><i class="bi bi-lock"></i> Freezar y Enviar a ST</button>
+                <small class="text-muted d-block mt-1">Remito: N° de serie <strong>{{ entry.numero_serie }}</strong></small>
             </form>
         </div>
     </div>
@@ -221,6 +219,11 @@
             <i class="bi bi-ticket"></i> Ir a crear ticket <i class="bi bi-arrow-right"></i>
         </a>
         {% endif %}
+        {% elif user_role == 'RAYPAC' and ficha %}
+        {# #265: RAYPAC solo puede ver la ficha (crearla es del lado DML). #}
+        <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-info">
+            <i class="bi bi-file-earmark-text"></i> Ver Ficha DML <i class="bi bi-arrow-right"></i>
+        </a>
         {% endif %}
     </div>
 </div>

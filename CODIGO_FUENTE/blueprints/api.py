@@ -1,7 +1,8 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, url_for
 
-from CODIGO_FUENTE.decorators import login_required
+from CODIGO_FUENTE.decorators import get_current_user, login_required
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.avisos import avisos_sin_ver
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -44,3 +45,20 @@ def verificar_stock_api(codigo):
         "descripcion": repuesto['item'] or "",
         "codigo": repuesto['codigo_repuesto']
     })
+
+
+@api_bp.route("/avisos")
+@login_required
+def avisos_api():
+    """Campanita de la navbar (#170/#258): lo llegado de RAYPAC que el
+    usuario todavía no vio. El JS de base.html lo consulta al cargar cada
+    página y cada minuto. RAYPAC (sin avisos) recibe una lista vacía."""
+    avisos = avisos_sin_ver(get_current_user())
+    for aviso in avisos:
+        if aviso["tipo"] == "MAQUINA":
+            aviso["url"] = url_for("raypac.raypac_view", id=aviso["id"])
+        else:
+            aviso["url"] = url_for("envios.envios_view", id=aviso["id"])
+        aviso["clave"] = f"{aviso['tipo']}-{aviso['id']}"
+        aviso["fecha"] = aviso["fecha"].strftime("%d/%m/%Y") if aviso["fecha"] else ""
+    return jsonify({"total": len(avisos), "avisos": avisos})

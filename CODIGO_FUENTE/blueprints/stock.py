@@ -9,18 +9,11 @@ from CODIGO_FUENTE.decorators import (
     verify_admin_password,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.stock import nivel_de_cantidad, verificar_alerta_stock
 
 stock_bp = Blueprint("stock", __name__, url_prefix="/stock")
 
-def calcular_nivel_alerta(cantidad):
-    if cantidad == 0:
-        return "ROJO"
-    elif cantidad == 1:
-        return "AMARILLO"
-    elif cantidad == 2:
-        return "NARANJA"
-    else:
-        return "OK"
+
 
 @stock_bp.route("")
 @login_required
@@ -59,7 +52,7 @@ def stock_list(readonly=False):
     # Agregar información de alerta
     stocks_con_alerta = []
     for stock in stocks:
-        alerta = calcular_nivel_alerta(stock['cantidad'])
+        alerta = nivel_de_cantidad(stock['cantidad'])
         stocks_con_alerta.append({
             **dict(stock),
             'alerta': alerta,
@@ -81,7 +74,8 @@ def stock_list(readonly=False):
 
 @stock_bp.route("/new", methods=["GET", "POST"])
 @login_required
-@role_required("ADMIN", "DML_ST", "RAYPAC")
+# Los códigos nuevos los da de alta solo DML, no RAYPAC (pedido de David).
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
 def stock_new():
     user = get_current_user()
     db = get_db()
@@ -201,7 +195,7 @@ def stock_edit(codigo):
                 WHERE codigo_repuesto = %s AND ubicacion = %s
             """, (cantidad, codigo, ubicacion))
             db.commit()
-
+            verificar_alerta_stock(codigo, ubicacion, cantidad_anterior=stock['cantidad'])
             log_action(user['id'], "UPDATE", "stock_ubicaciones", None,
                       f"Anterior: {stock['cantidad']}", f"Nuevo: {cantidad}")
 

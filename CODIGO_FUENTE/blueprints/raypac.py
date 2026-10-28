@@ -11,9 +11,25 @@ from CODIGO_FUENTE.decorators import (
     role_required,
 )
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.avisos import marcar_visto, reiniciar_vistos
 from CODIGO_FUENTE.services.flujo import build_flow_steps
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
+
+
+def codigo_desfreeze(numero_remito):
+    """Código que pide "Desfreezar Definitivamente" y cómo explicárselo al
+    ADMIN. Devuelve (codigo, explicacion).
+
+    #259: el remito pasó a ser el número de serie de la máquina -> código =
+    sus últimos 4 caracteres. Los ingresos viejos, freezados con un remito
+    en formato 00001-XXXXXXXX, siguen pidiendo lo que va después del guión
+    (CAMBIO DAVID original).
+    """
+    remito = numero_remito or ""
+    if re.match(r'^\d{4,5}-\d{8}$', remito):
+        return remito.split('-')[-1], "los 8 dígitos del remito después del guión"
+    return remito[-4:], "los últimos 4 caracteres del N° de serie"
 
 
 def _obtener_clientes(db):
@@ -51,6 +67,7 @@ def raypac_list(readonly=False):
             SELECT r.*,
                    (SELECT COUNT(*) FROM dml_fichas f WHERE f.raypac_id = r.id) AS fichas_count,
                    (SELECT f.id FROM dml_fichas f WHERE f.raypac_id = r.id ORDER BY f.created_at DESC LIMIT 1) AS ficha_id,
+                   (SELECT f.numero_ficha FROM dml_fichas f WHERE f.raypac_id = r.id ORDER BY f.created_at DESC LIMIT 1) AS numero_ficha,
                    (SELECT f.estado_reparacion FROM dml_fichas f WHERE f.raypac_id = r.id ORDER BY f.created_at DESC LIMIT 1) AS estado_ficha,
                    (SELECT t.id FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_id,
                    (SELECT t.numero_ticket FROM tickets t WHERE t.raypac_id = r.id ORDER BY t.created_at DESC LIMIT 1) AS ticket_numero
@@ -92,6 +109,7 @@ def raypac_list(readonly=False):
         "EN REPARACIÓN": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "En Reparación"},
         "EN REPARACION": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "En Reparación"},  # alias sin tilde, ver #44
         "A LA ESPERA DE REPUESTOS": {"color": "#fd7e14", "texto_color": "#000000", "texto": "A la Espera de Repuestos"},
+        "A LA ESPERA DE APROBACIÓN DE PRESUPUESTO": {"color": "#fd7e14", "texto_color": "#000000", "texto": "A la Espera de Aprobación de Presupuesto"},  # #260
         "REPARACIÓN COMPLETADA": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "Reparación Completada"},
         "MÁQUINA LISTA PARA RETIRAR": {"color": "#ffc107", "texto_color": "#000000", "texto": "Lista para Retirar"},
         "MÁQUINA ENTREGADA": {"color": "#28a745", "texto_color": "#ffffff", "texto": "Máquina Entregada"}
@@ -130,11 +148,12 @@ def raypac_new():
                 flash("Por favor completa todos los campos obligatorios.", "error")
                 return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
-            # Verificar que el número de serie es único
-            existe = db.execute("SELECT id FROM raypac_entries WHERE numero_serie = %s", (numero_serie,)).fetchone()
-            if existe:
-                flash("Este número de serie ya existe en el sistema.", "error")
-                return render_template("raypac_form.html", clientes=_obtener_clientes(db))
+            # #259: la misma máquina puede entrar varias veces (el N° de serie
+            # es también el remito), así que ya no se bloquea un N° de serie
+            # repetido - solo se avisa, por si fue una carga duplicada sin querer.
+            ingresos_previos = db.execute(
+                "SELECT COUNT(*) AS n FROM raypac_entries WHERE numero_serie = %s", (numero_serie,)
+            ).fetchone()['n']
 
             # Número correlativo interno
             correlativo = db.execute("SELECT COALESCE(MAX(numero_correlativo), 0) + 1 AS next FROM raypac_entries").fetchone()['next']
@@ -160,6 +179,9 @@ def raypac_new():
                       f"Ingreso RAYPAC: {cliente} - {numero_serie}")
 
             flash("Ingreso RAYPAC registrado correctamente.", "success")
+            if ingresos_previos:
+                veces = "1 vez" if ingresos_previos == 1 else f"{ingresos_previos} veces"
+                flash(f"ℹ️ Esta máquina (N° de serie {numero_serie}) ya ingresó {veces} antes.", "info")
             return redirect(url_for("raypac.raypac_view", id=raypac_id))
         except Exception as e:
             db.rollback()  # Revertir la transacción en caso de error
@@ -180,6 +202,9 @@ def raypac_view(id, readonly=False):
     if not entry:
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
+
+    # Campanita de DML (#258): abrir el detalle saca la máquina de "sin ver"
+    marcar_visto(user, "MAQUINA", id)
 
     # Verificar si existe un ticket asociado
     ticket = db.execute("SELECT numero_ticket FROM tickets WHERE raypac_id = %s", (id,)).fetchone()
@@ -207,7 +232,8 @@ def raypac_view(id, readonly=False):
     flow_steps = build_flow_steps(["Ingreso RAYPAC", "Envío a DML", "Recibido en DML"], current_step)
 
     return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly,
-                            ticket=ticket, ficha=ficha, flow_steps=flow_steps)
+                            ticket=ticket, ficha=ficha, flow_steps=flow_steps,
+                            codigo_desfreeze_ayuda=codigo_desfreeze(entry['numero_remito'])[1])
 
 
 @raypac_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -279,33 +305,12 @@ def raypac_freeze(id):
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
-    numero_remito = (request.form.get("numero_remito") or "").strip()
-
-    # CAMBIO DAVID: Remito OBLIGATORIO con formato ####-#### (8 dígitos)
+    # #259: el remito del envío a DML es el número de serie de la máquina (ya
+    # no se carga a mano). Se puede repetir: la misma máquina puede entrar
+    # varias veces, así que no se valida que sea único.
+    numero_remito = (entry['numero_serie'] or "").strip()
     if not numero_remito:
-        flash("⚠️ El número de remito es OBLIGATORIO para freezar y enviar. Formato: últimos 4 dígitos o completo ####-####.", "error")
-        return redirect(url_for("raypac.raypac_view", id=id))
-
-    # Auto-completar formato si solo ingresa 4 dígitos (últimos)
-    if re.match(r'^\d{1,8}$', numero_remito):
-        # Autocompletar con el prefijo estándar 00001-, siempre 8 dígitos del lado derecho
-        ultimo = numero_remito.zfill(8)  # Rellenar con ceros a la izquierda hasta completar 8 dígitos
-        numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXXXXXX (8 dígitos)
-        flash(f"📋 Remito auto-completado: {numero_remito}", "info")
-    elif not re.match(r'^\d{4,5}-\d{8}$', numero_remito):
-        flash("⚠️ Formato de remito inválido. Ingresa solo los dígitos del remito (ej: 4222 o 2568) o el formato completo #####-######## (ej: 00001-00004222).", "error")
-        return redirect(url_for("raypac.raypac_view", id=id))
-
-    # Verificar que no exista ya en raypac_entries
-    existe = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = %s", (numero_remito,)).fetchone()
-    if existe and existe['id'] != id:
-        flash("El número de remito ya existe en otro equipo.", "error")
-        return redirect(url_for("raypac.raypac_view", id=id))
-
-    # Verificar que no exista en envios_repuestos
-    existe_envio = db.execute("SELECT id FROM envios_repuestos WHERE numero_remito = %s", (numero_remito,)).fetchone()
-    if existe_envio:
-        flash("El número de remito ya existe en un envío de repuestos. Usa un remito diferente.", "error")
+        flash("⚠️ El ingreso no tiene número de serie. Editalo y cargalo antes de freezar.", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     db.execute("""
@@ -321,6 +326,9 @@ def raypac_freeze(id):
         END
     WHERE id = %s
 """, (numero_remito, id))
+    # Si se había desfreezado y vuelve a salir, es un envío nuevo para la
+    # campanita de DML (#258): se le vuelve a mostrar a todos.
+    reiniciar_vistos("MAQUINA", id)
     db.commit()
 
     log_action(user['id'], "FREEZE", "raypac_entries", id, None,
@@ -349,15 +357,9 @@ def raypac_unfreeze(id):
 
     unfreeze_code = request.form.get("unfreeze_code", "").strip()
 
-    # CAMBIO DAVID: Verificar código usando los dígitos del remito después del guión
-    # Formato remito: 00001-XXXX o 00001-XXXXX (la cantidad de dígitos crece con el tiempo)
-    if entry['numero_remito'] and '-' in entry['numero_remito']:
-        codigo_correcto = entry['numero_remito'].split('-')[-1]  # Todo lo que sigue al guión
-    else:
-        codigo_correcto = entry['numero_remito'][-4:] if entry['numero_remito'] else ""
-
-    if unfreeze_code != codigo_correcto:
-        flash(f"⚠️ Código incorrecto. Use los últimos 4 dígitos del remito ({entry['numero_remito']}).", "error")
+    codigo_correcto, explicacion = codigo_desfreeze(entry['numero_remito'])
+    if unfreeze_code.upper() != codigo_correcto.upper():
+        flash(f"⚠️ Código incorrecto. Use {explicacion} ({entry['numero_remito']}).", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     # Al desfreezar, el envío a DML queda sin confirmar de nuevo (vuelve a
