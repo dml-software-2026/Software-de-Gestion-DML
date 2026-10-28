@@ -18,6 +18,12 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+> **⚠️ PENDIENTE AL ARRANCAR LA PRÓXIMA SESIÓN (2026-10-28, entrega al
+> cliente):** recordarle a Facu que pase **todos los archivos que dio el
+> cliente** (ubicaciones del stock, etc.) y la **planilla de stock
+> actualizada**. Además, pasar a issues los 11 puntos de
+> `docs/NOTAS_ENTREGA_2026-10-28.md` (comentarios del cliente en la demo).
+
 - **Última actualización:** 2026-10-22, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
 - **Ojo: el chat de esta sesión se borró a la mitad** (Facu lo cerró sin
