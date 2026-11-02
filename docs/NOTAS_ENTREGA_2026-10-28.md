@@ -4,10 +4,10 @@ Comentarios del cliente durante la demo (entrega del 2026-10-28) que todavía
 no están en la app, más las dudas que surgieron. Hay que repasarlo con Facu y
 decidir cuáles pasan a issues en el kanban.
 
-> **⚠️ Recordatorio para la próxima sesión (pedido de Facu):** pedirle a Facu
-> **todos los archivos que dio el cliente** (ubicaciones del stock, etc.) y
-> una **planilla de stock actualizada**, para compararlos con lo que ya está
-> en `DOCUMENTOS DML/` (ver punto 6). Además, convertir esta nota en issues.
+> **✅ Pasado a issues el 2026-11-02:** #305 (punto 1), #306 (2), #307 (3),
+> #308 (4), #309 (5 y 7), #310 (6), #311 (9), #312 (10), #313 (11). El
+> punto 8 no lleva issue (ya está respondido). Los archivos del cliente se
+> revisaron (ver punto 6) y salió además el #314.
 
 ---
 
@@ -198,11 +198,12 @@ con el real.
   REPUESTOS (1) copy.pdf`, y `Observaciones del soft.docx` (en la raíz).
 
 **Pendiente:**
-- [ ] **RECORDARLE A FACU que pase todos los archivos que dio el cliente**,
-      para compararlos con lo que ya está en `DOCUMENTOS DML/` y ver si hay
-      algo nuevo (ubicaciones, stock más reciente, etc.).
-- [ ] Pedirle al cliente un **stock actualizado** (planilla con el mismo
-      formato) y recargarlo con la carga masiva por CSV de Admin. Antes,
+- [x] Facu pasó los archivos del cliente (2026-11-02). Lo nuevo:
+      `NUEVO STOCK DE REPUESTOS COMPLETO al 31-08-2026.xlsx` (275 códigos,
+      todos con ubicación) y `FICHA VACIA PARA RELLENAR 2 con stock
+      (2026).xlsx`, sumados a `DOCUMENTOS DML/`. Detalle en el #310.
+- [x] Stock actualizado: es la planilla al 31/08/2026 de arriba.
+- [ ] Recargarlo con la carga masiva por CSV de Admin (#310). Antes,
       revisar qué pasa con el stock que ya se movió en el sistema (repuestos
       usados en fichas, envíos recibidos), porque la carga pisa las cantidades.
 

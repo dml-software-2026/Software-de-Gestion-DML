@@ -18,11 +18,20 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-> **⚠️ PENDIENTE AL ARRANCAR LA PRÓXIMA SESIÓN (2026-10-28, entrega al
-> cliente):** recordarle a Facu que pase **todos los archivos que dio el
-> cliente** (ubicaciones del stock, etc.) y la **planilla de stock
-> actualizada**. Además, pasar a issues los 11 puntos de
-> `docs/NOTAS_ENTREGA_2026-10-28.md` (comentarios del cliente en la demo).
+> **✅ Hecho el 2026-11-02 (antes era el pendiente de la entrega del
+> 2026-10-28):** los puntos de `docs/NOTAS_ENTREGA_2026-10-28.md` ya están
+> en el kanban como **#305-#313** (Backlog), más el **#314** (fichas
+> históricas corregidas por el cliente). Facu pasó los archivos del
+> cliente: la planilla de stock al 31/08/2026 y la plantilla de ficha nueva
+> quedaron en `DOCUMENTOS DML/`. **Criterio de Facu:** ante contradicciones
+> entre archivos del cliente, manda la planilla de stock más nueva; algunos
+> archivos son de la cohorte anterior (fechas no confiables). Las
+> correcciones con datos de máquinas/clientes (`ingresos_con_error.csv`,
+> `Fechas, Modelos y una ficha invalida- corregido.xlsx`, `Codigos no
+> reconocidos - DATO ACTUALIZADO.csv`) **no se suben** (repo público, mismo
+> criterio que el `.gitignore` de `scripts/data/`): las tiene Facu, el
+> resumen está en el #314. **Pendiente:** mandarle al cliente las preguntas
+> de los issues #305-#314 y anotar las respuestas en cada uno.
 
 - **Última actualización:** 2026-10-22, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
