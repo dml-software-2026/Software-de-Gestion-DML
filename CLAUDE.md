@@ -18,11 +18,32 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
-> **⚠️ PENDIENTE AL ARRANCAR LA PRÓXIMA SESIÓN (2026-10-28, entrega al
-> cliente):** recordarle a Facu que pase **todos los archivos que dio el
-> cliente** (ubicaciones del stock, etc.) y la **planilla de stock
-> actualizada**. Además, pasar a issues los 11 puntos de
-> `docs/NOTAS_ENTREGA_2026-10-28.md` (comentarios del cliente en la demo).
+> **✅ Hecho el 2026-11-02 (antes era el pendiente de la entrega del
+> 2026-10-28):** los puntos de `docs/NOTAS_ENTREGA_2026-10-28.md` ya están
+> en el kanban como **#305-#313** (Backlog), más el **#314** (fichas
+> históricas corregidas por el cliente). Facu pasó los archivos del
+> cliente: la planilla de stock al 31/08/2026 y la plantilla de ficha nueva
+> quedaron en `DOCUMENTOS DML/`. **Criterio de Facu:** ante contradicciones
+> entre archivos del cliente, manda la planilla de stock más nueva; algunos
+> archivos son de la cohorte anterior (fechas no confiables). Las
+> correcciones con datos de máquinas/clientes (`ingresos_con_error.csv`,
+> `Fechas, Modelos y una ficha invalida- corregido.xlsx`, `Codigos no
+> reconocidos - DATO ACTUALIZADO.csv`) **no se suben** (repo público, mismo
+> criterio que el `.gitignore` de `scripts/data/`): las tiene Facu, el
+> resumen está en el #314.
+>
+> **⚠️ PENDIENTE AL ARRANCAR LA PRÓXIMA SESIÓN (2026-11-02):** las
+> preguntas para el cliente están en borrador en
+> `docs/PREGUNTAS_CLIENTE_2026-11-02.md`. Facu se las pasa a sus
+> compañeros, porque alguna puede que ya se le haya hecho al cliente antes.
+> **Preguntarle a Facu qué hay que sacar o cambiar**, aplicarlo y armar la
+> versión final como **Google Doc** prolijo, con lugar para que el cliente
+> responda en el mismo doc (el mensaje es largo para WhatsApp/mail). Cuando
+> respondan, anotar cada respuesta en su issue (#305-#314). La referencia
+> de stock es `Copia de NUEVO STOCK DE REPUESTOS COMPLETO` (el encabezado
+> dice 31/08/2026, pero según Facu es lo más nuevo; se le pregunta al
+> cliente en el punto 6). `CAMPOS DE INGRESO DML` **no** es stock: es la
+> especificación de campos de 2025.
 
 - **Última actualización:** 2026-10-22, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
