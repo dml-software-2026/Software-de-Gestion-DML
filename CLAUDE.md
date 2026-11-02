@@ -30,8 +30,20 @@ asumir contexto de nada más.
 > `Fechas, Modelos y una ficha invalida- corregido.xlsx`, `Codigos no
 > reconocidos - DATO ACTUALIZADO.csv`) **no se suben** (repo público, mismo
 > criterio que el `.gitignore` de `scripts/data/`): las tiene Facu, el
-> resumen está en el #314. **Pendiente:** mandarle al cliente las preguntas
-> de los issues #305-#314 y anotar las respuestas en cada uno.
+> resumen está en el #314.
+>
+> **⚠️ PENDIENTE AL ARRANCAR LA PRÓXIMA SESIÓN (2026-11-02):** las
+> preguntas para el cliente están en borrador en
+> `docs/PREGUNTAS_CLIENTE_2026-11-02.md`. Facu se las pasa a sus
+> compañeros, porque alguna puede que ya se le haya hecho al cliente antes.
+> **Preguntarle a Facu qué hay que sacar o cambiar**, aplicarlo y armar la
+> versión final como **Google Doc** prolijo, con lugar para que el cliente
+> responda en el mismo doc (el mensaje es largo para WhatsApp/mail). Cuando
+> respondan, anotar cada respuesta en su issue (#305-#314). La referencia
+> de stock es `Copia de NUEVO STOCK DE REPUESTOS COMPLETO` (el encabezado
+> dice 31/08/2026, pero según Facu es lo más nuevo; se le pregunta al
+> cliente en el punto 6). `CAMPOS DE INGRESO DML` **no** es stock: es la
+> especificación de campos de 2025.
 
 - **Última actualización:** 2026-10-22, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
