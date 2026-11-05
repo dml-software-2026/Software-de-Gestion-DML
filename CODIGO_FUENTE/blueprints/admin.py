@@ -15,6 +15,7 @@ from CODIGO_FUENTE.decorators import (
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.backup import generar_backup_zip
+from CODIGO_FUENTE.services.ubicacion_fisica import normalizar_ubicacion_fisica
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -84,7 +85,7 @@ def cargar_stock_desde_web():
                     codigo = row[2].strip() if len(row) > 2 and row[2] else None
                     item = row[3].strip() if len(row) > 3 and row[3] else None
                     cantidad_str = row[4].strip() if len(row) > 4 and row[4] else "0"
-                    codigo_ubicacion = row[9].strip() if len(row) > 9 and row[9] else "SIN UBICACIÓN"
+                    codigo_ubicacion = normalizar_ubicacion_fisica(row[9] if len(row) > 9 else None)  # #309
 
                     if not codigo or not item:
                         continue
