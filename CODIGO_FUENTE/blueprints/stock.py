@@ -10,8 +10,17 @@ from CODIGO_FUENTE.decorators import (
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.stock import nivel_de_cantidad, verificar_alerta_stock
+from CODIGO_FUENTE.services.ubicacion_fisica import (
+    SIN_UBICACION,
+    UBICACION_FISICA_MAX,
+    normalizar_ubicacion_fisica,
+)
 
 stock_bp = Blueprint("stock", __name__, url_prefix="/stock")
+
+# #309: roles que pueden cambiar la ubicación física (sin contraseña, a
+# diferencia de Editar stock): DML_REPUESTOS es quien maneja el depósito.
+ROLES_EDITAR_UBICACION = ("ADMIN", "DML_ST", "DML_REPUESTOS")
 
 
 
@@ -35,17 +44,32 @@ def stock_list(readonly=False):
         ubicacion = request.args.get("ubicacion", "DML")
 
     buscar = request.args.get("buscar", "")
+    # #309: la ubicación física es solo del depósito de DML.
+    mostrar_ubicacion_fisica = ubicacion == "DML"
+    sin_ubicacion = mostrar_ubicacion_fisica and request.args.get("sin_ubicacion") == "1"
 
     # Query con filtro por ubicación
-    query = """SELECT DISTINCT m.*, COALESCE(su.cantidad, 0) as cantidad
+    query = """SELECT DISTINCT m.*, COALESCE(su.cantidad, 0) as cantidad,
+                     su.id AS stock_id, su.codigo_ubicacion_fisica
               FROM matriz_repuestos m
               LEFT JOIN stock_ubicaciones su ON su.codigo_repuesto = m.codigo_repuesto AND su.ubicacion = %s
               WHERE 1=1"""
     params = [ubicacion]
 
     if buscar:
-        query += " AND (m.codigo_repuesto LIKE %s OR m.item LIKE %s)"
-        params.extend([f"%{buscar}%", f"%{buscar}%"])
+        # ILIKE: que "e05" encuentre "E05-F05-B02" (y lo mismo en código/descripción).
+        if mostrar_ubicacion_fisica:
+            query += " AND (m.codigo_repuesto ILIKE %s OR m.item ILIKE %s OR su.codigo_ubicacion_fisica ILIKE %s)"
+            params.extend([f"%{buscar}%"] * 3)
+        else:
+            query += " AND (m.codigo_repuesto ILIKE %s OR m.item ILIKE %s)"
+            params.extend([f"%{buscar}%"] * 2)
+
+    if sin_ubicacion:
+        query += """ AND (su.codigo_ubicacion_fisica IS NULL
+                          OR TRIM(su.codigo_ubicacion_fisica) = ''
+                          OR su.codigo_ubicacion_fisica = %s)"""
+        params.append(SIN_UBICACION)
 
     stocks = db.execute(query + " ORDER BY m.codigo_repuesto", params).fetchall()
 
@@ -53,10 +77,12 @@ def stock_list(readonly=False):
     stocks_con_alerta = []
     for stock in stocks:
         alerta = nivel_de_cantidad(stock['cantidad'])
+        fisica = (stock['codigo_ubicacion_fisica'] or "").strip()
         stocks_con_alerta.append({
             **dict(stock),
             'alerta': alerta,
-            'ubicacion': ubicacion
+            'ubicacion': ubicacion,
+            'ubicacion_fisica': "" if fisica in ("", SIN_UBICACION) else fisica,
         })
 
     # Para ADMIN, mostrar opción de cambiar ubicación
@@ -69,7 +95,63 @@ def stock_list(readonly=False):
                          rows=stocks_con_alerta,
                          ubicacion=ubicacion,
                          ubicaciones_disponibles=ubicaciones_disponibles,
-                         readonly=readonly)
+                         readonly=readonly,
+                         mostrar_ubicacion_fisica=mostrar_ubicacion_fisica,
+                         sin_ubicacion=sin_ubicacion,
+                         puede_editar_ubicacion=(mostrar_ubicacion_fisica
+                                                 and user['role'] in ROLES_EDITAR_UBICACION),
+                         ubicacion_fisica_max=UBICACION_FISICA_MAX)
+
+
+@stock_bp.route("/<codigo>/ubicacion-fisica", methods=["POST"])
+@login_required
+@role_required(*ROLES_EDITAR_UBICACION)
+def stock_ubicacion_fisica(codigo):
+    """#309: cambiar el lugar físico de un repuesto en el depósito de DML.
+
+    Botón propio en /stock, sin contraseña de ADMIN (a diferencia de Editar
+    stock), porque solo toca la ubicación y no la cantidad.
+    """
+    user = get_current_user()
+    db = get_db()
+    ubicacion = "DML"
+
+    # Volver al listado con la misma búsqueda/filtro que tenía la persona.
+    volver = {"ubicacion": ubicacion}
+    if request.form.get("buscar"):
+        volver["buscar"] = request.form["buscar"]
+    if request.form.get("sin_ubicacion") == "1":
+        volver["sin_ubicacion"] = "1"
+
+    nueva = normalizar_ubicacion_fisica(request.form.get("codigo_ubicacion_fisica"))
+    if len(nueva) > UBICACION_FISICA_MAX:
+        flash(f"La ubicación no puede tener más de {UBICACION_FISICA_MAX} caracteres.", "error")
+        return redirect(url_for("stock.stock_list", **volver))
+
+    stock = db.execute(
+        "SELECT id, codigo_ubicacion_fisica FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = %s",
+        (codigo, ubicacion)
+    ).fetchone()
+    if not stock:
+        flash(f"El repuesto {codigo} no está cargado en el stock de {ubicacion}.", "error")
+        return redirect(url_for("stock.stock_list", **volver))
+
+    anterior = stock['codigo_ubicacion_fisica'] or SIN_UBICACION
+    if anterior != nueva:
+        db.execute("""
+            UPDATE stock_ubicaciones
+            SET codigo_ubicacion_fisica = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (nueva, stock['id']))
+        db.commit()
+        log_action(user['id'], "UPDATE", "stock_ubicaciones", stock['id'],
+                   f"{codigo} ubicación: {anterior}", f"{codigo} ubicación: {nueva}")
+
+    if nueva == SIN_UBICACION:
+        flash(f"{codigo} quedó sin ubicación.", "warning")
+    else:
+        flash(f"Ubicación de {codigo} actualizada: {nueva}.", "success")
+    return redirect(url_for("stock.stock_list", **volver))
 
 
 @stock_bp.route("/new", methods=["GET", "POST"])
