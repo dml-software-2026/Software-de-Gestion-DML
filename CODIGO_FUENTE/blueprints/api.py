@@ -7,7 +7,7 @@ from CODIGO_FUENTE.services.avisos import avisos_sin_ver
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 
-@api_bp.route("/verificar-stock/<codigo>")
+@api_bp.route("/verificar-stock/<path:codigo>")
 @login_required
 def verificar_stock_api(codigo):
     """API para verificar existencia y stock de un repuesto en tiempo real.
