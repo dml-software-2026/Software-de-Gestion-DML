@@ -278,3 +278,132 @@ def test_codigo_con_barra_funciona_en_editar_ubicacion_y_eliminar(client):
             db.execute("DELETE FROM stock_ubicaciones WHERE codigo_repuesto = %s", (codigo,))
             db.execute("DELETE FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,))
             db.commit()
+
+
+# --- #309 (c): ubicación obligatoria al recibir un envío -------------------
+
+@pytest.fixture
+def envio_test(repuesto_test):
+    """Envío ya salido de RAYPAC (freezado) con 1 renglón del repuesto de prueba (2 unidades).
+
+    Devuelve (envio_id, detalle_id, codigo). Se borra al final, pase o falle el test.
+    """
+    with app.app_context():
+        db = get_db()
+        envio_id = db.execute("""
+            INSERT INTO envios_repuestos (numero_remito, fecha_envio, estado_envio, is_frozen)
+            VALUES (%s, CURRENT_DATE, 'ENVIADO', TRUE) RETURNING id
+        """, (f"QA-REM-{repuesto_test}",)).fetchone()['id']
+        detalle_id = db.execute("""
+            INSERT INTO envios_repuestos_detalles (envio_id, codigo_repuesto, cantidad)
+            VALUES (%s, %s, 2) RETURNING id
+        """, (envio_id, repuesto_test)).fetchone()['id']
+        db.commit()
+    yield envio_id, detalle_id, repuesto_test
+    with app.app_context():
+        db = get_db()
+        db.execute("DELETE FROM avisos_vistos WHERE tipo = 'REPUESTO' AND ref_id = %s", (envio_id,))
+        db.execute("DELETE FROM envios_repuestos WHERE id = %s", (envio_id,))  # los renglones van en cascada
+        db.commit()
+
+
+def estado_envio(envio_id):
+    with app.app_context():
+        return get_db().execute("SELECT estado_envio FROM envios_repuestos WHERE id = %s", (envio_id,)).fetchone()['estado_envio']
+
+
+@necesita_db
+def test_recepcion_pide_ubicacion_y_la_precarga(client, envio_test):
+    envio_id, detalle_id, codigo = envio_test
+    loguear_como(client, "DML_REPUESTOS")
+    html = client.get(f"/envios/{envio_id}").get_data(as_text=True)
+    assert f'name="ubicacion_{detalle_id}" value=""' in html  # sin ubicación todavía: vacío
+
+    client.post(f"/stock/{codigo}/ubicacion-fisica", data={"codigo_ubicacion_fisica": "E04-F01-B04"})
+    html = client.get(f"/envios/{envio_id}").get_data(as_text=True)
+    assert f'name="ubicacion_{detalle_id}" value="E04-F01-B04"' in html
+
+
+@necesita_db
+def test_recepcion_sin_ubicacion_se_rechaza_y_no_suma_stock(client, envio_test):
+    envio_id, detalle_id, codigo = envio_test
+    loguear_como(client, "DML_REPUESTOS")
+    response = client.post(f"/envios/{envio_id}/confirmar",
+                           data={f"recibido_{detalle_id}": "2", f"ubicacion_{detalle_id}": "  "})
+    assert response.status_code == 302
+    assert estado_envio(envio_id) != "RECIBIDO"
+    assert ubicacion_de(codigo, "DML") == {"cantidad": 5, "codigo_ubicacion_fisica": SIN_UBICACION}
+
+
+@necesita_db
+def test_recepcion_guarda_ubicacion_normalizada_y_suma_stock(client, envio_test):
+    envio_id, detalle_id, codigo = envio_test
+    loguear_como(client, "DML_REPUESTOS")
+    client.post(f"/envios/{envio_id}/confirmar",
+                data={f"recibido_{detalle_id}": "2", f"ubicacion_{detalle_id}": "e3 - f5 - pa - b4"})
+    assert estado_envio(envio_id) == "RECIBIDO"
+    assert ubicacion_de(codigo, "DML") == {"cantidad": 7, "codigo_ubicacion_fisica": "E03-F05-PA-B04"}
+
+
+@necesita_db
+def test_recepcion_con_campo_vacio_usa_la_ubicacion_que_ya_tenia(client, envio_test):
+    envio_id, detalle_id, codigo = envio_test
+    loguear_como(client, "DML_REPUESTOS")
+    client.post(f"/stock/{codigo}/ubicacion-fisica", data={"codigo_ubicacion_fisica": "E06-F01-B01"})
+    client.post(f"/envios/{envio_id}/confirmar", data={f"recibido_{detalle_id}": "2", f"ubicacion_{detalle_id}": ""})
+    assert estado_envio(envio_id) == "RECIBIDO"
+    assert ubicacion_de(codigo, "DML") == {"cantidad": 7, "codigo_ubicacion_fisica": "E06-F01-B01"}
+
+
+@necesita_db
+def test_recepcion_con_cero_recibido_no_pide_ubicacion(client, envio_test):
+    envio_id, detalle_id, codigo = envio_test
+    loguear_como(client, "DML_REPUESTOS")
+    client.post(f"/envios/{envio_id}/confirmar", data={f"recibido_{detalle_id}": "0", f"ubicacion_{detalle_id}": ""})
+    assert estado_envio(envio_id) == "RECIBIDO"
+    assert ubicacion_de(codigo, "DML") == {"cantidad": 5, "codigo_ubicacion_fisica": SIN_UBICACION}
+
+
+@necesita_db
+def test_recepcion_mismo_codigo_con_dos_ubicaciones_se_rechaza(client, envio_test):
+    envio_id, detalle_id, codigo = envio_test
+    with app.app_context():
+        db = get_db()
+        otro_id = db.execute("""INSERT INTO envios_repuestos_detalles (envio_id, codigo_repuesto, cantidad)
+                                VALUES (%s, %s, 1) RETURNING id""", (envio_id, codigo)).fetchone()['id']
+        db.commit()
+    loguear_como(client, "DML_REPUESTOS")
+    client.post(f"/envios/{envio_id}/confirmar", data={
+        f"recibido_{detalle_id}": "2", f"ubicacion_{detalle_id}": "E01-F01",
+        f"recibido_{otro_id}": "1", f"ubicacion_{otro_id}": "E02-F02",
+    })
+    assert estado_envio(envio_id) != "RECIBIDO"
+    assert ubicacion_de(codigo, "DML")["cantidad"] == 5
+
+
+@necesita_db
+def test_recepcion_no_listado_nuevo_queda_con_ubicacion(client, envio_test):
+    envio_id, _, _ = envio_test
+    nuevo = f"QA-NL-{int(time.time() * 1000)}"
+    with app.app_context():
+        db = get_db()
+        nl_id = db.execute("""INSERT INTO envios_repuestos_detalles (envio_id, codigo_repuesto, cantidad, descripcion)
+                              VALUES (%s, %s, 3, 'No listado de prueba QA') RETURNING id""",
+                           (envio_id, nuevo)).fetchone()['id']
+        db.commit()
+    try:
+        loguear_como(client, "DML_REPUESTOS")
+        client.post(f"/envios/{envio_id}/confirmar", data={
+            f"recibido_{nl_id}": "3", f"codigo_{nl_id}": nuevo, f"descripcion_{nl_id}": "No listado de prueba QA",
+            f"ubicacion_{nl_id}": "E07 -F03 -B01",
+            # el otro renglón (repuesto de prueba) no llegó
+            f"recibido_{envio_test[1]}": "0",
+        })
+        assert estado_envio(envio_id) == "RECIBIDO"
+        assert ubicacion_de(nuevo, "DML") == {"cantidad": 3, "codigo_ubicacion_fisica": "E07-F03-B01"}
+    finally:
+        with app.app_context():
+            db = get_db()
+            db.execute("DELETE FROM stock_ubicaciones WHERE codigo_repuesto = %s", (nuevo,))
+            db.execute("DELETE FROM matriz_repuestos WHERE codigo_repuesto = %s", (nuevo,))
+            db.commit()
