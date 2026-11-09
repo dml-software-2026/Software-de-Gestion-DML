@@ -43,13 +43,21 @@
             <!-- Formulario de búsqueda -->
             <form method="GET" class="mb-3">
                 <div class="input-group">
-                    <input type="text" name="buscar" class="form-control" placeholder="Buscar por código o descripción..." value="{{ request.args.get('buscar', '') }}">
+                    <input type="text" name="buscar" class="form-control" placeholder="Buscar por código, descripción{% if mostrar_ubicacion_fisica %} o ubicación{% endif %}..." value="{{ request.args.get('buscar', '') }}">
                     <input type="hidden" name="ubicacion" value="{{ ubicacion }}">
                     <button type="submit" class="btn btn-primary">🔍 Buscar</button>
-                    {% if request.args.get('buscar') %}
+                    {% if request.args.get('buscar') or sin_ubicacion %}
                     <a href="{{ url_for('stock.stock_list', ubicacion=ubicacion) }}" class="btn btn-secondary">Limpiar</a>
                     {% endif %}
                 </div>
+                {# #309: filtro para ver qué repuestos falta ubicar en el depósito #}
+                {% if mostrar_ubicacion_fisica %}
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" name="sin_ubicacion" value="1" id="filtroSinUbicacion"
+                           {% if sin_ubicacion %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="form-check-label" for="filtroSinUbicacion">Mostrar solo los que no tienen ubicación</label>
+                </div>
+                {% endif %}
             </form>
             
             {% if rows %}
@@ -65,6 +73,9 @@
                     <tr>
                         <th>Código</th>
                         <th>Descripción</th>
+                        {% if mostrar_ubicacion_fisica %}
+                        <th>Ubicación</th>
+                        {% endif %}
                         {% if user.role != 'RAYPAC' %}
                         <th>Cantidad</th>
                         <th>Estado</th>
@@ -79,6 +90,27 @@
                     <tr>
                         <td><strong>{{ row.codigo_repuesto }}</strong></td>
                         <td><span style="color: black;">{{ row.item or 'N/A' }}</span></td>
+                        {% if mostrar_ubicacion_fisica %}
+                        <td class="text-nowrap">
+                            {% if row.ubicacion_fisica %}
+                            <span>{{ row.ubicacion_fisica }}</span>
+                            {% elif row.stock_id %}
+                            <span class="badge text-dark" style="background-color: #ffc107;" title="Falta cargar dónde está guardado">⚠️ Sin ubicación</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                            {# Solo si el repuesto está cargado en el stock de DML (hay fila donde guardarla) #}
+                            {% if puede_editar_ubicacion and row.stock_id %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary ms-1 btn-editar-ubicacion"
+                                    title="Editar ubicación" aria-label="Editar ubicación de {{ row.codigo_repuesto }}"
+                                    data-codigo="{{ row.codigo_repuesto }}"
+                                    data-ubicacion="{{ row.ubicacion_fisica }}"
+                                    data-action="{{ url_for('stock.stock_ubicacion_fisica', codigo=row.codigo_repuesto) }}">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            {% endif %}
+                        </td>
+                        {% endif %}
                         {% if user.role != 'RAYPAC' %}
                         <td class="text-center">
                             <strong style="color: black;">{{ row.cantidad }}</strong>
@@ -114,9 +146,57 @@
             </table>
             </div>
             {% else %}
-            <div class="alert alert-info">No hay repuestos en stock.</div>
+            <div class="alert alert-info">
+                {% if sin_ubicacion %}Todos los repuestos{% if request.args.get('buscar') %} de la búsqueda{% endif %} tienen ubicación.{% else %}No hay repuestos en stock.{% endif %}
+            </div>
             {% endif %}
         </div>
     </div>
 </div>
+
+{% if puede_editar_ubicacion %}
+{# #309: un solo modal para todas las filas; el JS de abajo le pone el código y la acción. #}
+<div class="modal fade" id="modalUbicacion" tabindex="-1" aria-labelledby="modalUbicacionLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" class="modal-content" id="formUbicacion">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalUbicacionLabel">Ubicación de <span id="modalUbicacionCodigo"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <label for="inputUbicacion" class="form-label">Lugar en el depósito</label>
+        <input type="text" class="form-control" id="inputUbicacion" name="codigo_ubicacion_fisica"
+               maxlength="{{ ubicacion_fisica_max }}" placeholder="Ej. E01-F04-PB-B02" autocomplete="off">
+        <div class="form-text">
+          Formato: <strong>E05-F04-PB-B02</strong> (Estante-Fila-Posición-Box; Posición y Box son opcionales).
+          Se puede escribir con espacios o en minúscula, se acomoda solo. Vacío = queda "Sin ubicación".
+        </div>
+        <input type="hidden" name="buscar" value="{{ request.args.get('buscar', '') }}">
+        {% if sin_ubicacion %}<input type="hidden" name="sin_ubicacion" value="1">{% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const modalEl = document.getElementById('modalUbicacion');
+  const form = document.getElementById('formUbicacion');
+  const input = document.getElementById('inputUbicacion');
+  const codigoEl = document.getElementById('modalUbicacionCodigo');
+  document.querySelectorAll('.btn-editar-ubicacion').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      form.action = btn.dataset.action;
+      codigoEl.textContent = btn.dataset.codigo;
+      input.value = btn.dataset.ubicacion || '';
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    });
+  });
+  modalEl.addEventListener('shown.bs.modal', function () { input.focus(); input.select(); });
+});
+</script>
+{% endif %}
 {% endblock %}
