@@ -16,6 +16,11 @@ from CODIGO_FUENTE.services.stock import (
     actualizar_estado_alerta_stock,
     ajustar_stock_ubicacion,
 )
+from CODIGO_FUENTE.services.ubicacion_fisica import (
+    SIN_UBICACION,
+    UBICACION_FISICA_MAX,
+    normalizar_ubicacion_fisica,
+)
 
 envios_bp = Blueprint("envios", __name__, url_prefix="/envios")
 
@@ -328,11 +333,14 @@ def envios_view(id):
         return redirect(url_for("envios.envios_list"))
     # Campanita de DML (#170): abrir el detalle saca el envío de "sin ver"
     marcar_visto(get_current_user(), "REPUESTO", id)
+    # #309 (c): con la ubicación actual del código en DML, para precargarla
+    # en la recepción.
     detalles = db.execute(
         """
-        SELECT d.*, m.item
+        SELECT d.*, m.item, su.codigo_ubicacion_fisica AS ubicacion_fisica_dml
         FROM envios_repuestos_detalles d
         LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto
+        LEFT JOIN stock_ubicaciones su ON su.codigo_repuesto = d.codigo_repuesto AND su.ubicacion = 'DML'
         WHERE d.envio_id = %s
         ORDER BY d.codigo_repuesto
         """,
@@ -420,6 +428,41 @@ def envios_confirmar(id):
         ).fetchone()
         revisados[det['id']] = (existente['codigo_repuesto'] if existente else codigo, descripcion, not existente)
 
+    # #309 (c): todo repuesto que entra al depósito queda con ubicación
+    # física. Se pide en cada renglón con algo recibido; viene precargada si
+    # el código ya tenía. Si el campo llega vacío se usa la que ya tenía el
+    # código (ej. un no listado que DML corrigió a un código existente).
+    ubicaciones = {}  # código final -> ubicación normalizada
+    ubicaciones_cambiadas = 0
+    for det in detalles:
+        if recibidos[det['id']] == 0:
+            continue
+        codigo = revisados[det['id']][0] if det['id'] in revisados else det['codigo_repuesto']
+        actual = db.execute(
+            "SELECT codigo_ubicacion_fisica FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = 'DML'",
+            (codigo,)
+        ).fetchone()
+        actual = normalizar_ubicacion_fisica(actual['codigo_ubicacion_fisica'] if actual else None)
+        ubicacion = normalizar_ubicacion_fisica(request.form.get(f"ubicacion_{det['id']}"))
+        if ubicacion == SIN_UBICACION:
+            ubicacion = actual
+        if ubicacion == SIN_UBICACION:
+            db.rollback()
+            flash(f"Falta la ubicación en el depósito de {codigo}: completala, o poné 0 en Recibido si no llegó.", "error")
+            return redirect(url_for("envios.envios_view", id=id))
+        if len(ubicacion) > UBICACION_FISICA_MAX:
+            db.rollback()
+            flash(f"La ubicación de {codigo} no puede tener más de {UBICACION_FISICA_MAX} caracteres.", "error")
+            return redirect(url_for("envios.envios_view", id=id))
+        if ubicaciones.get(codigo, ubicacion) != ubicacion:
+            db.rollback()
+            flash(f"{codigo} aparece en más de un renglón con ubicaciones distintas "
+                  f"({ubicaciones[codigo]} y {ubicacion}): dejá una sola.", "error")
+            return redirect(url_for("envios.envios_view", id=id))
+        if codigo not in ubicaciones and ubicacion != actual:
+            ubicaciones_cambiadas += 1
+        ubicaciones[codigo] = ubicacion
+
     try:
         codigos_nuevos = []
 
@@ -455,6 +498,11 @@ def envios_confirmar(id):
 
             if qty > 0:
                 ajustar_stock_ubicacion(codigo, "DML", qty)
+                db.execute(
+                    """UPDATE stock_ubicaciones SET codigo_ubicacion_fisica = %s
+                       WHERE codigo_repuesto = %s AND ubicacion = 'DML'""",
+                    (ubicaciones[codigo], codigo)
+                )
 
             db.execute(
                 "UPDATE envios_repuestos_detalles SET cantidad_recibida = %s WHERE id = %s",
@@ -497,7 +545,8 @@ def envios_confirmar(id):
 
     diferencias = [det for det in detalles if recibidos[det['id']] != det['cantidad']]
     log_action(user['id'], "CONFIRM", "envios_repuestos", id, None,
-               f"Recepción en DML ({len(diferencias)} diferencias con el remito)")
+               f"Recepción en DML ({len(diferencias)} diferencias con el remito, "
+               f"{ubicaciones_cambiadas} ubicaciones cargadas o cambiadas)")
 
     _avisar_recepcion_a_raypac(envio, detalles, recibidos)
     # Sin mail de "código nuevo": el alta la acaba de revisar alguien de DML
