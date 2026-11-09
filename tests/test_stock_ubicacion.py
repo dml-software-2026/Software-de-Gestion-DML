@@ -151,3 +151,130 @@ def test_raypac_no_ve_la_columna_de_ubicacion(client, repuesto_test):
     html = client.get("/stock").get_data(as_text=True)
     assert "<th>Ubicación</th>" not in html
     assert "btn-editar-ubicacion" not in html
+
+
+# --- #309 (b): Nuevo y Editar repuesto -----------------------------------
+
+@pytest.fixture
+def codigo_nuevo():
+    """Código que todavía no existe; se borra al final lo que haya creado el test."""
+    codigo = f"TEST-NEW-{int(time.time() * 1000)}"
+    yield codigo
+    with app.app_context():
+        db = get_db()
+        db.execute("DELETE FROM stock_ubicaciones WHERE codigo_repuesto = %s", (codigo,))
+        db.execute("DELETE FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,))
+        db.commit()
+
+
+def ubicacion_de(codigo, ubicacion):
+    with app.app_context():
+        fila = get_db().execute(
+            "SELECT cantidad, codigo_ubicacion_fisica FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = %s",
+            (codigo, ubicacion)
+        ).fetchone()
+    return dict(fila) if fila else None
+
+
+@necesita_db
+def test_nuevo_repuesto_muestra_campo_solo_en_dml(client):
+    loguear_como(client, "DML_ST")
+    assert 'name="codigo_ubicacion_fisica"' in client.get("/stock/new?ubicacion=DML").get_data(as_text=True)
+    assert 'name="codigo_ubicacion_fisica"' not in client.get("/stock/new?ubicacion=RAYPAC").get_data(as_text=True)
+
+
+@necesita_db
+def test_nuevo_repuesto_guarda_ubicacion_normalizada(client, codigo_nuevo):
+    loguear_como(client, "DML_REPUESTOS")
+    response = client.post("/stock/new", data={
+        "codigo_repuesto": codigo_nuevo, "item": "Repuesto de prueba QA", "cantidad": "3",
+        "codigo_ubicacion_fisica": " e5 - f4 - pb - b2 ",
+    })
+    assert response.status_code == 302
+    assert ubicacion_de(codigo_nuevo, "DML") == {"cantidad": 3, "codigo_ubicacion_fisica": "E05-F04-PB-B02"}
+
+
+@necesita_db
+def test_nuevo_repuesto_sin_ubicacion_queda_pendiente(client, codigo_nuevo):
+    loguear_como(client, "DML_REPUESTOS")
+    client.post("/stock/new", data={"codigo_repuesto": codigo_nuevo, "item": "Repuesto de prueba QA", "cantidad": "1"})
+    assert ubicacion_de(codigo_nuevo, "DML")["codigo_ubicacion_fisica"] == SIN_UBICACION
+
+
+@necesita_db
+def test_nuevo_repuesto_en_raypac_ignora_ubicacion(client, codigo_nuevo):
+    loguear_como(client, "DML_ST")
+    client.post("/stock/new?ubicacion=RAYPAC", data={
+        "codigo_repuesto": codigo_nuevo, "item": "Repuesto de prueba QA", "cantidad": "1",
+        "codigo_ubicacion_fisica": "E01-F01",
+    })
+    assert ubicacion_de(codigo_nuevo, "RAYPAC")["codigo_ubicacion_fisica"] == SIN_UBICACION
+
+
+@necesita_db
+def test_nuevo_repuesto_sin_descripcion_no_rompe(client, codigo_nuevo):
+    # Antes este camino renderizaba sin user= y el template tiraba error.
+    loguear_como(client, "DML_REPUESTOS")
+    response = client.post("/stock/new", data={"codigo_repuesto": codigo_nuevo, "item": "",
+                                               "codigo_ubicacion_fisica": "E02-F02"})
+    assert response.status_code == 200
+    assert 'value="E02-F02"' in response.get_data(as_text=True)  # no se pierde lo que escribió
+    assert ubicacion_de(codigo_nuevo, "DML") is None
+
+
+@necesita_db
+def test_editar_repuesto_precarga_y_cambia_ubicacion(client, repuesto_test):
+    loguear_como(client, "DML_ST")
+    client.post(f"/stock/{repuesto_test}/ubicacion-fisica", data={"codigo_ubicacion_fisica": "E01-F01-B01"})
+
+    html = client.get(f"/stock/{repuesto_test}/edit?ubicacion=DML").get_data(as_text=True)
+    assert 'value="E01-F01-B01"' in html
+
+    response = client.post(f"/stock/{repuesto_test}/edit?ubicacion=DML",
+                           data={"cantidad": "7", "codigo_ubicacion_fisica": "e3 f7 pb b4"})
+    assert response.status_code == 302
+    assert ubicacion_de(repuesto_test, "DML") == {"cantidad": 7, "codigo_ubicacion_fisica": "E03-F07-PB-B04"}
+
+
+@necesita_db
+def test_editar_repuesto_sin_ubicacion_no_precarga_el_texto_default(client, repuesto_test):
+    loguear_como(client, "DML_ST")
+    html = client.get(f"/stock/{repuesto_test}/edit?ubicacion=DML").get_data(as_text=True)
+    assert f'value="{SIN_UBICACION}"' not in html
+    client.post(f"/stock/{repuesto_test}/edit?ubicacion=DML", data={"cantidad": "5", "codigo_ubicacion_fisica": ""})
+    assert ubicacion_de(repuesto_test, "DML")["codigo_ubicacion_fisica"] == SIN_UBICACION
+
+
+@necesita_db
+def test_codigo_con_barra_funciona_en_editar_ubicacion_y_eliminar(client):
+    # Con <codigo> en la ruta, "/stock/QA 5/11/edit" daba 404.
+    codigo = f"QA {int(time.time() * 1000) % 100000}/11"
+    with app.app_context():
+        db = get_db()
+        numero = db.execute("SELECT MAX(numero) AS max FROM matriz_repuestos").fetchone()['max'] or 0
+        db.execute("""INSERT INTO matriz_repuestos (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
+                      VALUES (%s, %s, 'Repuesto de prueba QA', 0, 0, 'RAYPAC')""", (numero + 1, codigo))
+        db.execute("INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad) VALUES (%s, 'DML', 1)", (codigo,))
+        db.commit()
+    try:
+        loguear_como(client, "DML_ST")
+        html = client.get("/stock?buscar=" + codigo).get_data(as_text=True)
+        assert "/11/edit" in html  # el link de Editar se arma con la barra adentro
+
+        assert client.get(f"/stock/{codigo}/edit?ubicacion=DML").status_code == 200
+        assert client.post(f"/stock/{codigo}/edit?ubicacion=DML",
+                           data={"cantidad": "2", "codigo_ubicacion_fisica": "E01-F01"}).status_code == 302
+        assert client.post(f"/stock/{codigo}/ubicacion-fisica",
+                           data={"codigo_ubicacion_fisica": "E02-F02"}).status_code == 302
+        assert ubicacion_de(codigo, "DML") == {"cantidad": 2, "codigo_ubicacion_fisica": "E02-F02"}
+        assert client.get(f"/api/verificar-stock/{codigo}").status_code == 200
+
+        # Eliminar: la ruta existe (sin contraseña redirige con aviso, no 404)
+        loguear_como(client, "ADMIN")
+        assert client.post(f"/stock/{codigo}/delete?ubicacion=DML").status_code == 302
+    finally:
+        with app.app_context():
+            db = get_db()
+            db.execute("DELETE FROM stock_ubicaciones WHERE codigo_repuesto = %s", (codigo,))
+            db.execute("DELETE FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,))
+            db.commit()
