@@ -26,7 +26,7 @@ ROLES_EDITAR_UBICACION = ("ADMIN", "DML_ST", "DML_REPUESTOS")
 
 @stock_bp.route("")
 @login_required
-@permission_required(read_roles=["DML_ST"], write_roles=["DML_REPUESTOS", "RAYPAC"])
+@permission_required(read_roles=["DML_ST", "RAYPAC"], write_roles=["DML_REPUESTOS"])
 
 def stock_list(readonly=False):
     user = get_current_user()
