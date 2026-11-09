@@ -85,8 +85,8 @@ les va a mandar por mail una copia de todos los datos cada cierto tiempo.
 
 - ¿Cada cuánto quieren recibirlo? (Sugerimos una vez por semana, o todos los días si
   hay mucho movimiento.)
-- ¿A qué casilla lo mandamos? (Mejor una de DML que no use todo el mundo, porque el
-  archivo tiene datos de clientes.)
+- ¿A qué dirección de mail se los mandamos? (Mejor un mail de DML al que no tenga
+  acceso todo el mundo, porque el archivo tiene datos de clientes.)
 
 ## 7. Un código de repuesto (#314)
 
