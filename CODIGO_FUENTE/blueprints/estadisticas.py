@@ -132,7 +132,7 @@ def export_fichas_csv():
 
 @estadisticas_bp.route("/export/stock-csv")
 @login_required
-@role_required("ADMIN", "DML_REPUESTOS", "RAYPAC")
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS", "RAYPAC")
 def export_stock_csv():
     """Exportar stock a CSV"""
     db = get_db()

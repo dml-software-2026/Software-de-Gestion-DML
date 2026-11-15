@@ -46,6 +46,20 @@
                         <input type="hidden" name="cantidad" value="999999">
                         {% endif %}
 
+                        {# #309 (b): lugar físico en el depósito de DML, opcional #}
+                        {% if ubicacion == 'DML' %}
+                        <div class="form-group mb-3">
+                            <label for="codigo_ubicacion_fisica">Ubicación en el depósito (opcional):</label>
+                            <input type="text" class="form-control" id="codigo_ubicacion_fisica" name="codigo_ubicacion_fisica"
+                                   maxlength="100" autocomplete="off" placeholder="ej. E01-F04-PB-B02"
+                                   value="{{ request.form.get('codigo_ubicacion_fisica', '') }}">
+                            <div class="form-text">
+                                Formato: <strong>E05-F04-PB-B02</strong> (Estante-Fila-Posición-Box; Posición y Box son opcionales).
+                                Si lo dejás vacío queda "Sin ubicación" y se puede cargar después.
+                            </div>
+                        </div>
+                        {% endif %}
+
                         <button type="submit" class="btn btn-success">Crear Repuesto</button>
                         <a href="{{ url_for('stock.stock_list') }}" class="btn btn-secondary">Cancelar</a>
                     </form>

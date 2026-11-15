@@ -186,6 +186,26 @@ def migrate_db():
             db.commit()
             print("[MIGRATION] Agregada columna codigo_ubicacion_fisica a stock_ubicaciones")
 
+        # #309: dejar todas las ubicaciones físicas con el mismo formato que
+        # guarda la app (ej. "E05 -F04 " -> "E05-F04"). Las cargadas por CSV
+        # antes del #309 venían con espacios sueltos. Idempotente: solo
+        # actualiza las que cambian; las que no son un código (ej. "USO
+        # TALLER") quedan igual.
+        from CODIGO_FUENTE.services.ubicacion_fisica import normalizar_ubicacion_fisica
+        filas_ubicacion = db.execute(
+            "SELECT id, codigo_ubicacion_fisica FROM stock_ubicaciones WHERE codigo_ubicacion_fisica IS NOT NULL"
+        ).fetchall()
+        cambios_ubicacion = [
+            (normalizar_ubicacion_fisica(f["codigo_ubicacion_fisica"]), f["id"])
+            for f in filas_ubicacion
+            if normalizar_ubicacion_fisica(f["codigo_ubicacion_fisica"]) != f["codigo_ubicacion_fisica"]
+        ]
+        for valor, id_fila in cambios_ubicacion:
+            db.execute("UPDATE stock_ubicaciones SET codigo_ubicacion_fisica = %s WHERE id = %s", (valor, id_fila))
+        if cambios_ubicacion:
+            db.commit()
+            print(f"[MIGRATION] Normalizadas {len(cambios_ubicacion)} ubicaciones físicas (#309)")
+
         # NOTA: las tablas tickets, ticket_historial, stock_alertas,
         # estadisticas_repuestos y freezing_log ya NO se crean acá.
         # Esos CREATE TABLE quedaron cubiertos por schema-postgre.sql,
@@ -299,6 +319,26 @@ def migrate_db():
 
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error creando tabla usuarios_notificaciones: {e}")
+        db.rollback()
+
+    try:
+        cols_notif = _columnas_de(db, "usuarios_notificaciones")
+        if "tipo" not in cols_notif:
+            db.execute("ALTER TABLE usuarios_notificaciones ADD COLUMN tipo TEXT NOT NULL DEFAULT 'STOCK_BAJO'")
+            db.execute("ALTER TABLE usuarios_notificaciones DROP CONSTRAINT IF EXISTS usuarios_notificaciones_email_key")
+            db.execute("""
+                INSERT INTO usuarios_notificaciones (email, nombre, activo, tipo)
+                SELECT email, nombre, activo, 'NUEVO_INGRESO'
+                FROM usuarios_notificaciones WHERE tipo = 'STOCK_BAJO'
+            """)
+        db.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS usuarios_notificaciones_email_tipo_key
+            ON usuarios_notificaciones (email, tipo)
+        """)
+        db.commit()
+        print("[MIGRATION] ✅ usuarios_notificaciones con tipo de aviso (#307)")
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando tipo a usuarios_notificaciones: {e}")
         db.rollback()
 
     # Migración: Tabla avisos_vistos (campanita de DML, #170/#258)
@@ -512,10 +552,12 @@ def migrate_db():
 
 def _huella_migraciones():
     """Huella de los archivos que definen migraciones y datos iniciales:
-    cambia sola cuando alguien toca migrate_db() o el seed."""
+    cambia sola cuando alguien toca migrate_db() o el seed (o la
+    normalización de ubicaciones físicas que usa una migración, #309)."""
     h = hashlib.sha256()
     base = os.path.dirname(os.path.abspath(__file__))
-    for archivo in ("extensions.py", os.path.join("services", "seed.py")):
+    for archivo in ("extensions.py", os.path.join("services", "seed.py"),
+                    os.path.join("services", "ubicacion_fisica.py")):
         with open(os.path.join(base, archivo), "rb") as f:
             h.update(f.read().replace(bytes([13, 10]), bytes([10])))  # CRLF -> LF
     return h.hexdigest()

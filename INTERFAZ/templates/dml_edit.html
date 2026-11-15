@@ -277,7 +277,7 @@
                     return Promise.resolve();
                 }
 
-                return fetch(`/api/verificar-stock/${codigo}`)
+                return fetch(`/api/verificar-stock/${encodeURIComponent(codigo)}`)
                     .then(response => response.json())
                     .then(data => {
                         const stockDisponible = data.stock || 0;

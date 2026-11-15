@@ -1,12 +1,10 @@
-import csv
 import os
 import sys
 from io import BytesIO
 
-from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, url_for
 from werkzeug.security import generate_password_hash
 
-from CODIGO_FUENTE.config import BASE_DIR
 from CODIGO_FUENTE.decorators import (
     get_current_user,
     log_action,
@@ -15,6 +13,7 @@ from CODIGO_FUENTE.decorators import (
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.backup import generar_backup_zip
+from CODIGO_FUENTE.services.carga_stock import PLANILLA_STOCK, cargar_stock_dml, leer_planilla_stock
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -31,195 +30,62 @@ def usuarios_list():
     return render_template("usuarios_list.html", usuarios=usuarios, user=user)
 
 
-@admin_bp.route("/cargar-stock-csv", methods=["POST", "GET"])
+@admin_bp.route("/cargar-stock-csv", methods=["GET", "POST"])
 @login_required
 @role_required("ADMIN")
 def cargar_stock_desde_web():
-    """Endpoint para cargar stock desde el CSV en producción"""
+    """Carga masiva del stock de DML desde la planilla del cliente (#310).
+
+    GET solo muestra la pantalla; la carga se hace con el botón (POST), porque
+    pisa las cantidades y ubicaciones de DML.
+    """
     user = get_current_user()
-    output = []
+    ruta = current_app.config.get("PLANILLA_STOCK", PLANILLA_STOCK)
+    nombre_planilla = os.path.basename(ruta)
+    if request.method == "GET":
+        return render_template("cargar_stock.html", planilla=nombre_planilla,
+                               existe=os.path.exists(ruta), resultado=None)
+
+    db = get_db()
     try:
-        # Ruta al CSV
-        csv_path = os.path.join(BASE_DIR, "DOCUMENTOS DML", "Copia de NUEVO STOCK DE REPUESTOS COMPLETO.csv")
-        output.append(f"[STOCK] Buscando CSV: {csv_path}")
-        print(f"[STOCK] Buscando CSV: {csv_path}", file=sys.stderr, flush=True)
-
-        if not os.path.exists(csv_path):
-            output.append("[STOCK] ❌ Archivo CSV no encontrado")
-            log_action(
-                user['id'],
-                "CARGA_CSV",
-                "matriz_repuestos",
-                None,
-                None,
-                f"resultado=error, motivo=csv_no_encontrado, path={csv_path}"
-            )
-            return "<br>".join(output), 404
-
-        output.append("[STOCK] ✅ CSV encontrado, iniciando carga...")
-        print("[STOCK] ✅ CSV encontrado", file=sys.stderr, flush=True)
-
-        db = get_db()
-        repuestos_cargados = 0
-        repuestos_actualizados = 0
-        cargas_comunes = 0
-        errores = 0
-        resultados_filas = []  # auditoría por fila (#213): se loguea en el 2do loop, después del commit de negocio
-
-        with open(csv_path, 'r', encoding='utf-8-sig') as f:
-            reader = csv.reader(f, delimiter=';')
-
-            # Saltar las primeras 4 filas (encabezados)
-            for _ in range(4):
-                next(reader, None)
-
-            for idx, row in enumerate(reader, start=1):
-                if len(row) < 11:
-                    continue
-
-                codigo = None
-                item = None
-                try:
-                    # Extraer datos
-                    codigo = row[2].strip() if len(row) > 2 and row[2] else None
-                    item = row[3].strip() if len(row) > 3 and row[3] else None
-                    cantidad_str = row[4].strip() if len(row) > 4 and row[4] else "0"
-                    codigo_ubicacion = row[9].strip() if len(row) > 9 and row[9] else "SIN UBICACIÓN"
-
-                    if not codigo or not item:
-                        continue
-
-                    # Limpiar y convertir cantidad
-                    cantidad_str = cantidad_str.replace(',', '')
-                    try:
-                        cantidad = int(float(cantidad_str))
-                    except Exception:
-                        errores += 1
-                        resultados_filas.append({
-                            "record_id": None, "item": item, "resultado": "error",
-                            "motivo": f"cantidad_invalida={cantidad_str}"
-                        })
-                        continue
-
-                    if cantidad <= 0:
-                        cursor = db.execute("SELECT id FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,))
-                        fila_existente = cursor.fetchone()
-                        cargas_comunes += 1
-                        resultados_filas.append({
-                            "record_id": fila_existente["id"] if fila_existente else None,
-                            "item": item, "resultado": "carga_comun",
-                            "motivo": "cantidad_cero_o_menor"
-                        })
-                        continue
-
-                    # 1. Insertar o actualizar en matriz_repuestos
-                    cursor = db.execute("SELECT id FROM matriz_repuestos WHERE codigo_repuesto = %s", (codigo,))
-                    existe_matriz = cursor.fetchone()
-
-                    if not existe_matriz:
-                        numero_correlativo = idx
-                        cursor = db.execute("""
-                            INSERT INTO matriz_repuestos (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
-                            VALUES (%s, %s, %s, %s, %s, 'DML')
-                            RETURNING id
-                        """, (numero_correlativo, codigo, item, cantidad, cantidad))
-                        record_id_fila = cursor.fetchone()["id"]
-                        repuestos_cargados += 1
-                        resultado_fila = "nuevo"
-                    else:
-                        db.execute("""
-                            UPDATE matriz_repuestos
-                            SET item = %s, cantidad_actual = %s
-                            WHERE codigo_repuesto = %s
-                        """, (item, cantidad, codigo))
-                        record_id_fila = existe_matriz["id"]
-                        repuestos_actualizados += 1
-                        resultado_fila = "actualizado"
-
-                    # 2. Insertar o actualizar en stock_ubicaciones (DML)
-                    cursor = db.execute("""
-                        SELECT id FROM stock_ubicaciones
-                        WHERE codigo_repuesto = %s AND ubicacion = 'DML'
-                    """, (codigo,))
-
-                    existe_stock = cursor.fetchone()
-
-                    if not existe_stock:
-                        db.execute("""
-                            INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
-                            VALUES (%s, 'DML', %s, %s)
-                        """, (codigo, cantidad, codigo_ubicacion))
-                    else:
-                        db.execute("""
-                            UPDATE stock_ubicaciones
-                            SET cantidad = %s, codigo_ubicacion_fisica = %s, updated_at = CURRENT_TIMESTAMP
-                            WHERE codigo_repuesto = %s AND ubicacion = 'DML'
-                        """, (cantidad, codigo_ubicacion, codigo))
-
-                    resultados_filas.append({
-                        "record_id": record_id_fila, "item": item, "resultado": resultado_fila
-                    })
-
-                except Exception as e:
-                    errores += 1
-                    resultados_filas.append({
-                        "record_id": None, "item": item, "resultado": "error", "motivo": str(e)
-                    })
-                    continue
-
-        db.commit()  # commit de negocio, atómico — sin cambios respecto a hoy
-
-        # Segundo loop: auditoría por fila, ya con el commit de negocio hecho.
-        # try/except individual: si una fila falla al loguearse, no corta a
-        # las demás, pero se acumula para avisar al final (#213 rediseño).
-        fallos_auditoria = []
-        for r in resultados_filas:
-            try:
-                detalle = f"item={r.get('item')}, resultado={r['resultado']}"
-                if r.get("motivo"):
-                    detalle += f", motivo={r['motivo']}"
-                log_action(user['id'], "CARGA_CSV", "matriz_repuestos", r["record_id"], None, detalle)
-            except Exception:
-                fallos_auditoria.append(r.get("item") or "(sin código)")
-
-        output.append("[STOCK] ✅ Carga completada!")
-        output.append(f"[STOCK] 📦 Repuestos nuevos: {repuestos_cargados}")
-        output.append(f"[STOCK] 🔄 Repuestos actualizados: {repuestos_actualizados}")
-        output.append(f"[STOCK] ➖ Cargas comunes (cantidad 0 o menor): {cargas_comunes}")
-        output.append(f"[STOCK] ⚠️ Errores: {errores}")
-
-        if fallos_auditoria:
-            aviso = f"{len(fallos_auditoria)} fila(s) no pudieron auditarse: {', '.join(fallos_auditoria)}"
-            output.append(f"[STOCK] ⚠️ {aviso}")
-            flash(f"Carga completada, pero {aviso}", "warning")
-
-        print(f"[STOCK] Nuevos: {repuestos_cargados}, Actualizados: {repuestos_actualizados}, "
-              f"Cargas comunes: {cargas_comunes}, Errores: {errores}", file=sys.stderr, flush=True)
-
-        result = "<br>".join(output)
-        result += "<br><br><a href='/stock'>Ver Stock Cargado</a>"
-        return result, 200
-
+        filas, errores = leer_planilla_stock(ruta)
+        resultados = cargar_stock_dml(db, filas)
+        db.commit()
     except Exception as e:
-        import traceback
-        error_msg = str(e)
-        trace = traceback.format_exc()
-        output.append(f"[STOCK] ❌ Error: {error_msg}")
-        print(f"[STOCK] ❌ Error: {error_msg}", file=sys.stderr, flush=True)
-        print(trace, file=sys.stderr, flush=True)
+        db.rollback()
+        print(f"[STOCK] ❌ Error en la carga masiva: {type(e).__name__}: {e!s}", file=sys.stderr, flush=True)
+        log_action(user['id'], "CARGA_CSV", "matriz_repuestos", None, None,
+                   f"resultado=error, planilla={nombre_planilla}, motivo={type(e).__name__}: {e!s}")
+        flash(f"No se cargó nada: {e!s}", "error")
+        return redirect(url_for("admin.cargar_stock_desde_web"))
 
-        log_action(
-            user['id'],
-            "CARGA_CSV",
-            "matriz_repuestos",
-            None,
-            None,
-            f"resultado=error, motivo=excepcion, detalle={error_msg}"
-        )
+    # Auditoría por fila (#213), después del commit de negocio: si una falla, no corta a las demás.
+    fallos_auditoria = []
+    for codigo, item, record_id, resultado in resultados:
+        try:
+            log_action(user['id'], "CARGA_CSV", "matriz_repuestos", record_id, None,
+                       f"{codigo} - {item}, resultado={resultado}, planilla={nombre_planilla}")
+        except Exception:
+            fallos_auditoria.append(codigo)
+    for numero_fila, codigo, motivo in errores:
+        try:
+            log_action(user['id'], "CARGA_CSV", "matriz_repuestos", None, None,
+                       f"{codigo}, resultado=error, fila={numero_fila}, motivo={motivo}")
+        except Exception:
+            fallos_auditoria.append(codigo)
+    if fallos_auditoria:
+        flash(f"Carga completada, pero {len(fallos_auditoria)} fila(s) no pudieron auditarse: "
+              f"{', '.join(fallos_auditoria)}", "warning")
 
-        result = "<br>".join(output)
-        result += f"<br><br><pre>{trace}</pre>"
-        return result, 500
+    resultado = {
+        "nuevos": [r[0] for r in resultados if r[3] == "nuevo"],
+        "actualizados": sum(1 for r in resultados if r[3] == "actualizado"),
+        "en_cero": sum(1 for f in filas if f["cantidad"] == 0),
+        "errores": errores,
+    }
+    print(f"[STOCK] Carga masiva: {len(resultado['nuevos'])} nuevos, {resultado['actualizados']} actualizados, "
+          f"{len(errores)} errores", file=sys.stderr, flush=True)
+    return render_template("cargar_stock.html", planilla=nombre_planilla, existe=True, resultado=resultado)
 
 
 @admin_bp.route("/usuarios/nueva", methods=["GET", "POST"])

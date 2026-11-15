@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Cargar stock desde la planilla{% endblock %}
+
+{% block content %}
+{# #310: carga masiva del stock de DML con la planilla del cliente. #}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="bi bi-file-earmark-spreadsheet"></i> Cargar stock desde la planilla</h3>
+                </div>
+                <div class="card-body">
+                    {% if resultado %}
+                    <div class="alert alert-success" role="alert">
+                        <i class="bi bi-check-circle-fill"></i> <strong>Carga completada.</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Repuestos actualizados: <strong>{{ resultado.actualizados }}</strong></li>
+                            <li>Repuestos nuevos: <strong>{{ resultado.nuevos | length }}</strong>
+                                {% if resultado.nuevos %}<br><small>{{ resultado.nuevos | join(', ') }}</small>{% endif %}</li>
+                            <li>Quedaron en 0 (agotados según la planilla): <strong>{{ resultado.en_cero }}</strong></li>
+                        </ul>
+                    </div>
+                    {% if resultado.errores %}
+                    <div class="alert alert-warning" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <strong>{{ resultado.errores | length }} fila(s) no se cargaron</strong> y esos repuestos quedaron como estaban:
+                        <ul class="mb-0 mt-2">
+                            {% for fila, codigo, motivo in resultado.errores %}
+                            <li>Fila {{ fila }}, {{ codigo }}: {{ motivo }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    <a href="{{ url_for('stock.stock_list') }}" class="btn btn-primary">
+                        <i class="bi bi-box-seam"></i> Ver el stock
+                    </a>
+                    {% else %}
+                    <p>
+                        Reemplaza el stock de <strong>DML</strong> con la planilla del cliente
+                        <code>{{ planilla }}</code>:
+                    </p>
+                    <ul class="mb-3">
+                        <li>Pisa la <strong>cantidad</strong> y la <strong>ubicación física</strong> de cada repuesto de la planilla (un 0 lo deja agotado).</li>
+                        <li>Da de alta los códigos que todavía no existen.</li>
+                        <li>Los repuestos que no están en la planilla y el stock de RAYPAC no se tocan.</li>
+                        <li>No manda alertas ni mails de stock bajo.</li>
+                    </ul>
+
+                    <div class="alert alert-warning d-flex gap-2 align-items-start" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <div>
+                            Los movimientos hechos en el sistema después de la fecha de la planilla (repuestos usados en fichas,
+                            envíos recibidos, correcciones a mano) se pierden.
+                            Antes de cargar, <a href="{{ url_for('admin.backup') }}">descargá un backup</a>.
+                        </div>
+                    </div>
+
+                    {% if existe %}
+                    {# Modal de confirmación de la app (#132), no el confirm() del navegador #}
+                    <form method="post" onsubmit="return confirmarAccion(event, 'Esto reemplaza las cantidades y ubicaciones de DML con la planilla {{ planilla }}. ¿Continuar?');">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-upload"></i> Cargar stock desde la planilla
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="alert alert-danger mb-0" role="alert">
+                        No se encontró la planilla en el servidor (<code>DOCUMENTOS DML/{{ planilla }}</code>).
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
