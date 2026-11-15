@@ -21,7 +21,7 @@ from CODIGO_FUENTE.decorators import (
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.flujo import build_flow_steps
-from CODIGO_FUENTE.services.mail import send_mail
+from CODIGO_FUENTE.services.mail import get_destinatarios, send_mail
 from CODIGO_FUENTE.services.numeracion import crear_ticket, generate_ficha_number
 from CODIGO_FUENTE.services.pdf import generar_pdf_ficha
 from CODIGO_FUENTE.services.stock import (
@@ -832,7 +832,8 @@ def dml_close(id):
             """
             mail_sent = send_mail(raypac['mail_comercial'],
                                  f"✅ Máquina Lista: Ficha #{ficha['numero_ficha']:07d}",
-                                 html_body)
+                                 html_body,
+                                 cc=get_destinatarios("MAQUINA_LISTA"))
             mail_status = "enviada" if mail_sent else "fallida (revisar logs)"
         else:
             mail_status = "sin email configurado"
@@ -840,7 +841,8 @@ def dml_close(id):
         log_action(user['id'], "CLOSE", "dml_fichas", id, None,
                   f"Ficha finalizada - Notificación {mail_status} - Comercial: {raypac['comercial'] if raypac else 'N/A'}")
 
-        flash(f"✅ Ficha #{ficha['numero_ficha']} cerrada y marcada como ENTREGADA. Notificación {mail_status}.", "success")
+        categoria = "success" if mail_status == "enviada" else "warning"
+        flash(f"✅ Ficha #{ficha['numero_ficha']} cerrada y marcada como ENTREGADA. Notificación {mail_status}.", categoria)
         return redirect(url_for("dml.dml_view", id=id))
     except Exception as e:
         flash(f"Error al cerrar ficha: {e!s}", "error")
