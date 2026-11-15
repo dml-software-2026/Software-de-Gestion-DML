@@ -10,8 +10,8 @@
                     {% if readonly %}
                     <span class="badge badge-info" style="font-size: 14px; margin-right: 10px;">Modo Solo Lectura</span>
                     {% endif %}
-                    <a href="{{ url_for('estadisticas.export_stock_csv') }}" class="btn btn-success btn-sm" title="Exportar a CSV">
-                        <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                    <a href="{{ url_for('estadisticas.export_stock_xlsx') }}" class="btn btn-success btn-sm" title="Descargar el stock en Excel">
+                        <i class="bi bi-file-earmark-excel"></i> Descargar Excel
                     </a>
                     {% if ubicaciones_disponibles %}
                     <div class="btn-group ms-2" role="group">

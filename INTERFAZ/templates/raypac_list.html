@@ -20,8 +20,8 @@
             <a class="btn btn-success" href="{{ url_for('raypac.raypac_new') }}">
                 <i class="fas fa-plus"></i> Nuevo Ingreso
             </a>
-            <a href="{{ url_for('estadisticas.export_raypac_csv') }}" class="btn btn-info btn-sm" title="Exportar a CSV">
-                <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+            <a href="{{ url_for('estadisticas.export_raypac_xlsx') }}" class="btn btn-info btn-sm" title="Descargar los ingresos en Excel">
+                <i class="bi bi-file-earmark-excel"></i> Descargar Excel
             </a>
             {% elif readonly %}
             <span class="badge badge-info" style="font-size: 14px;">Modo Solo Lectura</span>
