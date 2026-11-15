@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.services.mail import send_mail
+from CODIGO_FUENTE.services.mail import get_destinatarios, send_mail
 
 NIVELES_CON_MAIL = ("NARANJA", "ROJO")
 
@@ -151,13 +151,8 @@ def enviar_alerta_stock(codigo, item, cantidad, nivel, ubicacion="DML"):
     """
 
      # Enviar a todos los destinatarios activos configurados en usuarios_notificaciones
-    db = get_db()
-    destinatarios = db.execute(
-        "SELECT email FROM usuarios_notificaciones WHERE activo = TRUE"
-    ).fetchall()
-
-    for destinatario in destinatarios:
-        send_mail(destinatario["email"], f"🔔 Alerta de Stock: {item}", body)
+    for email in get_destinatarios("STOCK_BAJO"):
+        send_mail(email, f"🔔 Alerta de Stock: {item}", body)
 
 
 def actualizar_estado_alerta_stock(codigo, ubicacion="DML"):

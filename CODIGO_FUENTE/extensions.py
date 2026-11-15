@@ -321,6 +321,26 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error creando tabla usuarios_notificaciones: {e}")
         db.rollback()
 
+    try:
+        cols_notif = _columnas_de(db, "usuarios_notificaciones")
+        if "tipo" not in cols_notif:
+            db.execute("ALTER TABLE usuarios_notificaciones ADD COLUMN tipo TEXT NOT NULL DEFAULT 'STOCK_BAJO'")
+            db.execute("ALTER TABLE usuarios_notificaciones DROP CONSTRAINT IF EXISTS usuarios_notificaciones_email_key")
+            db.execute("""
+                INSERT INTO usuarios_notificaciones (email, nombre, activo, tipo)
+                SELECT email, nombre, activo, 'NUEVO_INGRESO'
+                FROM usuarios_notificaciones WHERE tipo = 'STOCK_BAJO'
+            """)
+        db.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS usuarios_notificaciones_email_tipo_key
+            ON usuarios_notificaciones (email, tipo)
+        """)
+        db.commit()
+        print("[MIGRATION] ✅ usuarios_notificaciones con tipo de aviso (#307)")
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando tipo a usuarios_notificaciones: {e}")
+        db.rollback()
+
     # Migración: Tabla avisos_vistos (campanita de DML, #170/#258)
     try:
         db.execute("""

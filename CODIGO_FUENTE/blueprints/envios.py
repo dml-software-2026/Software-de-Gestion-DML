@@ -11,7 +11,7 @@ from CODIGO_FUENTE.decorators import (
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.avisos import ids_sin_ver, marcar_visto, reiniciar_vistos
-from CODIGO_FUENTE.services.mail import get_destinatarios_activos, send_mail
+from CODIGO_FUENTE.services.mail import get_destinatarios, send_mail
 from CODIGO_FUENTE.services.stock import (
     actualizar_estado_alerta_stock,
     ajustar_stock_ubicacion,
@@ -582,7 +582,8 @@ def _avisar_recepcion_a_raypac(envio, detalles, recibidos):
         <ul>{''.join(lineas)}</ul>
         <p>Los repuestos fueron cargados en stock DML con las cantidades recibidas.</p>
         """
-        send_mail("raypac@dml.local", f"Recepción remito {envio['numero_remito']} en DML", html_body)
+        for email in get_destinatarios("RECEPCION_REPUESTOS"):
+            send_mail(email, f"Recepción remito {envio['numero_remito']} en DML", html_body)
     except Exception as e:
         print(f"Error enviando mail de recepción a Raypac: {e}")
 
@@ -712,7 +713,7 @@ def _avisar_envio_despachado(envio):
         <p>Tipo de entrega: {envio['tipo_entrega']}</p>
         <ul>{items_html}</ul>
         """
-        for email in get_destinatarios_activos():
+        for email in get_destinatarios("NUEVO_INGRESO"):
             send_mail(email, f"📦 Nuevo envío {envio['numero_remito']}", html)
     except Exception as e:
         print(f"Error enviando aviso de nuevo envío: {e}")
