@@ -78,6 +78,7 @@ TIPOS_AVISO = {
     "STOCK_BAJO": "Stock bajo",
     "MAQUINA_LISTA": "Máquina lista para retirar (copia)",
     "NUEVO_INGRESO": "Nuevo pedido o máquina ingresada",
+    "RECEPCION_REPUESTOS": "Recepción de repuestos en DML (aviso a RAYPAC)",
     "BACKUP": "Backup semanal",
 }
 

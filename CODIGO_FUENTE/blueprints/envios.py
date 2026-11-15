@@ -582,7 +582,8 @@ def _avisar_recepcion_a_raypac(envio, detalles, recibidos):
         <ul>{''.join(lineas)}</ul>
         <p>Los repuestos fueron cargados en stock DML con las cantidades recibidas.</p>
         """
-        send_mail("raypac@dml.local", f"Recepción remito {envio['numero_remito']} en DML", html_body)
+        for email in get_destinatarios("RECEPCION_REPUESTOS"):
+            send_mail(email, f"Recepción remito {envio['numero_remito']} en DML", html_body)
     except Exception as e:
         print(f"Error enviando mail de recepción a Raypac: {e}")
 
