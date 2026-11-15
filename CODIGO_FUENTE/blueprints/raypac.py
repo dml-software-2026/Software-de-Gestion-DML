@@ -13,23 +13,30 @@ from CODIGO_FUENTE.decorators import (
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.avisos import marcar_visto, reiniciar_vistos
 from CODIGO_FUENTE.services.flujo import build_flow_steps
+from CODIGO_FUENTE.services.remito import normalizar_remito, numero_para_input
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
 
 
-def codigo_desfreeze(numero_remito):
-    """Código que pide "Desfreezar Definitivamente" y cómo explicárselo al
-    ADMIN. Devuelve (codigo, explicacion).
+CODIGO_DESFREEZE_AYUDA = "los últimos 4 dígitos del remito"
 
-    #259: el remito pasó a ser el número de serie de la máquina -> código =
-    sus últimos 4 caracteres. Los ingresos viejos, freezados con un remito
-    en formato 00001-XXXXXXXX, siguen pidiendo lo que va después del guión
-    (CAMBIO DAVID original).
+
+def codigos_desfreeze(numero_remito):
+    """Códigos que acepta "Desfreezar Definitivamente" para un remito.
+
+    #305: el código son los últimos 4 dígitos del remito (así lo describe el
+    cliente). Sirve igual para los ingresos freezados en la época del #292,
+    cuyo "remito" era el N° de serie: sus últimos 4 caracteres. Por
+    compatibilidad, los remitos 00001-XXXXXXXX aceptan también los 8 dígitos
+    después del guión, que era el código antes del #292.
     """
-    remito = numero_remito or ""
+    remito = (numero_remito or "").strip().upper()
+    if not remito:
+        return set()
+    codigos = {remito[-4:]}
     if re.match(r'^\d{4,5}-\d{8}$', remito):
-        return remito.split('-')[-1], "los 8 dígitos del remito después del guión"
-    return remito[-4:], "los últimos 4 caracteres del N° de serie"
+        codigos.add(remito.split('-')[-1])
+    return codigos
 
 
 def _obtener_clientes(db):
@@ -148,9 +155,9 @@ def raypac_new():
                 flash("Por favor completa todos los campos obligatorios.", "error")
                 return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
-            # #259: la misma máquina puede entrar varias veces (el N° de serie
-            # es también el remito), así que ya no se bloquea un N° de serie
-            # repetido - solo se avisa, por si fue una carga duplicada sin querer.
+            # #259: la misma máquina puede entrar varias veces, así que no se
+            # bloquea un N° de serie repetido - solo se avisa, por si fue una
+            # carga duplicada sin querer.
             ingresos_previos = db.execute(
                 "SELECT COUNT(*) AS n FROM raypac_entries WHERE numero_serie = %s", (numero_serie,)
             ).fetchone()['n']
@@ -233,7 +240,8 @@ def raypac_view(id, readonly=False):
 
     return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly,
                             ticket=ticket, ficha=ficha, flow_steps=flow_steps,
-                            codigo_desfreeze_ayuda=codigo_desfreeze(entry['numero_remito'])[1])
+                            codigo_desfreeze_ayuda=CODIGO_DESFREEZE_AYUDA,
+                            remito_precargado=numero_para_input(entry['numero_remito']))
 
 
 @raypac_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -305,12 +313,17 @@ def raypac_freeze(id):
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
-    # #259: el remito del envío a DML es el número de serie de la máquina (ya
-    # no se carga a mano). Se puede repetir: la misma máquina puede entrar
-    # varias veces, así que no se valida que sea único.
-    numero_remito = (entry['numero_serie'] or "").strip()
-    if not numero_remito:
-        flash("⚠️ El ingreso no tiene número de serie. Editalo y cargalo antes de freezar.", "error")
+    if entry['is_frozen']:
+        flash("El registro ya está freezado.", "error")
+        return redirect(url_for("raypac.raypac_view", id=id))
+
+    # #305: el remito lo carga RAYPAC a mano (el #292 había puesto el N° de
+    # serie, fue un malentendido del #259). Obligatorio: "toda máquina viene
+    # con remito" (David, 2026-11-15). Se puede repetir: varias máquinas
+    # viajan con el mismo remito, así que no se valida que sea único.
+    numero_remito, error = normalizar_remito(request.form.get("numero_remito"))
+    if error:
+        flash(error, "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     db.execute("""
@@ -334,7 +347,7 @@ def raypac_freeze(id):
     log_action(user['id'], "FREEZE", "raypac_entries", id, None,
               f"Freezado con remito {numero_remito} - Equipo enviado a DML")
 
-    flash("Máquina freezada y enviada a ST.", "success")
+    flash(f"Máquina freezada y enviada a ST con el remito {numero_remito}.", "success")
     return redirect(url_for("raypac.raypac_view", id=id))
 
 
@@ -357,9 +370,8 @@ def raypac_unfreeze(id):
 
     unfreeze_code = request.form.get("unfreeze_code", "").strip()
 
-    codigo_correcto, explicacion = codigo_desfreeze(entry['numero_remito'])
-    if unfreeze_code.upper() != codigo_correcto.upper():
-        flash(f"⚠️ Código incorrecto. Use {explicacion} ({entry['numero_remito']}).", "error")
+    if unfreeze_code.upper() not in codigos_desfreeze(entry['numero_remito']):
+        flash(f"⚠️ Código incorrecto. Use {CODIGO_DESFREEZE_AYUDA} ({entry['numero_remito']}).", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     # Al desfreezar, el envío a DML queda sin confirmar de nuevo (vuelve a
