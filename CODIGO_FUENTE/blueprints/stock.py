@@ -26,7 +26,7 @@ ROLES_EDITAR_UBICACION = ("ADMIN", "DML_ST", "DML_REPUESTOS")
 
 @stock_bp.route("")
 @login_required
-@permission_required(read_roles=["DML_ST"], write_roles=["DML_REPUESTOS", "RAYPAC"])
+@permission_required(read_roles=["DML_ST", "RAYPAC"], write_roles=["DML_REPUESTOS"])
 
 def stock_list(readonly=False):
     user = get_current_user()
@@ -34,8 +34,8 @@ def stock_list(readonly=False):
 
     # Determinar ubicación según rol del usuario
     if user['role'] == 'RAYPAC':
-        # RAYPAC solo ve su stock (RAYPAC)
-        ubicacion = "RAYPAC"
+        ubicacion = "DML"
+
     elif user['role'] in ['DML_REPUESTOS', 'DML_ST']:
         # DML_REPUESTOS y DML_ST ven stock de DML
         ubicacion = "DML"
@@ -45,7 +45,7 @@ def stock_list(readonly=False):
 
     buscar = request.args.get("buscar", "")
     # #309: la ubicación física es solo del depósito de DML.
-    mostrar_ubicacion_fisica = ubicacion == "DML"
+    mostrar_ubicacion_fisica = ubicacion == "DML" and user['role'] != 'RAYPAC'
     sin_ubicacion = mostrar_ubicacion_fisica and request.args.get("sin_ubicacion") == "1"
 
     # Query con filtro por ubicación
@@ -251,7 +251,7 @@ def stock_new():
 # /stock/PRUEBA 5/11/edit daba 404. Lo mismo en ubicacion-fisica y delete.
 @stock_bp.route("/<path:codigo>/edit", methods=["GET", "POST"])
 @login_required
-@role_required("ADMIN", "DML_ST")
+@role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
 def stock_edit(codigo):
     user = get_current_user()
     db = get_db()
