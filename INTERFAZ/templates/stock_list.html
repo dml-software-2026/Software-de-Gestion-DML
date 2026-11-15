@@ -70,20 +70,18 @@
             {# #199: thead oscuro, mismo patrón que dml_list.html/raypac_list.html/tickets_list.html #}
             <table class="table table-striped table-hover">
                 <thead class="table-dark">
-                    <tr>
-                        <th>Código</th>
-                        <th>Descripción</th>
-                        {% if mostrar_ubicacion_fisica %}
-                        <th>Ubicación</th>
-                        {% endif %}
-                        {% if user.role != 'RAYPAC' %}
-                        <th>Cantidad</th>
-                        <th>Estado</th>
-                        {% endif %}
-                        {% if user.role in ['ADMIN', 'DML_ST'] %}
-                        <th>Acciones</th>
-                        {% endif %}
-                    </tr>
+                   <tr>
+                      <th>Código</th>
+                      <th>Descripción</th>
+                      {% if mostrar_ubicacion_fisica %}
+                     <th>Ubicación</th>
+                     {% endif %}
+                     <th>Cantidad</th>
+                     <th>Estado</th>
+                     {% if user.role in ['ADMIN', 'DML_ST', 'DML_REPUESTOS'] %}
+                     <th>Acciones</th>
+                     {% endif %}
+                  </tr>
                 </thead>
                 <tbody>
                     {% for row in rows %}
@@ -111,7 +109,6 @@
                             {% endif %}
                         </td>
                         {% endif %}
-                        {% if user.role != 'RAYPAC' %}
                         <td class="text-center">
                             <strong style="color: black;">{{ row.cantidad }}</strong>
                         </td>
@@ -128,8 +125,7 @@
                             <span class="badge bg-secondary">N/A</span>
                             {% endif %}
                         </td>
-                        {% endif %}
-                        {% if user.role in ['ADMIN', 'DML_ST'] %}
+                        {% if user.role in ['ADMIN', 'DML_ST', 'DML_REPUESTOS'] %}
                         <td>
                             <a href="{{ url_for('stock.stock_edit', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" class="btn btn-sm btn-primary">Editar</a>
                             {% if user.role == 'ADMIN' %}
