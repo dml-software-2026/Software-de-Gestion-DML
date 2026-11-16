@@ -64,7 +64,7 @@ def ticket_nuevo(raypac_id):
             servo = request.form.get("servo", "BUENO")
             rueda_arrastre = request.form.get("rueda_arrastre", "BUENO")
             resorte_manija = request.form.get("resorte_manija", "BUENO")
-            otros = request.form.get("otros", "BUENO")
+            otros = request.form.get("otros", "").strip()[:500]  # #330: texto libre
 
             # Validación
             if not tecnico_responsable:

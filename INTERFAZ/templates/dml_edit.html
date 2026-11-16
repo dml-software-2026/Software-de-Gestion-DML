@@ -60,6 +60,14 @@
 
                 <div class="row mb-4">
                     {% for parte in partes %}
+                    {% if parte.nombre_parte == 'OTROS' %}
+                    {# #330: OTROS es texto libre y sale completo en la vista y el PDF #}
+                    <div class="col-12 mb-3">
+                        <label class="form-label fw-bold" for="parte_{{ loop.index0 }}">OTROS:</label>
+                        <textarea name="parte_{{ loop.index0 }}" id="parte_{{ loop.index0 }}" class="form-control" rows="2" maxlength="500"
+                                  placeholder="Otras observaciones del estado del equipo (opcional)">{{ parte.estado or '' }}</textarea>
+                    </div>
+                    {% else %}
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-bold">{{ parte.nombre_parte }}:</label>
                         <select name="parte_{{ loop.index0 }}" class="js-select-enhance">
@@ -72,6 +80,7 @@
                             <option value="DESGASTADA" {% if parte.estado == 'DESGASTADA' %}selected{% endif %}>DESGASTADA</option>
                         </select>
                     </div>
+                    {% endif %}
                     {% endfor %}
                 </div>
 

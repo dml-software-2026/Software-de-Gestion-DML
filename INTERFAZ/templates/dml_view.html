@@ -136,7 +136,12 @@
                         {% for parte in partes %}
                         <tr>
                             <td>{{ parte.nombre_parte }}</td>
+                            {% if parte.nombre_parte == 'OTROS' %}
+                            {# #330: texto libre, completo y respetando los saltos de línea #}
+                            <td style="white-space: pre-wrap;">{{ parte.estado or '-' }}</td>
+                            {% else %}
                             <td><span class="badge bg-{{ parte_color.get(parte.estado, 'secondary') }}">{{ parte.estado or 'BUENO' }}</span></td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
