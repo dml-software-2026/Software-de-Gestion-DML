@@ -443,6 +443,19 @@ def migrate_db():
             db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS recibido_por TEXT")
             print("[MIGRATION] ✅ Columna recibido_por agregada")
 
+        # #333: cuándo DML envió la ficha a RAYPAC ("Enviar a RAYPAC"). La
+        # ficha recién se cierra (is_closed) con el OK de recepción de RAYPAC.
+        # Las fichas ya cerradas antes del #333 se marcan como enviadas (no se
+        # reabren): quedan entregadas, igual que antes.
+        if "enviada_raypac_at" not in column_names:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS enviada_raypac_at TIMESTAMP")
+            db.execute("""
+                UPDATE dml_fichas
+                SET enviada_raypac_at = COALESCE(fecha_egreso::timestamp, updated_at, CURRENT_TIMESTAMP)
+                WHERE is_closed = TRUE AND enviada_raypac_at IS NULL
+            """)
+            print("[MIGRATION] Columna enviada_raypac_at agregada")
+
         db.commit()
         print("[MIGRATION] ✅ Campos de acuse de recibo verificados")
 

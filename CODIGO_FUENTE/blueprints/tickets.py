@@ -198,7 +198,7 @@ def ticket_view(numero_ticket):
     ticket = db.execute("""
         SELECT t.*,
                f.numero_ficha, f.estado_reparacion, f.diagnostico_inicial, f.diagnostico_reparacion,
-               f.is_closed, f.fecha_entrega_cliente,
+               f.is_closed, f.fecha_entrega_cliente, f.enviada_raypac_at,
                r.cliente, r.numero_serie, r.modelo_maquina, r.comercial
         FROM tickets t
         LEFT JOIN dml_fichas f ON t.ficha_id = f.id
@@ -218,9 +218,9 @@ def ticket_view(numero_ticket):
     # #158: tracker de 4 pasos, mismo criterio que dml_view() - acá el
     # ticket es la puerta de entrada, así que puede no tener ficha todavía
     # (a diferencia de dml_view, donde el ticket siempre está hecho).
-    if ticket['fecha_entrega_cliente']:
+    if ticket['fecha_entrega_cliente'] or ticket['is_closed']:
         current_step = 4
-    elif ticket['is_closed']:
+    elif ticket['enviada_raypac_at']:  # #333: DML la envió, falta el OK de RAYPAC
         current_step = 3
     elif ticket['numero_ficha']:
         current_step = 2

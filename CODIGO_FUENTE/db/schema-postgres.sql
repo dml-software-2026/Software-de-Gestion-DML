@@ -237,6 +237,7 @@ CREATE TABLE dml_fichas (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     fecha_entrega_cliente TIMESTAMP,
     recibido_por TEXT,
+    enviada_raypac_at TIMESTAMP,  -- #333: "Enviar a RAYPAC"; se cierra con el OK de RAYPAC
     ticket_id INTEGER,
     FOREIGN KEY (raypac_id) REFERENCES raypac_entries (id) ON DELETE CASCADE
 );
