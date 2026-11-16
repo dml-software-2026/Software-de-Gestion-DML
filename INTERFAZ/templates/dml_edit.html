@@ -239,6 +239,10 @@
             // (así tampoco importa si el usuario tabuló o apretó Enter directo).
             let stockSuficiente = true;
             let bloqueoDuro = false; // ya está en la ficha, o código inexistente
+            // #306: evita el doble POST (doble clic mientras se verifica el
+            // stock). procesando = hay un clic en curso; enviando = ya se mandó.
+            let procesando = false;
+            let enviando = false;
             let ultimoCodigoVerificado = null;
 
             const codigoInput = document.getElementById('codigo_repuesto');
@@ -355,16 +359,34 @@
                 const modal = new bootstrap.Modal(document.getElementById('stockAlertModal'));
                 modal.show();
 
+                // #306: clonar el botón limpia los listeners de aperturas
+                // anteriores del modal (si no, se acumulan y un clic manda
+                // el form varias veces). Mismo truco que confirmMoveStock.
+                const confirmBtn = document.getElementById('confirmAddRepuesto');
+                confirmBtn.replaceWith(confirmBtn.cloneNode(true));
                 document.getElementById('confirmAddRepuesto').addEventListener('click', function() {
+                    this.disabled = true;
+                    this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Agregando...';
                     modal.hide();
-                    const newForm = formAgregar.cloneNode(true);
-                    formAgregar.parentNode.replaceChild(newForm, formAgregar);
-                    newForm.submit();
+                    enviarFormAgregar();
                 }, { once: true });
+            }
+
+            // #306: manda el form una sola vez y deja el botón en "Agregando...".
+            // form.submit() no vuelve a disparar el evento submit.
+            function enviarFormAgregar() {
+                if (enviando) return;
+                enviando = true;
+                btnAgregar.disabled = true;
+                btnAgregar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Agregando...';
+                formAgregar.submit();
             }
 
             formAgregar.addEventListener('submit', function(e) {
                 e.preventDefault();
+                if (procesando || enviando) return;  // #306: ignora los clics repetidos
+                procesando = true;
+                btnAgregar.disabled = true;
 
                 const codigo = codigoInput.value.trim().toUpperCase();
                 const chequeoPendiente = codigo !== ultimoCodigoVerificado
@@ -372,14 +394,30 @@
 
                 chequeoPendiente.then(() => {
                     if (stockSuficiente) {
-                        formAgregar.submit();
-                    } else if (!bloqueoDuro) {
+                        enviarFormAgregar();
+                        return;
+                    }
+                    if (!bloqueoDuro) {
                         mostrarModalConfirmacion();
                     }
                     // bloqueoDuro (duplicado o código inexistente): no se
                     // ofrece "agregar de todas formas", el usuario tiene que
                     // corregir el código primero.
+                    btnAgregar.disabled = bloqueoDuro;
+                }).finally(() => {
+                    procesando = false;
                 });
+            });
+
+            // #306: si se vuelve con "Atrás" el navegador puede restaurar la
+            // página con el botón trabado en "Agregando...": se resetea.
+            window.addEventListener('pageshow', function(e) {
+                if (e.persisted) {
+                    enviando = false;
+                    procesando = false;
+                    btnAgregar.disabled = false;
+                    btnAgregar.innerHTML = '<i class="bi bi-check-circle"></i> Agregar';
+                }
             });
 
             // Confirmación de eliminación de repuesto (reemplaza el confirm()

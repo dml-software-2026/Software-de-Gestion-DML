@@ -455,7 +455,10 @@ def agregar_repuesto(id):
     user = get_current_user()
     db = get_db()
 
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
+    # #306: FOR UPDATE bloquea la ficha hasta el commit. Si llegan dos POST
+    # seguidos (doble clic), el segundo espera acá a que termine el primero
+    # y después ve el repuesto ya cargado (chequeo de duplicado de abajo).
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s FOR UPDATE", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_edit", id=id))
@@ -478,6 +481,18 @@ def agregar_repuesto(id):
         flash(f"Repuesto '{codigo}' no encontrado en la matriz de repuestos.", "error")
         return redirect(url_for("dml.dml_edit", id=id))
 
+    # #306: mismo criterio que dml_edit.html ("Este repuesto ya está agregado a
+    # la ficha"), ahora también en el backend: frena el doble POST y que el
+    # stock se descuente dos veces.
+    ya_cargado = db.execute(
+        "SELECT 1 FROM dml_repuestos WHERE ficha_id = %s AND codigo_repuesto = %s",
+        (id, codigo)
+    ).fetchone()
+    if ya_cargado:
+        db.rollback()  # suelta el FOR UPDATE
+        flash(f"El repuesto '{codigo}' ya está agregado a la ficha.", "warning")
+        return redirect(url_for("dml.dml_edit", id=id))
+
     # Verificar stock AUTOMÁTICAMENTE en ubicación DML
     stock = db.execute(
         "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = 'DML'",
@@ -489,21 +504,25 @@ def agregar_repuesto(id):
         en_stock = 1
         en_falta = 0
         estado_repuesto = "EN STOCK"
-        # Descontar del stock en DML usando ajustar_stock_ubicacion
-        ajustar_stock_ubicacion(codigo, "DML", -cantidad_utilizada)
-        # Actualizar estadísticas de uso (solo cuando el repuesto se usa de verdad)
-        actualizar_estadistica_repuesto(codigo, cantidad_utilizada)
     else:
         en_stock = 0
         en_falta = 1
         estado_repuesto = "EN FALTA"
 
-    # Insertar repuesto
+    # Insertar repuesto. #306: va ANTES de tocar el stock porque
+    # actualizar_estadistica_repuesto() hace su propio commit (y eso suelta
+    # el FOR UPDATE): así el repuesto ya queda guardado junto con el descuento.
     db.execute("""
         INSERT INTO dml_repuestos
         (ficha_id, codigo_repuesto, descripcion, cantidad, cantidad_utilizada, estado_repuesto, en_stock, en_falta)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, (id, codigo, repuesto['item'], cantidad_utilizada, cantidad_utilizada, estado_repuesto, en_stock, en_falta))
+
+    if en_stock:
+        # Descontar del stock en DML usando ajustar_stock_ubicacion
+        ajustar_stock_ubicacion(codigo, "DML", -cantidad_utilizada)
+        # Actualizar estadísticas de uso (solo cuando el repuesto se usa de verdad)
+        actualizar_estadistica_repuesto(codigo, cantidad_utilizada)
     db.commit()
 
     # (se sacó la llamada a actualizar_estadistica_repuesto que estaba acá)
