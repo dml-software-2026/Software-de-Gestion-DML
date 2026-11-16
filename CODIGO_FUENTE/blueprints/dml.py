@@ -11,6 +11,7 @@ from flask import (
     url_for,
 )
 
+from CODIGO_FUENTE.config import TECNICOS_ST
 from CODIGO_FUENTE.decorators import (
     get_current_user,
     log_action,
@@ -155,6 +156,13 @@ def dml_new(raypac_id):
             if not tecnico and not tecnico_resp:
                 flash("Completa los campos obligatorios: debe indicar un técnico responsable.", "error")
                 return render_template("dml_form.html", raypac=raypac, ticket=ticket)
+
+            # #327: el técnico viene del ticket (hidden) o del <select>. Se acepta
+            # el del ticket aunque sea un texto viejo, sino tiene que ser de la lista.
+            for t in (tecnico, tecnico_resp):
+                if t and t not in TECNICOS_ST and t != ticket['tecnico_responsable']:
+                    flash("Técnico responsable inválido. Elegí uno de la lista.", "error")
+                    return render_template("dml_form.html", raypac=raypac, ticket=ticket)
 
             # Asegurar que ambos campos tengan valor (tecnico es NOT NULL en BD)
             if not tecnico_resp:
@@ -359,6 +367,11 @@ def dml_edit(id):
 
             if estado not in ESTADOS_EDITABLES:
                 flash("Estado de reparación inválido. Elegí uno de la lista.", "error")
+                return redirect(url_for("dml.dml_edit", id=id))
+
+            # #327: técnico de la lista, vacío, o el texto viejo que ya tenía la ficha
+            if tecnico_resp and tecnico_resp not in TECNICOS_ST and tecnico_resp != (ficha['tecnico_resp'] or ""):
+                flash("Técnico responsable inválido. Elegí uno de la lista.", "error")
                 return redirect(url_for("dml.dml_edit", id=id))
 
             # Validación de flujo lógico de estados según documento David

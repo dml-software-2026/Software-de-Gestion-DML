@@ -2,6 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from CODIGO_FUENTE.config import TECNICOS_ST
 from CODIGO_FUENTE.decorators import (
     get_current_user,
     log_action,
@@ -69,6 +70,10 @@ def ticket_nuevo(raypac_id):
             # Validación
             if not tecnico_responsable:
                 flash("El técnico responsable es obligatorio.", "error")
+                return render_template("ticket_nuevo.html", raypac=raypac)
+            # #327: solo los técnicos de la lista (TECNICOS_ST, config.py)
+            if tecnico_responsable not in TECNICOS_ST:
+                flash("Técnico responsable inválido. Elegí uno de la lista.", "error")
                 return render_template("ticket_nuevo.html", raypac=raypac)
 
             # Generar número de ticket: TK-{serie}

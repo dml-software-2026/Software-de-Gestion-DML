@@ -68,8 +68,13 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="tecnico_responsable" class="form-label">Técnico ST Responsable *</label>
-                                <input type="text" class="form-control" id="tecnico_responsable" 
-                                       name="tecnico_responsable" placeholder="Nombre del técnico" required>
+                                {# #327: la lista sale de TECNICOS_ST (config.py) #}
+                                <select class="form-select" id="tecnico_responsable" name="tecnico_responsable" required>
+                                    <option value="" selected disabled>Elegí el técnico</option>
+                                    {% for t in tecnicos_st %}
+                                    <option value="{{ t }}">{{ t }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
 

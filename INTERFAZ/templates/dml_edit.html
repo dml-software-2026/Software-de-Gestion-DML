@@ -99,7 +99,17 @@
                 <div class="row mb-4">
                     <div class="col-md-6 mb-3 mb-md-0">
                         <label class="form-label fw-bold">Técnico Responsable del ST:</label>
-                        <input type="text" class="form-control" name="tecnico_resp" value="{{ ficha.tecnico_resp or '' }}">
+                        {# #327: la lista sale de TECNICOS_ST (config.py). Si la ficha es vieja y
+                           tiene otro texto, se muestra como opción extra para no perderlo al guardar. #}
+                        <select class="form-select" name="tecnico_resp">
+                            <option value="" {% if not ficha.tecnico_resp %}selected{% endif %}>Elegí el técnico</option>
+                            {% for t in tecnicos_st %}
+                            <option value="{{ t }}" {% if ficha.tecnico_resp == t %}selected{% endif %}>{{ t }}</option>
+                            {% endfor %}
+                            {% if ficha.tecnico_resp and ficha.tecnico_resp not in tecnicos_st %}
+                            <option value="{{ ficha.tecnico_resp }}" selected>{{ ficha.tecnico_resp }} (dato anterior)</option>
+                            {% endif %}
+                        </select>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Estado de la Reparación:</label>

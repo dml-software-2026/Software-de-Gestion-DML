@@ -16,3 +16,11 @@ class Config:
     RESEND_API_KEY = os.getenv("RESEND_API_KEY")
     MAIL_FROM = os.getenv("MAIL_FROM", "onboarding@resend.dev")
     MAIL_DEV_REDIRECT = os.getenv("MAIL_DEV_REDIRECT")
+
+
+# #327: técnicos del ST de DML. Única fuente de la lista: ticket_nuevo.html,
+# dml_form.html y dml_edit.html arman el <select> a partir de esta constante
+# (global de Jinja, ver app.py) y el backend rechaza cualquier otro valor.
+# Para sumar un técnico, agregarlo acá. Las fichas/tickets viejos con otro
+# texto no se migran: se siguen mostrando como están.
+TECNICOS_ST = ["Ricardo", "David"]
