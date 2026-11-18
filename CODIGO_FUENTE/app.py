@@ -15,6 +15,7 @@ from CODIGO_FUENTE.blueprints.dml import dml_bp
 from CODIGO_FUENTE.blueprints.envios import envios_bp
 from CODIGO_FUENTE.blueprints.estadisticas import estadisticas_bp
 from CODIGO_FUENTE.blueprints.notificaciones import notificaciones_bp
+from CODIGO_FUENTE.blueprints.pedidos import pedidos_bp
 from CODIGO_FUENTE.blueprints.raypac import raypac_bp
 from CODIGO_FUENTE.blueprints.stock import stock_bp
 from CODIGO_FUENTE.blueprints.tickets import tickets_bp
@@ -65,6 +66,7 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(estadisticas_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(notificaciones_bp)
+app.register_blueprint(pedidos_bp)
 
 
 @app.route("/health")
