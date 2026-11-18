@@ -1,6 +1,7 @@
 from functools import wraps
 
 from flask import flash, g, redirect, session, url_for
+from psycopg2.extras import execute_values
 from werkzeug.security import check_password_hash
 
 from CODIGO_FUENTE.extensions import get_db
@@ -64,6 +65,18 @@ def log_action(user_id, action, table_name, record_id=None, old_value=None, new_
     detalle real de la acción (ej. "FREEZE") queda igual guardado dentro
     de new_value para no perder esa información.
     """
+    log_actions(user_id, action, table_name, [(record_id, old_value, new_value)])
+
+
+def log_actions(user_id, action, table_name, registros):
+    """Igual que log_action, pero varios registros en una sola consulta.
+
+    registros: [(record_id, old_value, new_value)]. Sirve para la carga
+    masiva de stock: en Render cada consulta a Supabase tarda ~0,2 s, y un
+    log_action por repuesto hacía que la carga se cortara por tiempo.
+    """
+    if not registros:
+        return
     db = get_db()
 
     mapa_tipo_accion = {
@@ -78,18 +91,20 @@ def log_action(user_id, action, table_name, record_id=None, old_value=None, new_
     }
     tipo_accion = mapa_tipo_accion.get(action, "INSERT")
 
-    valor_nuevo = new_value
-    if action not in ("INSERT", "UPDATE", "DELETE"):
-        # Conservamos la acción original (ej. "FREEZE") dentro del detalle,
-        # ya que la columna tipo_accion no la puede guardar tal cual.
-        valor_nuevo = f"[{action}] {new_value}" if new_value else f"[{action}]"
+    def valor_nuevo(new_value):
+        if action not in ("INSERT", "UPDATE", "DELETE"):
+            # Conservamos la acción original (ej. "FREEZE") dentro del detalle,
+            # ya que la columna tipo_accion no la puede guardar tal cual.
+            return f"[{action}] {new_value}" if new_value else f"[{action}]"
+        return new_value
 
-    db.execute(
-        """INSERT INTO logs_auditoria
+    filas = [(user_id, tipo_accion, table_name, record_id, old_value, valor_nuevo(new_value))
+             for record_id, old_value, new_value in registros]
+    cur = db.cursor()
+    execute_values(cur, """INSERT INTO logs_auditoria
            (id_usuario, tipo_accion, tabla_afectada, record_id, old_value, new_value)
-           VALUES (%s, %s, %s, %s, %s, %s)""",
-        (user_id, tipo_accion, table_name, record_id, old_value, valor_nuevo)
-    )
+           VALUES %s""", filas, page_size=len(filas))
+    cur.close()
     db.commit()
 
 

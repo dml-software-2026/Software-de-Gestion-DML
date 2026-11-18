@@ -7,6 +7,7 @@ repuesto por fila (C = código, D = ítem, E = total, J = código de ubicación)
 import os
 
 import openpyxl
+from psycopg2.extras import RealDictCursor, execute_values
 
 from CODIGO_FUENTE.config import BASE_DIR
 from CODIGO_FUENTE.services.ubicacion_fisica import normalizar_ubicacion_fisica
@@ -87,39 +88,48 @@ def cargar_stock_dml(db, filas):
     - Los códigos que no están en la planilla no se tocan.
     No dispara alertas ni mails: es el estado real del depósito, no un movimiento.
     Devuelve [(codigo, item, record_id, "nuevo" | "actualizado")].
+
+    Todo va en bloque (unas pocas consultas en total, no varias por repuesto):
+    en Render cada consulta a Supabase tarda ~0,2 s, y repuesto por repuesto la
+    carga pasaba de los 30 s que permite gunicorn y se cortaba.
     """
-    resultados = []
-    for f in filas:
-        existente = db.execute(
-            "SELECT id FROM matriz_repuestos WHERE codigo_repuesto = %s", (f["codigo"],)
-        ).fetchone()
-        if existente:
-            db.execute(
-                "UPDATE matriz_repuestos SET item = %s, cantidad_actual = %s, updated_at = CURRENT_TIMESTAMP "
-                "WHERE id = %s",
-                (f["item"], f["cantidad"], existente["id"])
-            )
-            record_id, resultado = existente["id"], "actualizado"
-        else:
-            numero = db.execute("SELECT MAX(numero) AS max FROM matriz_repuestos").fetchone()["max"] or 0
-            record_id = db.execute("""
-                INSERT INTO matriz_repuestos (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
-                VALUES (%s, %s, %s, %s, %s, 'DML')
-                RETURNING id
-            """, (numero + 1, f["codigo"], f["item"], f["cantidad"], f["cantidad"])).fetchone()["id"]
-            resultado = "nuevo"
+    if not filas:
+        return []
+    cur = db.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT id, codigo_repuesto FROM matriz_repuestos WHERE codigo_repuesto = ANY(%s)",
+                ([f["codigo"] for f in filas],))
+    ids = {r["codigo_repuesto"]: r["id"] for r in cur.fetchall()}
+    existentes = [f for f in filas if f["codigo"] in ids]
+    nuevas = [f for f in filas if f["codigo"] not in ids]
 
-        actualizado = db.execute("""
-            UPDATE stock_ubicaciones
-            SET cantidad = %s, codigo_ubicacion_fisica = %s, updated_at = CURRENT_TIMESTAMP
-            WHERE codigo_repuesto = %s AND ubicacion = 'DML'
-            RETURNING id
-        """, (f["cantidad"], f["ubicacion_fisica"], f["codigo"])).fetchone()
-        if not actualizado:
-            db.execute("""
-                INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
-                VALUES (%s, 'DML', %s, %s)
-            """, (f["codigo"], f["cantidad"], f["ubicacion_fisica"]))
+    if existentes:
+        execute_values(cur, """
+            UPDATE matriz_repuestos AS m
+            SET item = v.item, cantidad_actual = v.cantidad, updated_at = CURRENT_TIMESTAMP
+            FROM (VALUES %s) AS v(codigo, item, cantidad)
+            WHERE m.codigo_repuesto = v.codigo
+        """, [(f["codigo"], f["item"], f["cantidad"]) for f in existentes], page_size=len(existentes))
 
-        resultados.append((f["codigo"], f["item"], record_id, resultado))
-    return resultados
+    if nuevas:
+        cur.execute("SELECT COALESCE(MAX(numero), 0) AS max FROM matriz_repuestos")
+        numero = cur.fetchone()["max"]
+        insertadas = execute_values(cur, """
+            INSERT INTO matriz_repuestos (numero, codigo_repuesto, item, cantidad_inicial, cantidad_actual, ubicacion)
+            VALUES %s
+            RETURNING id, codigo_repuesto
+        """, [(numero + i, f["codigo"], f["item"], f["cantidad"], f["cantidad"], "DML")
+              for i, f in enumerate(nuevas, start=1)], page_size=len(nuevas), fetch=True)
+        ids.update({r["codigo_repuesto"]: r["id"] for r in insertadas})
+
+    execute_values(cur, """
+        INSERT INTO stock_ubicaciones (codigo_repuesto, ubicacion, cantidad, codigo_ubicacion_fisica)
+        VALUES %s
+        ON CONFLICT (codigo_repuesto, ubicacion) DO UPDATE
+        SET cantidad = EXCLUDED.cantidad, codigo_ubicacion_fisica = EXCLUDED.codigo_ubicacion_fisica,
+            updated_at = CURRENT_TIMESTAMP
+    """, [(f["codigo"], "DML", f["cantidad"], f["ubicacion_fisica"]) for f in filas], page_size=len(filas))
+    cur.close()
+
+    codigos_nuevos = {f["codigo"] for f in nuevas}
+    return [(f["codigo"], f["item"], ids[f["codigo"]], "nuevo" if f["codigo"] in codigos_nuevos else "actualizado")
+            for f in filas]
