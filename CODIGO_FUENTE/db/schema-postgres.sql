@@ -224,6 +224,7 @@ CREATE TABLE dml_fichas (
     n_ciclos INTEGER,
     mecanizado_adic TEXT,
     horas_adic REAL,
+    mano_de_obra TEXT,  -- #331: una de MANO_DE_OBRA_OPCIONES (config.py)
     tipo_trabajo TEXT NOT NULL DEFAULT 'REPARACIÓN',
     tecnico_resp TEXT NOT NULL,
     fecha_egreso DATE,

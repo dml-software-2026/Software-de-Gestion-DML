@@ -546,6 +546,18 @@
                     </div>
                 </div>
 
+                <div class="mb-4">
+                    {# #331: una sola opción por ficha, opcional. La lista sale de
+                       MANO_DE_OBRA_OPCIONES (config.py). #}
+                    <label class="form-label fw-bold" for="mano_de_obra">Mano de Obra:</label>
+                    <select form="form_ficha" class="form-select" name="mano_de_obra" id="mano_de_obra">
+                        <option value="" {% if not ficha.mano_de_obra %}selected{% endif %}>No aplica</option>
+                        {% for op in mano_de_obra_opciones %}
+                        <option value="{{ op }}" {% if ficha.mano_de_obra == op %}selected{% endif %}>{{ op }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
             <!-- BOTONES PRINCIPALES DEL FORM: Cancelar/Volver abajo a la
                  izquierda, Guardar (el paso siguiente) abajo a la
                  derecha - mismo criterio de jerarquía del #158. -->

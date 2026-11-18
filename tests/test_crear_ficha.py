@@ -144,3 +144,50 @@ def test_edicion_guarda_los_campos_de_abajo_de_repuestos(client, ingreso_con_tic
              "Repuestos Utilizados", "DIAGNÓSTICO DE REPARACIÓN", "CICLOS Y MANO DE OBRA"]
     posiciones = [html.index(t) for t in orden]
     assert posiciones == sorted(posiciones)
+
+
+# --- #331: mano de obra -----------------------------------------------------
+
+def _guardar(client, ficha_id, **extra):
+    data = {
+        "fecha_ingreso": "2026-11-18",
+        "estado_reparacion": "A LA ESPERA DE REVISIÓN",
+        "tecnico_resp": "David",
+        "n_ciclos": "0",
+    }
+    data.update(extra)
+    return client.post(f"/dml/{ficha_id}/edit", data=data)
+
+
+@necesita_db
+def test_mano_de_obra_se_guarda_y_sale_en_la_vista(client, ingreso_con_ticket):
+    raypac_id, _ = ingreso_con_ticket
+    client.post(f"/dml/new/{raypac_id}")
+    ficha_id = _fichas(raypac_id)[0]['id']
+    _guardar(client, ficha_id, mano_de_obra="En garantía")
+    assert _fichas(raypac_id)[0]['mano_de_obra'] == "En garantía"
+    assert "En garantía" in client.get(f"/dml/{ficha_id}").get_data(as_text=True)
+    # Vacío = no aplica (es opcional)
+    _guardar(client, ficha_id, mano_de_obra="")
+    assert _fichas(raypac_id)[0]['mano_de_obra'] is None
+
+
+@necesita_db
+def test_mano_de_obra_fuera_de_la_lista_se_rechaza(client, ingreso_con_ticket):
+    raypac_id, _ = ingreso_con_ticket
+    client.post(f"/dml/new/{raypac_id}")
+    ficha_id = _fichas(raypac_id)[0]['id']
+    _guardar(client, ficha_id, mano_de_obra="Cualquier cosa")
+    assert _fichas(raypac_id)[0]['mano_de_obra'] is None
+
+
+@necesita_db
+def test_mano_de_obra_sale_en_el_pdf(client, ingreso_con_ticket):
+    from CODIGO_FUENTE.services.pdf import generar_pdf_ficha
+    raypac_id, _ = ingreso_con_ticket
+    client.post(f"/dml/new/{raypac_id}")
+    ficha_id = _fichas(raypac_id)[0]['id']
+    _guardar(client, ficha_id, mano_de_obra="Sin cargo")
+    with app.app_context():
+        pdf = generar_pdf_ficha(ficha_id)
+    assert pdf[:4] == b"%PDF"

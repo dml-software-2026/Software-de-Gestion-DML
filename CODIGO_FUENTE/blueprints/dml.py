@@ -12,7 +12,7 @@ from flask import (
     url_for,
 )
 
-from CODIGO_FUENTE.config import TECNICOS_ST
+from CODIGO_FUENTE.config import MANO_DE_OBRA_OPCIONES, TECNICOS_ST
 from CODIGO_FUENTE.decorators import (
     get_current_user,
     log_action,
@@ -356,6 +356,7 @@ def dml_edit(id):
                 horas = None  # texto no numérico (ej. "NO APLICA")
             numero_remito = request.form.get("numero_remito_salida") or None
             tecnico_resp = request.form.get("tecnico_resp") or ""
+            mano_de_obra = request.form.get("mano_de_obra") or None
 
             # #157: "MÁQUINA ENTREGADA" ya no es una opción del <select> (ver
             # dml_edit.html), pero valido igual por si llega un POST armado a
@@ -374,6 +375,11 @@ def dml_edit(id):
             # #327: técnico de la lista, vacío, o el texto viejo que ya tenía la ficha
             if tecnico_resp and tecnico_resp not in TECNICOS_ST and tecnico_resp != (ficha['tecnico_resp'] or ""):
                 flash("Técnico responsable inválido. Elegí uno de la lista.", "error")
+                return redirect(url_for("dml.dml_edit", id=id))
+
+            # #331: una opción de la lista o vacío (opcional)
+            if mano_de_obra and mano_de_obra not in MANO_DE_OBRA_OPCIONES:
+                flash("Mano de obra inválida. Elegí una opción de la lista.", "error")
                 return redirect(url_for("dml.dml_edit", id=id))
 
             # Validación de flujo lógico de estados según documento David
@@ -406,12 +412,12 @@ def dml_edit(id):
                 SET fecha_ingreso=%s, fecha_egreso=%s,
                     estado_reparacion=%s, diagnostico_reparacion=%s, observaciones=%s,
                     n_ciclos=%s, mecanizado_adic=%s, horas_adic=%s, numero_remito_salida=%s,
-                    tecnico_resp=%s, updated_at=CURRENT_TIMESTAMP
+                    tecnico_resp=%s, mano_de_obra=%s, updated_at=CURRENT_TIMESTAMP
                 WHERE id = %s
             """, (fecha_ingreso, fecha_egreso,
                   estado, diagnostico_rep, observaciones,
                   n_ciclos, mecanizado, horas, numero_remito,
-                  tecnico_resp, id))
+                  tecnico_resp, mano_de_obra, id))
             # #171: solo si el estado cambió - guardar la ficha sin tocar el
             # estado (ej. solo observaciones) no es un paso nuevo del historial.
             if estado != ficha['estado_reparacion']:
