@@ -20,6 +20,7 @@ from reportlab.platypus import (
 
 from CODIGO_FUENTE.config import BASE_DIR
 from CODIGO_FUENTE.extensions import get_db
+from CODIGO_FUENTE.services.fechas import fecha_ddmmaaaa
 
 # Mismo logo que usa la navbar de la app (INTERFAZ/static/logo.png) - #263.
 LOGO_PATH = os.path.join(BASE_DIR, "INTERFAZ", "static", "logo.png")
@@ -72,12 +73,19 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     parts_header_style = ParagraphStyle('PartsHeader', parent=cell_style_bold, fontSize=8.5)
     parts_cell_style = ParagraphStyle('PartsCell', parent=styles['Normal'], fontSize=8, leading=9.5)
     rep_cell_style = ParagraphStyle('RepCell', parent=parts_cell_style, alignment=TA_CENTER)
+    rep_desc_style = ParagraphStyle('RepDesc', parent=parts_cell_style)  # #332: descripción a la izquierda
+    # #332: nombre de la empresa y "Servicio Técnico" en cuerpo 14
+    empresa_style = ParagraphStyle('Empresa', parent=styles['Normal'], fontSize=14, leading=17,
+                                   fontName='Helvetica-Bold')
+    servicio_style = ParagraphStyle('Servicio', parent=styles['Normal'], fontSize=14, leading=17,
+                                    fontName='Helvetica-Bold', alignment=TA_CENTER)
 
-    # ENCABEZADO: N° Ficha | número | INFORME DML SOBRE EL EQUIPO EN REVISION
+    # ENCABEZADO: N° Ficha | número | INFORME DML SOBRE EL EQUIPO REPARADO
+    # (#332: antes "EN REVISIÓN" - pedido del cliente)
     header_data = [[
         Paragraph("<b>N° Ficha</b>", small_style),
         Paragraph(f"<b>{ficha['numero_ficha']:07d}</b>", small_style),
-        Paragraph("<b>INFORME DML SOBRE EL<br/>EQUIPO EN REVISIÓN</b>", ParagraphStyle('Centered', parent=small_style, alignment=1))
+        Paragraph("<b>INFORME DML SOBRE EL<br/>EQUIPO REPARADO</b>", ParagraphStyle('Centered', parent=small_style, alignment=1))
     ]]
     # Ancho total de 7.1in: deja hueco visible dentro del frame de ~7.32in que
     # dejan los márgenes de 1.5cm (#263) - mismo ancho total que el resto de
@@ -101,6 +109,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     # PDF quedaba +600KB más pesado por una imagen que en la hoja se ve del
     # tamaño de una estampilla. Si el archivo no está o algo falla al
     # procesarlo, se sigue sin el logo en vez de romper la descarga del PDF.
+    logo_img = None
     try:
         if os.path.exists(LOGO_PATH):
             pil_logo = PILImage.open(LOGO_PATH).convert("RGB")
@@ -111,16 +120,25 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
             pil_logo.save(logo_buffer, format="JPEG", quality=88)
             logo_buffer.seek(0)
             logo_img = Image(logo_buffer, width=1.1*inch, height=1.1*inch * alto_px / ancho_px)
-            logo_row = Table([[logo_img]], colWidths=[7.1*inch])
-            logo_row.setStyle(TableStyle([('ALIGN', (0, 0), (0, 0), 'RIGHT')]))
-            story.append(logo_row)
-            story.append(Spacer(1, 0.05*inch))
     except Exception:
-        pass
+        logo_img = None
+
+    # #332: nombre de la empresa en cuerpo 14 y negrita, a la izquierda del
+    # logo y en la misma fila, por encima del recuadro del encabezado (así
+    # el logo no corta el recuadro, ver arriba). Sin logo, va solo.
+    empresa = Paragraph("SERVICIO TECNICO DML ELECTRICIDAD INDUSTRIAL SRL", empresa_style)
+    empresa_row = Table([[empresa, logo_img or ""]], colWidths=[5.8*inch, 1.3*inch])
+    empresa_row.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('LEFTPADDING', (0, 0), (0, 0), 0),
+    ]))
+    story.append(empresa_row)
+    story.append(Spacer(1, 0.08*inch))
 
     story.append(header_table)
     story.append(Spacer(1, 0.08*inch))
-    story.append(Paragraph("<b>Servicio Técnico</b>", ParagraphStyle('Center', parent=normal_style, alignment=1)))
+    story.append(Paragraph("Servicio Técnico", servicio_style))  # #332: cuerpo 14
     story.append(Spacer(1, 0.15*inch))
 
     # INFORMACIÓN GENERAL (IZQUIERDA) + ESTADO DEL EQUIPO (DERECHA)
@@ -130,15 +148,15 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     info_rows = [
         [_cell("Ficha N°:", cell_style_bold), _cell(f"{ficha['numero_ficha']:07d}", cell_style)],
         [_cell("Ticket N°:", cell_style_bold), _cell(ficha['numero_ticket'] or "", cell_style)],
-        [_cell("Fecha Ingreso DML:", cell_style_bold), _cell(ficha['fecha_ingreso'], cell_style)],
-        [_cell("Fecha Egreso DML:", cell_style_bold), _cell(ficha['fecha_egreso'] or "", cell_style)],
+        [_cell("Fecha Ingreso DML:", cell_style_bold), _cell(fecha_ddmmaaaa(ficha['fecha_ingreso']), cell_style)],
+        [_cell("Fecha Egreso DML:", cell_style_bold), _cell(fecha_ddmmaaaa(ficha['fecha_egreso']), cell_style)],
         [_cell("Técnico Responsable:", cell_style_bold), _cell(ficha['tecnico_resp'] or "", cell_style)],
         [_cell("Estado:", cell_style_bold), _cell(ficha['estado_reparacion'], cell_style)],
     ]
 
     if raypac:
         info_rows.extend([
-            [_cell("Fecha recepción Raypac:", cell_style_bold), _cell(raypac['fecha_recepcion'], cell_style)],
+            [_cell("Fecha recepción Raypac:", cell_style_bold), _cell(fecha_ddmmaaaa(raypac['fecha_recepcion']), cell_style)],
             [_cell("Cliente:", cell_style_bold), _cell(raypac['cliente'] or "", cell_style)],
             [_cell("N° Serie:", cell_style_bold), _cell(raypac['numero_serie'] or "", cell_style)],
             [_cell("Modelo:", cell_style_bold), _cell(raypac['modelo_maquina'] or "", cell_style)],
@@ -205,9 +223,11 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
 
     # OBSERVACIONES - texto libre que puede ser largo (varias oraciones);
     # _cell() lo envuelve en líneas en vez de desbordar hacia afuera de la
-    # tabla en una sola línea gigante.
+    # tabla en una sola línea gigante. #332: lo cargado en la ficha o la
+    # celda vacía - antes ponía un texto de relleno ("Ingreso reciente,
+    # pendiente inspección inicial") que el cliente no quiere ver.
     story.append(Paragraph("OBSERVACIONES", heading_style))
-    obs_data = [[_cell(ficha['observaciones'] or "Ingreso reciente, pendiente inspección inicial", cell_style)]]
+    obs_data = [[_cell(ficha['observaciones'] or "", cell_style)]]
     obs_table = Table(obs_data, colWidths=[7.1*inch])
     obs_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
@@ -220,7 +240,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
 
     # DIAGNÓSTICO DE REPARACIÓN - mismo motivo que OBSERVACIONES.
     story.append(Paragraph("DIAGNÓSTICO DE REPARACIÓN", heading_style))
-    rep_diag_data = [[_cell(ficha['diagnostico_reparacion'] or "Pendiente", cell_style)]]
+    rep_diag_data = [[_cell(ficha['diagnostico_reparacion'] or "", cell_style)]]  # #332: sin relleno
     rep_diag_table = Table(rep_diag_data, colWidths=[7.1*inch])
     rep_diag_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
@@ -267,20 +287,19 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     story.append(Paragraph("REPUESTOS COLOCADOS", heading_style))
 
     if repuestos:
-        rep_rows = [["Cantidad", "Código", "DESCRIPCION", "ESTADO", "EN STOCK", "EN FALTA"]]
+        # #332: solo cantidad, código y descripción, todo en mayúscula. Se
+        # sacan estado / en stock / en falta ("al cliente no le interesa").
+        rep_rows = [["CANTIDAD", "CÓDIGO", "DESCRIPCIÓN"]]
         for rep in repuestos:
             rep_rows.append([
                 str(rep['cantidad_utilizada'] or 1),
                 # Descripción completa, sin cortar: _cell() hace wrap y la fila
                 # crece lo que haga falta en vez de pisar la de abajo.
-                _cell(rep['codigo_repuesto'], rep_cell_style),
-                _cell(rep['descripcion'], rep_cell_style),
-                _cell(rep['estado_repuesto'], rep_cell_style),
-                "✓" if rep['en_stock'] else "",
-                "✗" if rep['en_falta'] else ""
+                _cell((rep['codigo_repuesto'] or "").upper(), rep_cell_style),
+                _cell((rep['descripcion'] or "").upper(), rep_desc_style),
             ])
 
-        rep_table = Table(rep_rows, colWidths=[0.8*inch, 1.2*inch, 2.3*inch, 1.0*inch, 0.9*inch, 0.9*inch],
+        rep_table = Table(rep_rows, colWidths=[1.0*inch, 1.6*inch, 4.5*inch],
                           repeatRows=1)  # repite el encabezado si la tabla sigue en otra hoja
         rep_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#808080')),
@@ -298,11 +317,6 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
                                 ParagraphStyle('Italic', parent=normal_style, fontName='Helvetica-Oblique')))
 
     story.append(Spacer(1, 0.15*inch))
-
-    # Generar PDF
-    doc.build(story)
-    buffer.seek(0)
-    return buffer.getvalue()
 
     # Generar PDF
     doc.build(story)

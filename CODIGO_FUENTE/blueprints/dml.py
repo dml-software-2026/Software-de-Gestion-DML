@@ -1057,7 +1057,7 @@ def descargar_ficha_pdf(id):
     # Devolver PDF
     return send_file(BytesIO(pdf_bytes), mimetype='application/pdf',
                     as_attachment=True,
-                    download_name=f"ficha_{ficha['numero_ficha']:07d}.pdf")
+                    download_name=f"FICHA_{ficha['numero_ficha']:07d}.pdf")  # #332: en mayúscula
 
 
 @dml_bp.route("/<int:id>/enviar-pdf", methods=["POST"])
@@ -1088,7 +1088,7 @@ def enviar_ficha_pdf(id):
     <p>Sistema de Gestión DML</p>
     """
     enviado = send_mail(user['email'], f"Ficha DML #{numero}", html_body,
-                        attachments=[(f"ficha_{numero}.pdf", pdf_bytes)])
+                        attachments=[(f"FICHA_{numero}.pdf", pdf_bytes)])  # #332
 
     if enviado:
         log_action(user['id'], "SEND_FICHA_PDF", "dml_fichas", id, None,
