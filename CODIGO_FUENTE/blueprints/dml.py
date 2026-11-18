@@ -148,6 +148,12 @@ def dml_entregadas():
 @login_required
 @role_required("ADMIN", "DML_ST")
 def dml_new(raypac_id):
+    # #328: "Crear Ficha" ya no pasa por un formulario intermedio
+    # (dml_form.html, eliminado): crea la ficha con lo que ya se sabe y
+    # manda directo a la edición. Solo crea por POST (los botones son
+    # <form method="POST">) para que un refresh, un link pegado o un
+    # prefetch del navegador no generen fichas. Un GET (link viejo/pegado)
+    # vuelve a la ficha si ya existe, o al ingreso RAYPAC si no.
     user = get_current_user()
     db = get_db()
 
@@ -156,127 +162,92 @@ def dml_new(raypac_id):
         flash("Ingreso RAYPAC no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
-    # Buscar si existe un ticket asociado a este RAYPAC (nuevo flujo)
-    ticket = db.execute("SELECT * FROM tickets WHERE raypac_id = %s AND ficha_id IS NULL", (raypac_id,)).fetchone()
-
-    # #55: la ficha solo se puede crear despues de generar el ticket. El
-    # boton "Crear Ficha" ya esta oculto en la UI hasta que exista ticket
-    # (raypac_list.html, raypac_view.html), pero eso no alcanzaba si alguien
-    # pegaba esta URL directo - habia un "flujo antiguo" que creaba la ficha
-    # igual y recien despues el ticket, salteando la inspeccion visual y el
-    # mail al comercial. Se saca esa rama y se bloquea acá tambien.
+    # #55: la ficha solo se puede crear despues de generar el ticket (se
+    # bloquea acá también, no solo ocultando el botón). FOR UPDATE: dos
+    # clics seguidos en "Crear Ficha" esperan uno al otro, y el segundo ve
+    # el ficha_id que dejó el primero en vez de crear una ficha duplicada.
+    ticket = db.execute(
+        "SELECT * FROM tickets WHERE raypac_id = %s ORDER BY id DESC LIMIT 1"
+        + (" FOR UPDATE" if request.method == "POST" else ""),
+        (raypac_id,)
+    ).fetchone()
     if not ticket:
         flash("Debe crear un ticket primero antes de generar la ficha.", "error")
         return redirect(url_for("raypac.raypac_view", id=raypac_id))
 
-    if request.method == "POST":
-        try:
-            fecha_ingreso = request.form.get("fecha_ingreso") or datetime.now().strftime("%Y-%m-%d")
-            tecnico = request.form.get("tecnico")
-            # CAMBIO DAVID: No usar diagnostico_inicial, ya viene de RAYPAC (diagnostico_ingreso)
-            observaciones = request.form.get("observaciones")
-            n_ciclos = request.form.get("n_ciclos") or 0
-            tecnico_resp = request.form.get("tecnico_resp")
+    if ticket['ficha_id']:
+        db.rollback()  # libera el FOR UPDATE
+        return redirect(url_for("dml.dml_edit", id=ticket['ficha_id']))
 
-            # Validar que exista al menos un técnico (tecnico o tecnico_resp)
-            if not tecnico and not tecnico_resp:
-                flash("Completa los campos obligatorios: debe indicar un técnico responsable.", "error")
-                return render_template("dml_form.html", raypac=raypac, ticket=ticket)
+    if request.method != "POST":
+        return redirect(url_for("raypac.raypac_view", id=raypac_id))
 
-            # #327: el técnico viene del ticket (hidden) o del <select>. Se acepta
-            # el del ticket aunque sea un texto viejo, sino tiene que ser de la lista.
-            for t in (tecnico, tecnico_resp):
-                if t and t not in TECNICOS_ST and t != ticket['tecnico_responsable']:
-                    flash("Técnico responsable inválido. Elegí uno de la lista.", "error")
-                    return render_template("dml_form.html", raypac=raypac, ticket=ticket)
+    try:
+        # Fecha de ingreso = hoy (editable en la edición). No hay una fecha
+        # guardada del "Dar de Alta en DML" para tomar en su lugar, y la
+        # ficha se crea en DML después de recibir la máquina y hacer el ticket.
+        fecha_ingreso = datetime.now().strftime("%Y-%m-%d")
+        # El técnico viene del ticket (#327, obligatorio al crearlo).
+        tecnico = ticket['tecnico_responsable'] or ""
 
-            # Asegurar que ambos campos tengan valor (tecnico es NOT NULL en BD)
-            if not tecnico_resp:
-                tecnico_resp = tecnico
-            if not tecnico:
-                tecnico = tecnico_resp
+        numero_ficha = generate_ficha_number()
 
-            numero_ficha = generate_ficha_number()
+        row = db.execute("""
+            INSERT INTO dml_fichas
+            (numero_ficha, raypac_id, ticket_id, numero_ticket, fecha_ingreso, tecnico,
+             n_ciclos, tecnico_resp, estado_reparacion)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso, tecnico,
+              0, tecnico or None, 'A LA ESPERA DE REVISIÓN')).fetchone()
 
-            # Ya se validó arriba que el ticket existe - se asocia la ficha con él
-            row = db.execute("""
-                INSERT INTO dml_fichas
-                (numero_ficha, raypac_id, ticket_id, numero_ticket, fecha_ingreso, tecnico,
-                 observaciones, n_ciclos, tecnico_resp,
-                 estado_reparacion)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso, tecnico,
-                  observaciones, n_ciclos, tecnico_resp, 'A LA ESPERA DE REVISIÓN')).fetchone()
+        ficha_id = row['id']
 
-            ficha_id = row['id']
+        registrar_estado(db, ficha_id, 'A LA ESPERA DE REVISIÓN', user['id'])
 
-            registrar_estado(db, ficha_id, 'A LA ESPERA DE REVISIÓN', user['id'])
+        db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
 
-            # Actualizar ticket con el ficha_id
-            db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
+        # Partes estándar, con el estado que se cargó en la inspección
+        # visual del ticket.
+        ticket_to_parte = {
+            'ESTADO DEL EQUIPO': 'estado_equipo',
+            'CARCAZA': 'carcaza',
+            'CUBRE FEEDWHEEL': 'cubre_feedwheel',
+            'MANGO': 'mango',
+            'BOTONES': 'botones',
+            'MOTOR DE ARRASTRE': 'motor_arrastre',
+            'MOTOR DE SELLADO': 'motor_sellado',
+            'CUCHILLA': 'cuchilla',
+            'SERVO': 'servo',
+            'RUEDA DE ARRASTRE': 'rueda_arrastre',
+            'RESORTE DE MANIJA': 'resorte_manija',
+            'OTROS': 'otros',
+        }
+        for parte_nombre, ticket_col in ticket_to_parte.items():
+            valor = ticket[ticket_col] if ticket_col in ticket.keys() else None
+            if parte_nombre == "OTROS":
+                # #330: OTROS es texto libre; vacío si no se escribió nada en el ticket
+                estado = valor or ""
+            else:
+                estado = valor or "POR INSPECCIONAR"
+            db.execute(
+                "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
+                (ficha_id, parte_nombre, estado)
+            )
 
-            numero_ticket = ticket['numero_ticket']
+        # Un solo commit: si algo falla no queda una ficha a medio crear
+        # (antes había un commit antes de las partes).
+        db.commit()
 
-            db.commit()
+        log_action(user['id'], "CREATE", "dml_fichas", ficha_id, None,
+                   f"Ficha DML #{numero_ficha} - Ticket: {ticket['numero_ticket']}")
 
-            # Crear partes estándar
-            partes_nombres = [
-                "ESTADO DEL EQUIPO", "CARCAZA", "CUBRE FEEDWHEEL", "MANGO",
-                "BOTONES", "MOTOR DE ARRASTRE", "MOTOR DE SELLADO", "CUCHILLA",
-                "SERVO", "RUEDA DE ARRASTRE", "RESORTE DE MANIJA", "OTROS"
-            ]
-
-            # Usar los estados del equipo completados en el ticket (inspección visual)
-            ticket_to_parte = {
-                'estado_equipo': 'ESTADO DEL EQUIPO',
-                'carcaza': 'CARCAZA',
-                'cubre_feedwheel': 'CUBRE FEEDWHEEL',
-                'mango': 'MANGO',
-                'botones': 'BOTONES',
-                'motor_arrastre': 'MOTOR DE ARRASTRE',
-                'motor_sellado': 'MOTOR DE SELLADO',
-                'cuchilla': 'CUCHILLA',
-                'servo': 'SERVO',
-                'rueda_arrastre': 'RUEDA DE ARRASTRE',
-                'resorte_manija': 'RESORTE DE MANIJA',
-                'otros': 'OTROS'
-            }
-
-            for parte_nombre in partes_nombres:
-                # Buscar el estado correspondiente en el ticket
-                estado = "POR INSPECCIONAR"
-                if parte_nombre == "OTROS":
-                    # #330: OTROS es texto libre; vacío si no se escribió nada en el ticket
-                    estado = (ticket['otros'] or "") if 'otros' in ticket.keys() else ""
-                    db.execute(
-                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
-                        (ficha_id, parte_nombre, estado)
-                    )
-                    continue
-                for ticket_col, parte_map in ticket_to_parte.items():
-                    if parte_map == parte_nombre and ticket_col in ticket.keys() and ticket[ticket_col]:
-                        estado = ticket[ticket_col]
-                        break
-
-                db.execute(
-                    "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
-                    (ficha_id, parte_nombre, estado)
-                )
-
-            db.commit()
-
-            log_action(user['id'], "CREATE", "dml_fichas", ficha_id, None,
-                      f"Ficha DML #{numero_ficha} - Ticket: {numero_ticket}")
-
-            # CAMBIO DAVID: Redirigir directamente a EDICIÓN en lugar de vista
-            flash(f"Ficha #{numero_ficha} creada correctamente. Ticket: {numero_ticket}", "success")
-            return redirect(url_for("dml.dml_edit", id=ficha_id))
-        except Exception as e:
-            flash(f"Error: {e!s}", "error")
-            return render_template("dml_form.html", raypac=raypac, ticket=ticket)
-
-    return render_template("dml_form.html", raypac=raypac, ticket=ticket)
+        flash(f"Ficha #{numero_ficha} creada. Ticket: {ticket['numero_ticket']}", "success")
+        return redirect(url_for("dml.dml_edit", id=ficha_id))
+    except Exception as e:
+        db.rollback()
+        flash(f"No se pudo crear la ficha: {e!s}", "error")
+        return redirect(url_for("raypac.raypac_view", id=raypac_id))
 
 
 @dml_bp.route("/<int:id>")

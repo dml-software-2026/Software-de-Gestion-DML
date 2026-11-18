@@ -438,6 +438,18 @@ function enhanceSelect(select) {
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('select.js-select-enhance').forEach(enhanceSelect);
 });
+
+// #328: "Crear Ficha" crea la ficha en el acto - se deshabilita el botón al
+// primer clic para que un doble clic no mande dos POST (el backend igual
+// lo frena con un FOR UPDATE sobre el ticket).
+document.addEventListener('submit', function (e) {
+  if (!e.target.classList.contains('js-crear-ficha')) return;
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creando...';
+  }
+});
 </script>
 </body>
 </html>
