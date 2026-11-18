@@ -3,7 +3,8 @@
 {% block title %}Pedido #{{ pedido.id }}{% endblock %}
 
 {% block content %}
-{# #341: detalle del pedido de repuestos #}
+{# #341: detalle del pedido de repuestos. #342: envío de DML con remito y recepción en RAYPAC. #}
+{% set enviado = pedido.estado in ['ENVIADO', 'RECIBIDO'] %}
 <div class="container mt-4">
   <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
     <div>
@@ -16,6 +17,19 @@
       <p class="mb-0">Estado: <span class="badge {{ estado[1] }}">{{ estado[0] }}</span></p>
       {% if pedido.estado == 'PEDIDO' %}
       <p class="text-muted small mb-0">RAYPAC lo puede corregir o cancelar hasta que DML lo empiece a preparar.</p>
+      {% endif %}
+      {% if enviado %}
+      <p class="text-muted mb-0">
+        <i class="bi bi-truck"></i> Remito <strong>{{ pedido.numero_remito }}</strong>
+        · enviado el {{ pedido.fecha_envio.strftime('%d/%m/%Y') if pedido.fecha_envio else '-' }}
+        {% if pedido.enviado_por_nombre %}por {{ pedido.enviado_por_nombre }}{% endif %}
+      </p>
+      {% endif %}
+      {% if pedido.estado == 'RECIBIDO' %}
+      <p class="text-muted mb-0">
+        <i class="bi bi-check2-circle"></i> Recibido el {{ pedido.fecha_recepcion.strftime('%d/%m/%Y') if pedido.fecha_recepcion else '-' }}
+        {% if pedido.recibido_por_nombre %}por {{ pedido.recibido_por_nombre }}{% endif %}
+      </p>
       {% endif %}
     </div>
     <div class="d-flex flex-wrap gap-2">
@@ -30,14 +44,29 @@
       {% if puede_preparar %}
       <form method="POST" action="{{ url_for('pedidos.pedidos_preparar', id=pedido.id) }}" class="d-inline"
             onsubmit="return confirmarAccion(event, '¿Empezar a preparar el pedido #{{ pedido.id }}? Desde ahora RAYPAC ya no lo puede cambiar ni cancelar.');">
-        <button type="submit" class="btn btn-primary"><i class="bi bi-box-seam"></i> Marcar en preparación</button>
+        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-box-seam"></i> Marcar en preparación</button>
       </form>
+      {% endif %}
+      {% if puede_enviar %}
+      <a class="btn btn-primary" href="{{ url_for('pedidos.pedidos_enviar', id=pedido.id) }}"><i class="bi bi-truck"></i> Enviar a RAYPAC</a>
+      {% endif %}
+      {% if puede_recibir %}
+      <button type="submit" form="recibir-form" class="btn btn-success"><i class="bi bi-check2-circle"></i> Confirmar recepción</button>
       {% endif %}
     </div>
   </div>
 
   {% if pedido.observaciones %}
   <div class="alert alert-light border"><strong>Observaciones:</strong> {{ pedido.observaciones }}</div>
+  {% endif %}
+
+  {% if puede_recibir %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Contá lo que llegó y corregí la columna <strong>Recibido</strong> si algo no coincide
+    con lo enviado. Las diferencias quedan registradas para DML.
+  </div>
+  <form method="POST" id="recibir-form" action="{{ url_for('pedidos.pedidos_recibir', id=pedido.id) }}"
+        onsubmit="return confirmarAccion(event, '¿Confirmar la recepción del pedido #{{ pedido.id }}?');"></form>
   {% endif %}
 
   <div class="table-responsive">
@@ -47,11 +76,40 @@
           <th>Código</th>
           <th>Descripción</th>
           <th class="text-center">Pedido</th>
+          {% if enviado %}
+          <th class="text-center">Enviado</th>
+          <th class="text-center" style="width: 16%">Recibido</th>
+          {% else %}
           <th class="text-center">Hay en DML</th>
+          {% endif %}
         </tr>
       </thead>
       <tbody>
         {% for d in detalles %}
+        {% if enviado %}
+        {% set dif_recibido = d.cantidad_recibida is not none and d.cantidad_recibida != (d.cantidad_enviada or 0) %}
+        <tr class="{{ 'table-danger' if dif_recibido else ('table-warning' if (d.cantidad_enviada or 0) < d.cantidad else '') }}">
+          <td><strong>{{ d.codigo_repuesto }}</strong></td>
+          <td>{{ d.item }}</td>
+          <td class="text-center">{{ d.cantidad }}</td>
+          <td class="text-center">
+            {{ d.cantidad_enviada or 0 }}
+            {% if (d.cantidad_enviada or 0) < d.cantidad %}<br><small class="text-warning-emphasis">Menos de lo pedido</small>{% endif %}
+          </td>
+          <td class="text-center">
+            {% if puede_recibir %}
+            <input type="number" class="form-control" min="0" step="1" required form="recibir-form"
+                   name="recibido_{{ d.id }}" value="{{ d.cantidad_enviada or 0 }}"
+                   aria-label="Recibido de {{ d.codigo_repuesto }}">
+            {% elif d.cantidad_recibida is not none %}
+            {{ d.cantidad_recibida }}
+            {% if dif_recibido %}<br><small class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Diferencia con lo enviado</small>{% endif %}
+            {% else %}
+            -
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
         {% set falta = d.stock_dml is none or d.cantidad > d.stock_dml %}
         <tr class="{{ 'table-warning' if falta and pedido.estado in ['PEDIDO', 'EN_PREPARACION'] else '' }}">
           <td><strong>{{ d.codigo_repuesto }}</strong></td>
@@ -59,6 +117,7 @@
           <td class="text-center">{{ d.cantidad }}</td>
           <td class="text-center">{{ d.stock_dml if d.stock_dml is not none else '-' }}</td>
         </tr>
+        {% endif %}
         {% endfor %}
       </tbody>
     </table>

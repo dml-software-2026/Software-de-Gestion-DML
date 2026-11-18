@@ -385,6 +385,21 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error creando las tablas de pedidos de repuestos: {e}")
         db.rollback()
 
+    # Migración: envío del pedido de DML a RAYPAC con remito y recepción (#342).
+    # La recepción no suma al stock de RAYPAC (decisión de Ivo): solo deja
+    # registrado qué llegó y si hubo diferencias.
+    try:
+        for columna in ("numero_remito TEXT UNIQUE", "fecha_envio TIMESTAMPTZ",
+                        "enviado_por INTEGER REFERENCES users(id)", "fecha_recepcion TIMESTAMPTZ",
+                        "recibido_por INTEGER REFERENCES users(id)"):
+            db.execute(f"ALTER TABLE pedidos_repuestos ADD COLUMN IF NOT EXISTS {columna}")
+        db.execute("ALTER TABLE pedidos_repuestos_detalles ADD COLUMN IF NOT EXISTS cantidad_enviada INTEGER")
+        db.execute("ALTER TABLE pedidos_repuestos_detalles ADD COLUMN IF NOT EXISTS cantidad_recibida INTEGER")
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando el envío a los pedidos de repuestos: {e}")
+        db.rollback()
+
     # Migración: Tabla dml_fichas_historial (#171) - cambios de estado de
     # cada ficha, para el historial que ve RAYPAC en dml_view.
     try:

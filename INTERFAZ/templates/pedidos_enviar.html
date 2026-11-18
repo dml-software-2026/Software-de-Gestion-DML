@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Enviar pedido #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+{# #342: DML manda el pedido a RAYPAC con remito; se descuenta del stock de DML. #}
+<div class="container mt-4">
+  <h2 class="mb-1"><i class="bi bi-truck"></i> Enviar pedido #{{ pedido.id }} a RAYPAC</h2>
+  <p class="text-muted">
+    Cargá lo que realmente sale (puede ser menos de lo pedido, o 0 si no hay). Al confirmar se descuenta del stock de DML
+    y a RAYPAC le llega el aviso por mail.
+  </p>
+
+  <form method="POST" id="enviar-form"
+        onsubmit="return confirmarAccion(event, '¿Enviar el pedido #{{ pedido.id }}? Se descuenta del stock de DML y ya no se puede cambiar.');">
+    <div class="card mb-4" style="border-left: 4px solid #ffc107;">
+      <div class="card-body">
+        <label for="numero_remito" class="form-label fw-bold">Remito de DML <span class="text-danger">*</span></label>
+        <input type="text" class="form-control form-control-lg" id="numero_remito" name="numero_remito" required
+               style="max-width: 22rem" autocomplete="off" placeholder="Ej: 4222 o 00001-00004222"
+               value="{{ valores.numero_remito if valores else '' }}">
+        <small class="text-muted">Con los últimos dígitos alcanza: el sistema completa el formato.</small>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Código</th>
+            <th>Descripción</th>
+            <th class="text-center">Pedido</th>
+            <th class="text-center">Hay en DML</th>
+            <th style="width: 16%">Se envía</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in detalles %}
+          {% set hay = d.stock_dml or 0 %}
+          {% set sugerido = d.cantidad if d.cantidad <= hay else hay %}
+          <tr class="{{ 'table-warning' if hay < d.cantidad else '' }}">
+            <td><strong>{{ d.codigo_repuesto }}</strong></td>
+            <td>{{ d.item }}</td>
+            <td class="text-center">{{ d.cantidad }}</td>
+            <td class="text-center">{{ hay }}</td>
+            <td>
+              <input type="number" class="form-control" min="0" max="{{ hay }}" step="1" required
+                     name="enviar_{{ d.id }}" aria-label="Cantidad a enviar de {{ d.codigo_repuesto }}"
+                     value="{{ valores.get('enviar_' ~ d.id, sugerido) if valores else sugerido }}">
+              {% if hay < d.cantidad %}<small class="text-warning-emphasis">Hay menos de lo pedido</small>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <a class="btn btn-outline-secondary" href="{{ url_for('pedidos.pedidos_view', id=pedido.id) }}">Volver</a>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Enviar a RAYPAC</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

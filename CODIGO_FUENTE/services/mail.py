@@ -80,6 +80,7 @@ TIPOS_AVISO = {
     "NUEVO_INGRESO": "Nuevo pedido o máquina ingresada",
     "RECEPCION_REPUESTOS": "Recepción de repuestos en DML (aviso a RAYPAC)",
     "BACKUP": "Backup semanal",
+    "PEDIDO_ENVIADO": "Pedido de repuestos enviado por DML (aviso a RAYPAC)",
 }
 
 
