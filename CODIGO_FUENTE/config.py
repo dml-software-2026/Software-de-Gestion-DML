@@ -16,6 +16,9 @@ class Config:
     RESEND_API_KEY = os.getenv("RESEND_API_KEY")
     MAIL_FROM = os.getenv("MAIL_FROM", "onboarding@resend.dev")
     MAIL_DEV_REDIRECT = os.getenv("MAIL_DEV_REDIRECT")
+    # #311: clave que manda el workflow de GitHub para pedir el backup semanal.
+    # Sin esta variable, /admin/backup/auto no hace nada.
+    BACKUP_AUTO_TOKEN = os.getenv("BACKUP_AUTO_TOKEN")
 
 
 # #327: técnicos del ST de DML. Única fuente de la lista: ticket_nuevo.html

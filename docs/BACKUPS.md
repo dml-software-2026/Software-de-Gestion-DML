@@ -22,8 +22,44 @@ La misma pantalla muestra cuándo se descargó el último backup y quién lo hiz
 | `LEEME.txt` | Fecha del backup y cantidad de filas por tabla. |
 
 > **El archivo es sensible:** tiene datos de clientes y las contraseñas
-> (cifradas) de los usuarios. No mandarlo por mail ni dejarlo en una carpeta
-> compartida abierta.
+> (cifradas) de los usuarios. No reenviarlo ni dejarlo en una carpeta
+> compartida abierta. El único mail que lo lleva es el backup automático
+> semanal, a la casilla que eligió DML (ver abajo).
+
+## Backup automático semanal (#311)
+
+Pedido de David (2026-11-15): todos los **lunes a las 8:00** el sistema manda
+el mismo `.zip` por mail a `service@dmlelectricidadind.com.ar`. Se manda
+**siempre**, aunque no haya habido movimientos: si un lunes no llega, es una
+alarma.
+
+- **Quién lo dispara:** Render free no tiene tareas programadas, así que lo
+  dispara un workflow de GitHub Actions (`.github/workflows/backup-semanal.yml`)
+  que le pega a `/admin/backup/auto` con una clave.
+- **A quién le llega:** a los destinatarios del aviso **«Backup semanal»** en
+  Admin → Notificaciones por mail.
+- **Cómo saber si anda:** la pantalla Admin → Backup de datos muestra cuándo
+  corrió el último y si falló. Si pasan más de 8 días sin correr, avisa. Si
+  falla, el workflow queda en rojo en la pestaña *Actions* de GitHub y GitHub
+  le manda un mail a quien lo configuró.
+
+### Configurarlo (una sola vez, en Prod)
+
+1. **Inventar una clave larga** (por ejemplo, con
+   `python -c "import secrets; print(secrets.token_urlsafe(32))"`).
+2. **Render** → servicio de Prod → *Environment*: agregar la variable
+   `BACKUP_AUTO_TOKEN` con esa clave.
+3. **GitHub** → repo → *Settings → Secrets and variables → Actions*: agregar
+   - `BACKUP_AUTO_URL` = `https://<app de prod>/admin/backup/auto`
+   - `BACKUP_AUTO_TOKEN` = la misma clave.
+4. **En la app:** Admin → Notificaciones por mail → agregar
+   `service@dmlelectricidadind.com.ar` al aviso «Backup semanal».
+5. **Probarlo:** GitHub → *Actions* → «Backup semanal» → *Run workflow*. Tiene
+   que llegar el mail y la pantalla de Backup tiene que decir cuándo corrió.
+
+Ojo: GitHub pausa los workflows programados si el repo pasa **60 días sin
+actividad**. Si eso pasa, la pantalla de Backup va a avisar que está atrasado;
+se reactiva desde *Actions* → «Backup semanal» → *Enable workflow*.
 
 ## Cuándo y dónde guardarlo
 
@@ -89,4 +125,6 @@ nada y la base queda como estaba.
 - Copia todas las tablas del esquema `public`, que es donde vive todo el
   sistema. No incluye vistas ni funciones (el sistema no usa ninguna) ni
   otras partes de Supabase (Auth, Storage) que la app no usa.
-- Pendiente (segundo PR del #52): envío automático del backup por mail.
+- El backup automático usa el mismo `.zip` (`services/backup_auto.py`). El
+  resultado de la última corrida queda en la tabla `app_meta`
+  (clave `backup_auto_ultimo`).
