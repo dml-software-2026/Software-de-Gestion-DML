@@ -24,3 +24,16 @@ class Config:
 # Para sumar un técnico, agregarlo acá. Las fichas/tickets viejos con otro
 # texto no se migran: se siguen mostrando como están.
 TECNICOS_ST = ["Ricardo", "David"]
+
+# #331: mano de obra de la ficha, una sola opción por ficha (opcional). Las
+# 5 primeras son las de la ficha en papel 2026 (se marcaban con una x);
+# "En garantía" la pidió David (2026-11-15). Única fuente de la lista: el
+# <select> de dml_edit.html (global de Jinja) y la validación de dml_edit().
+MANO_DE_OBRA_OPCIONES = [
+    "Módulo reparación base (3 hs) - máquina batería o neumática",
+    "Módulo reparación base (3 hs) - máquina manual",
+    "Costo presupuesto - máquina batería o neumática",
+    "Costo presupuesto - máquina manual",
+    "Sin cargo",
+    "En garantía",
+]

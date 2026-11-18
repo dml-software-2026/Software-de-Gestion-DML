@@ -447,6 +447,9 @@ def migrate_db():
         # ficha recién se cierra (is_closed) con el OK de recepción de RAYPAC.
         # Las fichas ya cerradas antes del #333 se marcan como enviadas (no se
         # reabren): quedan entregadas, igual que antes.
+        # #331: mano de obra (una de MANO_DE_OBRA_OPCIONES, o NULL)
+        if "mano_de_obra" not in column_names:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS mano_de_obra TEXT")
         if "enviada_raypac_at" not in column_names:
             db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS enviada_raypac_at TIMESTAMP")
             db.execute("""

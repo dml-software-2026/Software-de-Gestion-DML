@@ -237,6 +237,8 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         [_cell("N° DE CICLOS DE LA MÁQUINA CON LAS QUE SALE DE ST", cell_style_bold), _cell(ficha['n_ciclos'] or 0, cell_style)],
         [_cell("HORAS ADICIONALES DE TRABAJO", cell_style_bold), _cell(ficha['horas_adic'] or "NO APLICA", cell_style)],
         [_cell("MECANIZADO ADICIONAL REALIZADO A LA MAQUINA", cell_style_bold), _cell(ficha['mecanizado_adic'] or "NO APLICA", cell_style)],
+        # #331
+        [_cell("MANO DE OBRA", cell_style_bold), _cell((ficha['mano_de_obra'] or "NO APLICA").upper(), cell_style)],
         [_cell("TIPO DE TRABAJO REALIZADO", cell_style_bold), _cell(raypac['tipo_solicitud'] if raypac else "", cell_style)],
         [_cell("TÉCNICO RESPONSABLE DEL ST DE DML", cell_style_bold), _cell(ficha['tecnico_resp'] or "", cell_style)],
     ]
@@ -244,7 +246,11 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         marca_rows.insert(1, [_cell("TIPO DE MÁQUINA QUE INGRESO AL ST", cell_style_bold),
                               _cell(raypac['tipo_maquina'] if raypac else "A BATERIA", cell_style)])
 
-    marca_table = Table(marca_rows, colWidths=[5.8*inch, 1.3*inch])
+    # #331: antes 5.8/1.3 - la mano de obra más larga ("MÓDULO REPARACIÓN
+    # BASE (3 HS) - MÁQUINA BATERÍA O NEUMÁTICA", ~3.9in a 8.5pt) quedaba en
+    # 4-5 renglones. El rótulo más largo ("N° DE CICLOS DE LA MÁQUINA CON
+    # LAS QUE SALE DE ST", ~3.4in) sigue entrando en uno. Mismo ancho total.
+    marca_table = Table(marca_rows, colWidths=[3.6*inch, 3.5*inch])
     marca_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BACKGROUND', (0, 0), (-1, -1), colors.white),
