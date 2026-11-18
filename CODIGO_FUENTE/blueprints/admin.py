@@ -9,6 +9,7 @@ from werkzeug.security import generate_password_hash
 from CODIGO_FUENTE.decorators import (
     get_current_user,
     log_action,
+    log_actions,
     login_required,
     role_required,
 )
@@ -61,23 +62,18 @@ def cargar_stock_desde_web():
         flash(f"No se cargó nada: {e!s}", "error")
         return redirect(url_for("admin.cargar_stock_desde_web"))
 
-    # Auditoría por fila (#213), después del commit de negocio: si una falla, no corta a las demás.
-    fallos_auditoria = []
-    for codigo, item, record_id, resultado in resultados:
-        try:
-            log_action(user['id'], "CARGA_CSV", "matriz_repuestos", record_id, None,
-                       f"{codigo} - {item}, resultado={resultado}, planilla={nombre_planilla}")
-        except Exception:
-            fallos_auditoria.append(codigo)
-    for numero_fila, codigo, motivo in errores:
-        try:
-            log_action(user['id'], "CARGA_CSV", "matriz_repuestos", None, None,
-                       f"{codigo}, resultado=error, fila={numero_fila}, motivo={motivo}")
-        except Exception:
-            fallos_auditoria.append(codigo)
-    if fallos_auditoria:
-        flash(f"Carga completada, pero {len(fallos_auditoria)} fila(s) no pudieron auditarse: "
-              f"{', '.join(fallos_auditoria)}", "warning")
+    # Auditoría por fila (#213), después del commit de negocio, en una sola consulta
+    # (de a una, en Render la carga se cortaba por tiempo). Si falla, la carga ya quedó.
+    registros = [(record_id, None, f"{codigo} - {item}, resultado={resultado}, planilla={nombre_planilla}")
+                 for codigo, item, record_id, resultado in resultados]
+    registros += [(None, None, f"{codigo}, resultado=error, fila={numero_fila}, motivo={motivo}")
+                  for numero_fila, codigo, motivo in errores]
+    try:
+        log_actions(user['id'], "CARGA_CSV", "matriz_repuestos", registros)
+    except Exception as e:
+        db.rollback()
+        print(f"[STOCK] ⚠️ No se pudo auditar la carga: {type(e).__name__}: {e!s}", file=sys.stderr, flush=True)
+        flash(f"Carga completada, pero no se pudo registrar en la auditoría ({len(registros)} fila(s)).", "warning")
 
     resultado = {
         "nuevos": [r[0] for r in resultados if r[3] == "nuevo"],

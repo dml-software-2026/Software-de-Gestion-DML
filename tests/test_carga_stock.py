@@ -7,7 +7,7 @@ import pytest
 
 from CODIGO_FUENTE.app import app  # carga el .env (load_dotenv)
 from CODIGO_FUENTE.extensions import get_db
-from CODIGO_FUENTE.services.carga_stock import PLANILLA_STOCK, leer_planilla_stock
+from CODIGO_FUENTE.services.carga_stock import PLANILLA_STOCK, cargar_stock_dml, leer_planilla_stock
 
 necesita_db = pytest.mark.skipif(
     not os.getenv("DATABASE_URL"),
@@ -188,3 +188,38 @@ def test_carga_pisa_crea_y_no_toca_lo_ajeno(client, codigos):
     # Ajeno (no está en la planilla): igual que antes
     fila = stock_dml(ajeno)
     assert (fila['cantidad'], fila['codigo_ubicacion_fisica']) == (5, "E01-F01")
+
+
+class _ContadorDeConsultas:
+    """Envuelve la conexión y cuenta cuántas consultas manda a la base."""
+
+    def __init__(self, db):
+        self.db, self.consultas = db, 0
+
+    def cursor(self, *args, **kwargs):
+        contador, cur = self, self.db.cursor(*args, **kwargs)
+
+        class Cursor:
+            def execute(self, *a, **k):
+                contador.consultas += 1
+                return cur.execute(*a, **k)
+
+            def __getattr__(self, nombre):
+                return getattr(cur, nombre)
+        return Cursor()
+
+
+@necesita_db
+def test_la_carga_completa_usa_pocas_consultas():
+    """En Render cada consulta a Supabase tarda ~0,2 s: repuesto por repuesto, la carga de la
+    planilla real (275 filas) pasaba de los 30 s de gunicorn y se cortaba. Tiene que ir en bloque."""
+    filas, _ = leer_planilla_stock(PLANILLA_STOCK)
+    with app.app_context():
+        db = get_db()
+        contador = _ContadorDeConsultas(db)
+        try:
+            resultados = cargar_stock_dml(contador, filas)
+        finally:
+            db.rollback()  # no deja nada cargado
+    assert len(resultados) == len(filas) == 275
+    assert contador.consultas <= 6
