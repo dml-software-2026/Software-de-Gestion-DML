@@ -191,3 +191,57 @@ def test_mano_de_obra_sale_en_el_pdf(client, ingreso_con_ticket):
     with app.app_context():
         pdf = generar_pdf_ficha(ficha_id)
     assert pdf[:4] == b"%PDF"
+
+
+# --- #332: formato del PDF --------------------------------------------------
+
+def _texto_pdf(pdf_bytes):
+    """Texto crudo de los streams del PDF. reportlab los guarda con
+    /ASCII85Decode + /FlateDecode: se decodifican los dos pasos."""
+    import base64
+    import re
+    import zlib
+    partes = []
+    for m in re.finditer(rb"(?<!end)stream\r?\n(.*?)endstream", pdf_bytes, re.DOTALL):
+        datos = m.group(1).strip()
+        try:
+            if datos.endswith(b"~>"):
+                datos = base64.a85decode(datos[:-2])
+            partes.append(zlib.decompress(datos))
+        except (ValueError, zlib.error):
+            partes.append(m.group(1))
+    return b"".join(partes).decode("latin-1")
+
+
+def test_fecha_ddmmaaaa():
+    from datetime import date, datetime
+
+    from CODIGO_FUENTE.services.fechas import fecha_ddmmaaaa
+    assert fecha_ddmmaaaa("2026-11-13") == "13/11/2026"
+    assert fecha_ddmmaaaa("2026-11-13 10:22:00") == "13/11/2026"
+    assert fecha_ddmmaaaa(date(2026, 11, 13)) == "13/11/2026"
+    assert fecha_ddmmaaaa(datetime(2026, 11, 13, 10, 22)) == "13/11/2026"
+    assert fecha_ddmmaaaa(None) == ""
+    assert fecha_ddmmaaaa("") == ""
+    assert fecha_ddmmaaaa("sin fecha") == "sin fecha"
+
+
+@necesita_db
+def test_pdf_formato_del_cliente(client, ingreso_con_ticket):
+    raypac_id, _ = ingreso_con_ticket
+    client.post(f"/dml/new/{raypac_id}")
+    ficha = _fichas(raypac_id)[0]
+    _guardar(client, ficha['id'], fecha_ingreso="2026-11-13")
+    resp = client.get(f"/dml/{ficha['id']}/pdf")
+    assert resp.status_code == 200
+    # Nombre del archivo en mayúscula
+    assert f"FICHA_{ficha['numero_ficha']:07d}.pdf" in resp.headers['Content-Disposition']
+    texto = _texto_pdf(resp.data)
+    assert "SERVICIO TECNICO DML ELECTRICIDAD INDUSTRIAL SRL" in texto
+    assert "EQUIPO REPARADO" in texto
+    assert "EN REVISI" not in texto
+    assert "13/11/2026" in texto
+    assert "2026-11-13" not in texto
+    # Sin textos de relleno en observaciones/diagnóstico vacíos
+    assert "Ingreso reciente" not in texto
+    assert "Pendiente" not in texto

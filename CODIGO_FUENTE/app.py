@@ -21,6 +21,7 @@ from CODIGO_FUENTE.blueprints.tickets import tickets_bp
 from CODIGO_FUENTE.config import BASE_DIR, MANO_DE_OBRA_OPCIONES, TECNICOS_ST, Config
 from CODIGO_FUENTE.decorators import get_current_user_jinja
 from CODIGO_FUENTE.extensions import close_db, get_db, init_db, preparar_base
+from CODIGO_FUENTE.services.fechas import fecha_ddmmaaaa
 from CODIGO_FUENTE.services.stock import get_alert_badge
 
 # Nivel configurable por entorno: en Render se puede setear LOG_LEVEL=DEBUG
@@ -48,6 +49,7 @@ app.jinja_env.globals.update(
     tecnicos_st=TECNICOS_ST,  # #327
     mano_de_obra_opciones=MANO_DE_OBRA_OPCIONES,  # #331
 )
+app.jinja_env.filters['fecha'] = fecha_ddmmaaaa  # #332: {{ valor|fecha }} -> dd/mm/aaaa
 
 # Cerrar la conexión a la BD al final de cada request
 app.teardown_appcontext(close_db)
