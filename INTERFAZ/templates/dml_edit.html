@@ -103,6 +103,11 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Estado de la Reparación:</label>
+                        {% if ficha.is_closed %}
+                        {# #333: ya recibida por RAYPAC - el estado no se cambia desde acá #}
+                        <input type="text" class="form-control" value="{{ ficha.estado_reparacion }}" disabled>
+                        <small class="text-muted">La ficha ya fue recibida por RAYPAC: el estado no se cambia.</small>
+                        {% else %}
                         <select name="estado_reparacion" class="js-select-enhance" required>
                             {# #274: la lista sale de ESTADOS_EDITABLES (dml.py), la misma que valida el
                                backend al guardar. #260 (presupuesto) tiene el mismo nivel que EN REPARACIÓN/
@@ -117,6 +122,7 @@
                                y recien ahi marca is_closed=TRUE. Elegirlo desde aca dejaba la ficha
                                "huerfana": estado terminal pero is_closed=FALSE y editable sin restriccion. #}
                         </select>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -125,7 +131,7 @@
                     <input type="text" name="numero_remito_salida" value="{{ ficha.numero_remito_salida or '' }}"
                            placeholder="Ej: 4222 (se convertirá a 00001-04222)" pattern="[0-9]{1,5}" maxlength="5" class="form-control">
                     <small class="d-block mt-2">
-                        <i class="bi bi-info-circle"></i> <strong>Opcional durante edición. Requerido solo para CERRAR la ficha.</strong> Ingresa solo los últimos 4 dígitos del remito de salida (diferente al de entrada).
+                        <i class="bi bi-info-circle"></i> <strong>Opcional durante edición. Requerido para ENVIAR la ficha a RAYPAC.</strong> Ingresa solo los últimos 4 dígitos del remito de salida (diferente al de entrada).
                     </small>
                 </div>
 
@@ -171,6 +177,7 @@
                         <span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> ESTADO INDEFINIDO</span>
                         {% endif %}
                     </div>
+                    {% if not ficha.is_closed %}
                     <div class="d-flex gap-2">
                         {% if repuesto.en_falta %}
                         <form method="POST" action="{{ url_for('dml.mover_repuesto_a_stock', ficha_id=ficha.id, repuesto_id=repuesto.id) }}"
@@ -190,6 +197,7 @@
                             </button>
                         </form>
                     </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -197,6 +205,10 @@
             <p class="text-muted fst-italic">No hay repuestos registrados en esta ficha.</p>
             {% endif %}
 
+            {% if ficha.is_closed %}
+            {# #333: con la ficha recibida no se tocan repuestos (mueven el stock de DML) #}
+            <p class="text-muted fst-italic mb-0">La ficha ya fue recibida por RAYPAC: los repuestos no se modifican.</p>
+            {% else %}
             <!-- FORM PARA AGREGAR REPUESTO -->
             <div class="card border-success mb-0">
                 <div class="card-body">
@@ -512,6 +524,7 @@
                 }, { once: true });
             }
             </script>
+            {% endif %}
         </div>
     </div>
 </div>

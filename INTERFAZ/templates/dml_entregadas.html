@@ -53,8 +53,11 @@
                     <td class="text-dark">
                         {% if ficha.recibido_por %}
                             <strong>{{ ficha.recibido_por }}</strong>
+                        {% elif not ficha.is_closed %}
+                            {# #333: DML la envió, falta el OK de RAYPAC #}
+                            <span class="badge bg-warning text-dark">Pendiente de recepción</span>
                         {% else %}
-                            <span class="badge badge-secondary">No especificado</span>
+                            <span class="badge bg-secondary">No especificado</span>
                         {% endif %}
                     </td>
                     {% if user_role in ['ADMIN', 'RAYPAC'] %}
@@ -72,7 +75,7 @@
                            a este botón. #}
                         {% if not ficha.recibido_por and user_role in ['ADMIN', 'RAYPAC'] %}
                         <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalAcuse{{ ficha.id }}" title="Registrar Acuse">
-                            <i class="fas fa-check"></i> Acuse
+                            <i class="fas fa-check"></i> Confirmar recepción
                         </button>
                         {% endif %}
                     </td>
@@ -91,7 +94,7 @@
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="modalAcuseLabel{{ ficha.id }}">
-                    📋 Registrar Acuse de Recibo - Ficha #{{ '%07d' % ficha.numero_ficha }}
+                    📋 Confirmar Recepción - Ficha #{{ '%07d' % ficha.numero_ficha }}
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -124,7 +127,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-success">
-                        <i class="fas fa-check"></i> Registrar Acuse
+                        <i class="fas fa-check"></i> Confirmar Recepción
                     </button>
                 </div>
             </form>
