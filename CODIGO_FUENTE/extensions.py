@@ -430,6 +430,16 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error agregando columnas a envios_repuestos_detalles: {e}")
         db.rollback()
 
+    # Migración: el envío de repuestos se puede guardar como borrador sin
+    # remito; el remito se pide al freezar (#338). El UNIQUE se mantiene
+    # (Postgres admite varios NULL).
+    try:
+        db.execute("ALTER TABLE envios_repuestos ALTER COLUMN numero_remito DROP NOT NULL")
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error dejando opcional el remito de envios_repuestos: {e}")
+        db.rollback()
+
     # Migración: Agregar campos de acuse de recibo a dml_fichas
     try:
         print("[MIGRATION] Verificando campos de acuse de recibo...")

@@ -183,7 +183,7 @@ CREATE TABLE logs_auditoria (
  
 CREATE TABLE envios_repuestos (
     id SERIAL PRIMARY KEY,
-    numero_remito TEXT UNIQUE NOT NULL,
+    numero_remito TEXT UNIQUE,  -- NULL = borrador sin remito (#338)
     fecha_envio DATE NOT NULL,
     fecha_recepcion DATE,
     estado TEXT DEFAULT 'PENDIENTE',
