@@ -206,6 +206,26 @@ CREATE TABLE envios_repuestos_detalles (
     cantidad_recibida INTEGER,    -- lo que DML contó al recibir; NULL hasta la recepción (#57)
     FOREIGN KEY (envio_id) REFERENCES envios_repuestos (id) ON DELETE CASCADE
 );
+
+-- Pedidos de repuestos de RAYPAC a DML (#341).
+-- estado: PEDIDO -> EN_PREPARACION -> ENVIADO -> RECIBIDO (#342), o CANCELADO.
+CREATE TABLE pedidos_repuestos (
+    id SERIAL PRIMARY KEY,
+    estado TEXT NOT NULL DEFAULT 'PEDIDO',
+    observaciones TEXT,
+    creado_por INTEGER,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creado_por) REFERENCES users (id)
+);
+
+CREATE TABLE pedidos_repuestos_detalles (
+    id SERIAL PRIMARY KEY,
+    pedido_id INTEGER NOT NULL,
+    codigo_repuesto TEXT NOT NULL,
+    cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+    FOREIGN KEY (pedido_id) REFERENCES pedidos_repuestos (id) ON DELETE CASCADE
+);
  
 -- dml_fichas: depende de raypac_entries.
 -- La FK a tickets(id) (columna ticket_id) es circular con tickets,

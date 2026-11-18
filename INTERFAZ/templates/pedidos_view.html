@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Pedido #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+{# #341: detalle del pedido de repuestos #}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="mb-1"><i class="bi bi-cart"></i> Pedido #{{ pedido.id }}</h2>
+      <p class="text-muted mb-1">
+        {{ pedido.created_at.strftime('%d/%m/%Y %H:%M') if pedido.created_at else '' }}
+        {% if pedido.creado_por_nombre %} · pidió {{ pedido.creado_por_nombre }}{% endif %}
+      </p>
+      {% set estado = ESTADOS_PEDIDO.get(pedido.estado, (pedido.estado, 'bg-secondary')) %}
+      <p class="mb-0">Estado: <span class="badge {{ estado[1] }}">{{ estado[0] }}</span></p>
+      {% if pedido.estado == 'PEDIDO' %}
+      <p class="text-muted small mb-0">RAYPAC lo puede corregir o cancelar hasta que DML lo empiece a preparar.</p>
+      {% endif %}
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('pedidos.pedidos_list') }}">Volver al listado</a>
+      {% if puede_editar %}
+      <a class="btn btn-outline-primary" href="{{ url_for('pedidos.pedidos_edit', id=pedido.id) }}"><i class="bi bi-pencil"></i> Editar</a>
+      <form method="POST" action="{{ url_for('pedidos.pedidos_cancelar', id=pedido.id) }}" class="d-inline"
+            onsubmit="return confirmarAccion(event, '¿Cancelar el pedido #{{ pedido.id }}? DML deja de verlo como pendiente.');">
+        <button type="submit" class="btn btn-outline-danger"><i class="bi bi-x-circle"></i> Cancelar pedido</button>
+      </form>
+      {% endif %}
+      {% if puede_preparar %}
+      <form method="POST" action="{{ url_for('pedidos.pedidos_preparar', id=pedido.id) }}" class="d-inline"
+            onsubmit="return confirmarAccion(event, '¿Empezar a preparar el pedido #{{ pedido.id }}? Desde ahora RAYPAC ya no lo puede cambiar ni cancelar.');">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-box-seam"></i> Marcar en preparación</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if pedido.observaciones %}
+  <div class="alert alert-light border"><strong>Observaciones:</strong> {{ pedido.observaciones }}</div>
+  {% endif %}
+
+  <div class="table-responsive">
+    <table class="table table-bordered align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Código</th>
+          <th>Descripción</th>
+          <th class="text-center">Pedido</th>
+          <th class="text-center">Hay en DML</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in detalles %}
+        {% set falta = d.stock_dml is none or d.cantidad > d.stock_dml %}
+        <tr class="{{ 'table-warning' if falta and pedido.estado in ['PEDIDO', 'EN_PREPARACION'] else '' }}">
+          <td><strong>{{ d.codigo_repuesto }}</strong></td>
+          <td>{{ d.item }}</td>
+          <td class="text-center">{{ d.cantidad }}</td>
+          <td class="text-center">{{ d.stock_dml if d.stock_dml is not none else '-' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

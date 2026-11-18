@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Pedidos de repuestos{% endblock %}
+
+{% block content %}
+{# #341: pedidos de repuestos de RAYPAC a DML #}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h2 class="mb-0">Pedidos de repuestos</h2>
+    {% if get_current_user()['role'] in ['ADMIN', 'RAYPAC'] %}
+    <a class="btn btn-success" href="{{ url_for('pedidos.pedidos_new') }}"><i class="bi bi-cart-plus"></i> Nuevo pedido</a>
+    {% endif %}
+  </div>
+  <div class="mb-3">
+    {% if todos %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('pedidos.pedidos_list') }}">Ver solo los pendientes</a>
+    {% else %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('pedidos.pedidos_list', estado='todos') }}">Ver también recibidos y cancelados</a>
+    {% endif %}
+  </div>
+
+  {% if pedidos %}
+  <div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>Pedido</th>
+          <th>Fecha</th>
+          <th>Pidió</th>
+          <th>Repuestos</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in pedidos %}
+        {% set nuevo = p.id in sin_ver %}
+        <tr class="{{ 'table-primary' if nuevo else '' }}">
+          <td>
+            <strong>#{{ p.id }}</strong>
+            {% if nuevo %}<span class="badge bg-primary ms-1"><i class="bi bi-bell-fill"></i> Nuevo</span>{% endif %}
+          </td>
+          <td>{{ p.created_at.strftime('%d/%m/%Y') if p.created_at else '-' }}</td>
+          <td>{{ p.creado_por_nombre or '-' }}</td>
+          <td>{{ p['items'] }} ({{ p.unidades }} u.)</td>
+          <td>
+            {% set estado = ESTADOS_PEDIDO.get(p.estado, (p.estado, 'bg-secondary')) %}
+            <span class="badge {{ estado[1] }}">{{ estado[0] }}</span>
+          </td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('pedidos.pedidos_view', id=p.id) }}"><i class="bi bi-eye"></i> Ver</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="alert alert-info">
+    {% if todos %}Todavía no hay pedidos.{% else %}No hay pedidos pendientes.{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -358,6 +358,33 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error creando tabla avisos_vistos: {e}")
         db.rollback()
 
+    # Migración: pedidos de repuestos de RAYPAC a DML (#341). Estados:
+    # PEDIDO -> EN_PREPARACION (esta parte) -> ENVIADO -> RECIBIDO (#342);
+    # CANCELADO si RAYPAC lo cancela antes de que DML lo empiece a preparar.
+    try:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS pedidos_repuestos (
+                id SERIAL PRIMARY KEY,
+                estado TEXT NOT NULL DEFAULT 'PEDIDO',
+                observaciones TEXT,
+                creado_por INTEGER REFERENCES users(id),
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS pedidos_repuestos_detalles (
+                id SERIAL PRIMARY KEY,
+                pedido_id INTEGER NOT NULL REFERENCES pedidos_repuestos(id) ON DELETE CASCADE,
+                codigo_repuesto TEXT NOT NULL,
+                cantidad INTEGER NOT NULL CHECK (cantidad > 0)
+            )
+        """)
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error creando las tablas de pedidos de repuestos: {e}")
+        db.rollback()
+
     # Migración: Tabla dml_fichas_historial (#171) - cambios de estado de
     # cada ficha, para el historial que ve RAYPAC en dml_view.
     try:
