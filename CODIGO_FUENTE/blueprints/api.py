@@ -57,7 +57,7 @@ def avisos_api():
     for aviso in avisos:
         if aviso["tipo"] == "MAQUINA":
             aviso["url"] = url_for("raypac.raypac_view", id=aviso["id"])
-        elif aviso["tipo"] == "PEDIDO":  # #341
+        elif aviso["tipo"] in ("PEDIDO", "PEDIDO_ENVIADO"):  # #341 / #342
             aviso["url"] = url_for("pedidos.pedidos_view", id=aviso["id"])
         else:
             aviso["url"] = url_for("envios.envios_view", id=aviso["id"])

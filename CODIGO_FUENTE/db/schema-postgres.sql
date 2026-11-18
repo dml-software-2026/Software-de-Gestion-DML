@@ -216,7 +216,14 @@ CREATE TABLE pedidos_repuestos (
     creado_por INTEGER,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (creado_por) REFERENCES users (id)
+    numero_remito TEXT UNIQUE,    -- remito de DML al enviar (#342)
+    fecha_envio TIMESTAMPTZ,
+    enviado_por INTEGER,
+    fecha_recepcion TIMESTAMPTZ,  -- cuando RAYPAC confirma la recepción (#342)
+    recibido_por INTEGER,
+    FOREIGN KEY (creado_por) REFERENCES users (id),
+    FOREIGN KEY (enviado_por) REFERENCES users (id),
+    FOREIGN KEY (recibido_por) REFERENCES users (id)
 );
 
 CREATE TABLE pedidos_repuestos_detalles (
@@ -224,6 +231,8 @@ CREATE TABLE pedidos_repuestos_detalles (
     pedido_id INTEGER NOT NULL,
     codigo_repuesto TEXT NOT NULL,
     cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+    cantidad_enviada INTEGER,     -- lo que DML mandó (puede ser menos que lo pedido, #342)
+    cantidad_recibida INTEGER,    -- lo que RAYPAC contó al recibir; NULL hasta la recepción (#342)
     FOREIGN KEY (pedido_id) REFERENCES pedidos_repuestos (id) ON DELETE CASCADE
 );
  
