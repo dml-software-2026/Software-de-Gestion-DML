@@ -18,7 +18,7 @@ from CODIGO_FUENTE.blueprints.notificaciones import notificaciones_bp
 from CODIGO_FUENTE.blueprints.raypac import raypac_bp
 from CODIGO_FUENTE.blueprints.stock import stock_bp
 from CODIGO_FUENTE.blueprints.tickets import tickets_bp
-from CODIGO_FUENTE.config import BASE_DIR, Config
+from CODIGO_FUENTE.config import BASE_DIR, TECNICOS_ST, Config
 from CODIGO_FUENTE.decorators import get_current_user_jinja
 from CODIGO_FUENTE.extensions import close_db, get_db, init_db, preparar_base
 from CODIGO_FUENTE.services.stock import get_alert_badge
@@ -45,6 +45,7 @@ app.jinja_env.globals.update(
     get_current_user=get_current_user_jinja,
     get_alert_badge=get_alert_badge,
     current_year=lambda: datetime.now().year,
+    tecnicos_st=TECNICOS_ST,  # #327
 )
 
 # Cerrar la conexión a la BD al final de cada request

@@ -58,7 +58,13 @@
                             {% if not ticket %}
                             <div class="col-md-6">
                                 <label for="tecnico_resp" class="form-label">Técnico ST Responsable *</label>
-                                <input type="text" class="form-control" id="tecnico_resp" name="tecnico_resp" required>
+                                {# #327: la lista sale de TECNICOS_ST (config.py) #}
+                                <select class="form-select" id="tecnico_resp" name="tecnico_resp" required>
+                                    <option value="" selected disabled>Elegí el técnico</option>
+                                    {% for t in tecnicos_st %}
+                                    <option value="{{ t }}">{{ t }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             {% else %}
                             <div class="col-md-6">
