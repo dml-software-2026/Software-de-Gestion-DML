@@ -13,8 +13,8 @@
             <span class="badge badge-info" style="font-size: 14px; margin-right: 10px;">Modo Solo Lectura</span>
             {% endif %}
             {% if user_role in ['ADMIN', 'DML_ST'] %}
-            <a href="{{ url_for('estadisticas.export_fichas_csv') }}" class="btn btn-success btn-sm" title="Exportar a CSV">
-                <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+            <a href="{{ url_for('estadisticas.export_fichas_xlsx') }}" class="btn btn-success btn-sm" title="Descargar las fichas en Excel">
+                <i class="bi bi-file-earmark-excel"></i> Descargar Excel
             </a>
             {% endif %}
             <a href="{{ url_for('raypac.raypac_list') }}" class="btn btn-info">
