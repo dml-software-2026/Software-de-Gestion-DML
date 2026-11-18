@@ -49,8 +49,11 @@
                 </div>
                 <div class="col-md-6">
                     <strong>Tipo Solicitud:</strong> <span class="badge bg-info text-dark">{{ entry.tipo_solicitud }}</span><br>
-                    <strong>Modelo:</strong> {{ entry.modelo_maquina }}<br>
-                    <strong>Tipo Máquina:</strong> {{ entry.tipo_maquina }}
+                    <strong>Modelo:</strong> {{ entry.modelo_maquina }}
+                    {# #340: con el modelo OTRA (cargador, batería suelta) el tipo de máquina no aplica #}
+                    {% if not (entry.modelo_maquina or '').startswith('OTRA: ') %}
+                    <br><strong>Tipo Máquina:</strong> {{ entry.tipo_maquina }}
+                    {% endif %}
                 </div>
             </div>
 

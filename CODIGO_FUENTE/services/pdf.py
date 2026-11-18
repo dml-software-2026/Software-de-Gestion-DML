@@ -50,6 +50,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         return None
 
     raypac = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (ficha['raypac_id'],)).fetchone()
+    es_otra = bool(raypac) and (raypac['modelo_maquina'] or "").startswith("OTRA: ")  # #340: cargador, batería suelta
     partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s ORDER BY id", (ficha_id,)).fetchall()
     repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = %s", (ficha_id,)).fetchall()
 
@@ -141,11 +142,14 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
             [_cell("Cliente:", cell_style_bold), _cell(raypac['cliente'] or "", cell_style)],
             [_cell("N° Serie:", cell_style_bold), _cell(raypac['numero_serie'] or "", cell_style)],
             [_cell("Modelo:", cell_style_bold), _cell(raypac['modelo_maquina'] or "", cell_style)],
-            [_cell("Tipo Máquina:", cell_style_bold), _cell(raypac['tipo_maquina'] or "", cell_style)],
             [_cell("Comercial responsable:", cell_style_bold), _cell(raypac['comercial'] or "", cell_style)],
             [_cell("Batería N°:", cell_style_bold), _cell(raypac['numero_bateria'] or "", cell_style)],
             [_cell("Cargador N°:", cell_style_bold), _cell(raypac['numero_cargador'] or "", cell_style)],
         ])
+        # #340: con el modelo OTRA (cargador, batería suelta) el tipo de máquina no aplica
+        if not es_otra:
+            info_rows.insert(len(info_rows) - 3,  # después de Modelo, como antes
+                             [_cell("Tipo Máquina:", cell_style_bold), _cell(raypac['tipo_maquina'] or "", cell_style)])
 
     # #263: antes esta tabla iba lado a lado con la de "partes" (ver más
     # abajo), compartiendo fila por fila - pero cada una tiene su propia
@@ -231,12 +235,14 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     story.append(Paragraph("CICLOS Y DATOS FINALES", heading_style))
     marca_rows = [
         [_cell("N° DE CICLOS DE LA MÁQUINA CON LAS QUE SALE DE ST", cell_style_bold), _cell(ficha['n_ciclos'] or 0, cell_style)],
-        [_cell("TIPO DE MÁQUINA QUE INGRESO AL ST", cell_style_bold), _cell(raypac['tipo_maquina'] if raypac else "A BATERIA", cell_style)],
         [_cell("HORAS ADICIONALES DE TRABAJO", cell_style_bold), _cell(ficha['horas_adic'] or "NO APLICA", cell_style)],
         [_cell("MECANIZADO ADICIONAL REALIZADO A LA MAQUINA", cell_style_bold), _cell(ficha['mecanizado_adic'] or "NO APLICA", cell_style)],
         [_cell("TIPO DE TRABAJO REALIZADO", cell_style_bold), _cell(raypac['tipo_solicitud'] if raypac else "", cell_style)],
         [_cell("TÉCNICO RESPONSABLE DEL ST DE DML", cell_style_bold), _cell(ficha['tecnico_resp'] or "", cell_style)],
     ]
+    if not es_otra:  # #340
+        marca_rows.insert(1, [_cell("TIPO DE MÁQUINA QUE INGRESO AL ST", cell_style_bold),
+                              _cell(raypac['tipo_maquina'] if raypac else "A BATERIA", cell_style)])
 
     marca_table = Table(marca_rows, colWidths=[5.8*inch, 1.3*inch])
     marca_table.setStyle(TableStyle([

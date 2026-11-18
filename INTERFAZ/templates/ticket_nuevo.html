@@ -3,6 +3,8 @@
 {% block title %}Crear Ticket de Seguimiento{% endblock %}
 
 {% block content %}
+{# #340: un cargador o batería suelta (modelo "OTRA: ...") arranca con las partes en NO APLICA #}
+{% set es_otra = (raypac.modelo_maquina or '').startswith('OTRA: ') %}
 <div class="container mt-4">
     <div class="card shadow-lg">
         <div class="card-header bg-primary text-white">
@@ -30,7 +32,9 @@
                             <p><strong>Modelo:</strong> {{ raypac.modelo_maquina }}</p>
                         </div>
                         <div class="col-md-6">
+                            {% if not es_otra %}
                             <p><strong>Tipo de Máquina:</strong> {{ raypac.tipo_maquina }}</p>
+                            {% endif %}
                             <p><strong>Comercial:</strong> {{ raypac.comercial }}</p>
                             <p><strong>Email Comercial:</strong> {{ raypac.mail_comercial }}</p>
                         </div>
@@ -91,25 +95,27 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Estado del Equipo</label>
                                 <select class="form-select js-select-enhance" name="estado_equipo">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Carcaza</label>
                                 <select class="form-select js-select-enhance" name="carcaza">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                         </div>
@@ -118,25 +124,27 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Cubre Feedwheel</label>
                                 <select class="form-select js-select-enhance" name="cubre_feedwheel">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Mango</label>
                                 <select class="form-select js-select-enhance" name="mango">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                         </div>
@@ -145,25 +153,27 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Botones</label>
                                 <select class="form-select js-select-enhance" name="botones">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Motor de Arrastre</label>
                                 <select class="form-select js-select-enhance" name="motor_arrastre">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                         </div>
@@ -172,25 +182,27 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Motor de Sellado</label>
                                 <select class="form-select js-select-enhance" name="motor_sellado">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Cuchilla</label>
                                 <select class="form-select js-select-enhance" name="cuchilla">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                         </div>
@@ -199,25 +211,27 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Servo</label>
                                 <select class="form-select js-select-enhance" name="servo">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Rueda de Arrastre</label>
                                 <select class="form-select js-select-enhance" name="rueda_arrastre">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                         </div>
@@ -226,13 +240,14 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Resorte de Manija</label>
                                 <select class="form-select js-select-enhance" name="resorte_manija">
-                                    <option value="BUENO" selected>BUENO</option>
+                                    <option value="BUENO" {% if not es_otra %}selected{% endif %}>BUENO</option>
                                     <option value="OK">OK</option>
                                     <option value="A PROBAR">A PROBAR</option>
                                     <option value="ROTO">ROTO</option>
                                     <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
                                     <option value="FALTANTE">FALTANTE</option>
                                     <option value="DESGASTADA">DESGASTADA</option>
+                                    <option value="NO APLICA" {% if es_otra %}selected{% endif %}>NO APLICA</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
