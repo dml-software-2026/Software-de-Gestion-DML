@@ -231,16 +231,10 @@
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Otros</label>
-                                <select class="form-select js-select-enhance" name="otros">
-                                    <option value="BUENO" selected>BUENO</option>
-                                    <option value="OK">OK</option>
-                                    <option value="A PROBAR">A PROBAR</option>
-                                    <option value="ROTO">ROTO</option>
-                                    <option value="CON TORNILLOS FALTANTES">CON TORNILLOS FALTANTES</option>
-                                    <option value="FALTANTE">FALTANTE</option>
-                                    <option value="DESGASTADA">DESGASTADA</option>
-                                </select>
+                                <label class="form-label" for="otros">Otros</label>
+                                {# #330: texto libre en vez de las opciones fijas #}
+                                <textarea class="form-control" id="otros" name="otros" rows="2" maxlength="500"
+                                          placeholder="Otras observaciones del estado del equipo (opcional)"></textarea>
                             </div>
                         </div>
                     </div>

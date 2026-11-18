@@ -50,7 +50,7 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         return None
 
     raypac = db.execute("SELECT * FROM raypac_entries WHERE id = %s", (ficha['raypac_id'],)).fetchone()
-    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s", (ficha_id,)).fetchall()
+    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s ORDER BY id", (ficha_id,)).fetchall()
     repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = %s", (ficha_id,)).fetchall()
 
     # Crear PDF
@@ -175,9 +175,15 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     parts_rows = [[_cell("PARTE", parts_header_style), _cell("Estado", parts_header_style)]]
     if partes:
         for p in partes:
+            if p['nombre_parte'] == "OTROS":
+                # #330: texto libre. Paragraph lo envuelve; los saltos de línea
+                # se pasan a <br/> (escapando antes el resto del texto).
+                estado_cell = Paragraph(xml_escape(p['estado'] or "").replace("\n", "<br/>"), parts_cell_style)
+            else:
+                estado_cell = _cell(p['estado'] or "POR INSPECCIONAR", parts_cell_style)
             parts_rows.append([
                 _cell(p['nombre_parte'] or "", parts_cell_style),
-                _cell(p['estado'] or "POR INSPECCIONAR", parts_cell_style),
+                estado_cell,
             ])
     else:
         for i in range(12):

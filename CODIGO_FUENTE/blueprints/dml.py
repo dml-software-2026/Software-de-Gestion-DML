@@ -238,6 +238,14 @@ def dml_new(raypac_id):
             for parte_nombre in partes_nombres:
                 # Buscar el estado correspondiente en el ticket
                 estado = "POR INSPECCIONAR"
+                if parte_nombre == "OTROS":
+                    # #330: OTROS es texto libre; vacío si no se escribió nada en el ticket
+                    estado = (ticket['otros'] or "") if 'otros' in ticket.keys() else ""
+                    db.execute(
+                        "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
+                        (ficha_id, parte_nombre, estado)
+                    )
+                    continue
                 for ticket_col, parte_map in ticket_to_parte.items():
                     if parte_map == parte_nombre and ticket_col in ticket.keys() and ticket[ticket_col]:
                         estado = ticket[ticket_col]
@@ -427,9 +435,17 @@ def dml_edit(id):
             db.commit()
 
             # Actualizar partes
-            partes = db.execute("SELECT id FROM dml_partes WHERE ficha_id = %s ORDER BY id", (id,)).fetchall()
+            partes = db.execute("SELECT id, nombre_parte FROM dml_partes WHERE ficha_id = %s ORDER BY id", (id,)).fetchall()
             for idx, parte in enumerate(partes):
                 estado_parte = request.form.get(f"parte_{idx}")
+                if parte['nombre_parte'] == "OTROS":
+                    # #330: texto libre, se puede dejar vacío
+                    if estado_parte is not None:
+                        db.execute(
+                            "UPDATE dml_partes SET estado = %s WHERE id = %s",
+                            (estado_parte.strip()[:500], parte['id'])
+                        )
+                    continue
                 if estado_parte:
                     db.execute(
                         "UPDATE dml_partes SET estado = %s WHERE id = %s",
@@ -449,7 +465,8 @@ def dml_edit(id):
             db.rollback()  # Revertir la transacción en caso de error
             flash(f"Error: {e!s}", "error")
 
-    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s", (id,)).fetchall()
+    # ORDER BY id: el POST mapea parte_{idx} por este mismo orden
+    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s ORDER BY id", (id,)).fetchall()
     repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = %s", (id,)).fetchall()
 
     # Convertir Row a dict para serialización JSON
