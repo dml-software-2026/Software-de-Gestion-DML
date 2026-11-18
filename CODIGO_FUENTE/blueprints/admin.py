@@ -1,8 +1,9 @@
+import hmac
 import os
 import sys
 from io import BytesIO
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
 from werkzeug.security import generate_password_hash
 
 from CODIGO_FUENTE.decorators import (
@@ -13,6 +14,7 @@ from CODIGO_FUENTE.decorators import (
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.backup import generar_backup_zip
+from CODIGO_FUENTE.services.backup_auto import ejecutar_backup_automatico, ultimo_backup_automatico
 from CODIGO_FUENTE.services.carga_stock import PLANILLA_STOCK, cargar_stock_dml, leer_planilla_stock
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -221,7 +223,23 @@ def backup():
         ORDER BY l.fecha_hora DESC
         LIMIT 1
     """).fetchone()
-    return render_template("backup.html", ultimo=ultimo)
+    return render_template("backup.html", ultimo=ultimo, automatico=ultimo_backup_automatico(db))
+
+
+@admin_bp.route("/backup/auto", methods=["POST"])
+def backup_auto():
+    """Backup semanal por mail (#311). Lo llama el workflow de GitHub
+    (.github/workflows/backup-semanal.yml), sin sesión: se autoriza con el
+    header X-Backup-Token, que tiene que coincidir con BACKUP_AUTO_TOKEN.
+    Responde 500 si falla, para que el workflow quede en rojo."""
+    esperado = current_app.config.get("BACKUP_AUTO_TOKEN")
+    recibido = request.headers.get("X-Backup-Token", "")
+    if not esperado or not hmac.compare_digest(recibido.encode(), esperado.encode()):
+        return jsonify(ok=False, error="No autorizado"), 403
+
+    ok, detalle = ejecutar_backup_automatico(get_db())
+    print(f"[BACKUP AUTO] {'OK' if ok else 'ERROR'}: {detalle}", file=sys.stderr, flush=True)
+    return jsonify(ok=ok, detalle=detalle), (200 if ok else 500)
 
 
 @admin_bp.route("/backup/descargar")

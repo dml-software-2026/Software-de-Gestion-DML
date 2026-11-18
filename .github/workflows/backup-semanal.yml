@@ -1,0 +1,35 @@
+# Backup semanal por mail (#311)
+# Render free no tiene tareas programadas: este workflow le pide a la app que
+# arme el backup y lo mande por mail a los destinatarios del aviso
+# "Backup semanal" (Admin → Notificaciones por mail).
+#
+# Necesita dos secrets del repo (Settings → Secrets and variables → Actions):
+#   BACKUP_AUTO_URL   = https://<app de prod en Render>/admin/backup/auto
+#   BACKUP_AUTO_TOKEN = la misma clave que la variable BACKUP_AUTO_TOKEN de Render
+# Pasos completos en docs/BACKUPS.md.
+
+name: Backup semanal
+
+on:
+  schedule:
+    - cron: "0 11 * * 1"   # lunes 08:00 de Argentina (11:00 UTC)
+  workflow_dispatch:         # botón "Run workflow" para probarlo a mano
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pedirle el backup a la app
+        env:
+          URL: ${{ secrets.BACKUP_AUTO_URL }}
+          TOKEN: ${{ secrets.BACKUP_AUTO_TOKEN }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$TOKEN" ]; then
+            echo "Faltan los secrets BACKUP_AUTO_URL y/o BACKUP_AUTO_TOKEN (ver docs/BACKUPS.md)."
+            exit 1
+          fi
+          # Render free duerme la app: el primer pedido puede tardar en despertarla,
+          # por eso los reintentos y el tiempo máximo largo.
+          curl --fail-with-body --silent --show-error \
+               --retry 3 --retry-delay 30 --retry-all-errors --max-time 240 \
+               -X POST -H "X-Backup-Token: $TOKEN" "$URL"
