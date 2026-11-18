@@ -32,21 +32,47 @@ asumir contexto de nada más.
 > criterio que el `.gitignore` de `scripts/data/`): las tiene Facu, el
 > resumen está en el #314.
 >
-> **⚠️ PENDIENTE (actualizado 2026-11-09):** las preguntas para el cliente
-> ya están revisadas con el equipo (comentarios de Sebastián aplicados,
-> motivos en el encabezado de `docs/PREGUNTAS_CLIENTE_2026-11-02.md`, PR
-> #317). La versión para el cliente se armó como **Word**
-> (`Consultas_DML_noviembre_2026.docx`, en Descargas de la máquina de Facu,
-> no versionado), con un recuadro de respuesta por pregunta. **Facu la manda
-> a David.** Cuando responda, anotar cada respuesta en su issue (#305,
-> #307-#309, #311, #313, #314). Pendientes nuestros que salieron de la
-> revisión: en #305, al volver a cargar el remito a mano **no** restaurar la
-> validación vieja de remito único (se puede repetir); en #307, revisar en
-> Render `MAIL_FROM`/`MAIL_DEV_REDIRECT`; en #310, antes de cargar la
-> planilla en prod, revisar si hubo movimientos después del 31/08; en #314,
-> pedir el Excel de fichas actualizado para la entrega final. PR #316 (Ivo,
-> ubicación física) abierto. `CAMPOS DE INGRESO DML` **no** es stock: es la
-> especificación de campos de 2025.
+> **🎯 EN CURSO (actualizado 2026-11-15): última tanda, terminar todo el
+> kanban.** David respondió las preguntas y el cliente mandó observaciones
+> nuevas y una ficha corregida (3 .docx en Descargas de Facu, **no
+> versionados**: repo público). Resumen y mapeo a issues en
+> `docs/RESPUESTAS_Y_OBSERVACIONES_CLIENTE_2026-11-15.md`. Las respuestas
+> están comentadas en #305, #307-#309 y #311-#314. **Issues nuevos #323-#342**
+> (Backlog, con Size y Épica). #341 y #342 son sub-issues del #308. Plan
+> acordado con Facu: ir haciendo **todas** las tareas del kanban, una por
+> una (una tarea / un PR a la vez), hasta terminar.
+> - Hay que **contestarle a David** si el backup semanal se hace aunque no
+>   haya movimientos (#311; propuesta: sí, siempre).
+> - Las capturas de las observaciones son del usuario **ADMIN**: ver #336
+>   antes de tocar permisos de RAYPAC.
+> - Siguen valiendo de la revisión del 2026-11-09: en #305, al volver a
+>   cargar el remito a mano **no** restaurar la validación de remito único
+>   (se puede repetir); en #310, antes de cargar la planilla en prod, revisar
+>   si hubo movimientos después del 31/08; en #314, pedir el Excel de fichas
+>   actualizado para la entrega final.
+> - `CAMPOS DE INGRESO DML` **no** es stock: es la especificación de campos de 2025.
+>
+> **📍 Dónde quedamos (2026-11-16) - esperando que aprueben los PRs.**
+> Tareas de Facu hechas y probadas por él, cada una con su PR contra `dev`:
+> #343 (docs, este), #344 (#305), #345 (#312), #347 (#327), #348 (#330),
+> #349 (#333), #350 (#306 - Facu se lo pasó de Seba porque toca el mismo
+> `dml_edit.html` que el #328; comentado en el issue). **Se simuló mergear
+> los 7 juntos: sin conflictos en cualquier orden, 75 tests ok.**
+> - El #333 se implementó con supuestos que el cliente no especificó
+>   (comentario en el issue): RAYPAC edita la ficha recibida con los últimos
+>   4 dígitos del remito de salida; DML ya no la edita después del OK.
+> - **Al retomar, en este orden:**
+>   1. Confirmar en GitHub que los 7 PRs están mergeados y cerrar a mano
+>      #305, #306, #312, #327, #330, #333 (`Closes` no autocierra en `dev`).
+>   2. **#328** (crear ficha directo a la edición + reordenar secciones),
+>      rama nueva desde `dev` actualizado. No arrancarlo antes: #347-#350
+>      tocan `dml_edit.html`, que el #328 reordena entero.
+>   3. **#331** (mano de obra "Sin cargo"/"En garantía"), va en la sección
+>      reordenada por el #328.
+>   4. **#332** (formato del PDF), después de #330 y #331.
+> - Avisarle a Seba: el **#334** (Entregadas) arrancarlo desde `dev` después
+>   de que se mergee el #349, que cambia esa pantalla.
+> - Ramas: cortarlas siempre de `origin/dev`, no de `main`.
 
 - **Última actualización:** 2026-10-22, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).

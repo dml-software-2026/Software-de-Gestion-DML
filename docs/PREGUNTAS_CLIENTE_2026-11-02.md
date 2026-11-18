@@ -3,7 +3,9 @@
 Preguntas que salieron de la entrega del 2026-10-28 (`docs/NOTAS_ENTREGA_2026-10-28.md`)
 y de los archivos que pasó el cliente. Cada punto indica su issue.
 
-**Estado: versión final, revisada con el equipo (2026-11-09), todavía no se mandó.**
+**Estado: respondidas por David el 2026-11-15.** Las respuestas están en
+`docs/RESPUESTAS_Y_OBSERVACIONES_CLIENTE_2026-11-15.md` y comentadas en cada issue.
+(Antes: versión final revisada con el equipo el 2026-11-09.)
 
 - Revisada con los comentarios de Sebastián: se sacaron las preguntas ya respondidas
   (formato y repetición del remito, subdominios del mail) y las que sumaban alcance
