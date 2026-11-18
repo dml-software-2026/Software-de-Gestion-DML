@@ -52,26 +52,36 @@ asumir contexto de nada más.
 >   actualizado para la entrega final.
 > - `CAMPOS DE INGRESO DML` **no** es stock: es la especificación de campos de 2025.
 >
-> **📍 Dónde quedamos (2026-11-16) - esperando que aprueben los PRs.**
-> Tareas de Facu hechas y probadas por él, cada una con su PR contra `dev`:
-> #343 (docs, este), #344 (#305), #345 (#312), #347 (#327), #348 (#330),
-> #349 (#333), #350 (#306 - Facu se lo pasó de Seba porque toca el mismo
-> `dml_edit.html` que el #328; comentado en el issue). **Se simuló mergear
-> los 7 juntos: sin conflictos en cualquier orden, 75 tests ok.**
-> - El #333 se implementó con supuestos que el cliente no especificó
->   (comentario en el issue): RAYPAC edita la ficha recibida con los últimos
->   4 dígitos del remito de salida; DML ya no la edita después del OK.
-> - **Al retomar, en este orden:**
->   1. Confirmar en GitHub que los 7 PRs están mergeados y cerrar a mano
->      #305, #306, #312, #327, #330, #333 (`Closes` no autocierra en `dev`).
->   2. **#328** (crear ficha directo a la edición + reordenar secciones),
->      rama nueva desde `dev` actualizado. No arrancarlo antes: #347-#350
->      tocan `dml_edit.html`, que el #328 reordena entero.
->   3. **#331** (mano de obra "Sin cargo"/"En garantía"), va en la sección
->      reordenada por el #328.
->   4. **#332** (formato del PDF), después de #330 y #331.
-> - Avisarle a Seba: el **#334** (Entregadas) arrancarlo desde `dev` después
->   de que se mergee el #349, que cambia esa pantalla.
+> **📍 Dónde quedamos (2026-11-18) - tareas de Facu del kanban terminadas.**
+> Mergeados a `dev` (y sus issues cerrados): los 7 PRs del 16/11, más
+> **#353** (#328: "Crear Ficha" crea la ficha y va directo a la edición,
+> nuevo orden de secciones, autoguardado de la ficha antes de tocar un
+> repuesto), **#354** (#331: mano de obra, una opción de
+> `MANO_DE_OBRA_OPCIONES` en `config.py`, opcional) y **#356** (#332: formato
+> del PDF, fechas dd/mm/aaaa con `services/fechas.py` / filtro `|fecha`,
+> archivo `FICHA_0000844.pdf`). Tests nuevos en `tests/test_crear_ficha.py`.
+> - Cerrados sin código: **#203** y **#205** (ya resueltos por #301 y #252).
+>   **#206 cerrado como "no se hace"**: decisión de Facu, los usuarios
+>   (incluidas las contraseñas) los maneja **solo ADMIN**; nadie cambia su
+>   propia contraseña porque DML necesita poder entrar al usuario de RAYPAC.
+>   No proponer perfil ni autoservicio de contraseñas.
+> - **Lo de Facu que queda:** #308 (padre de #341/#342 de Ivo; se propuso
+>   reasignársela a Ivo, sin respuesta) y **#346** (prod): va **después de la
+>   última entrega y del OK del cliente**, junto con Facu.
+> - Pendientes sueltos: (1) verificar en prod si la ficha 0000844 tenía
+>   observaciones que no salieron en el PDF (#332); (2) preguntarle al
+>   cliente si la mano de obra es obligatoria (#331, hoy opcional);
+>   (3) Ivo (#314) pidió los archivos del cliente: Facu se los pasa por fuera
+>   de GitHub, falta encontrar `maquinas.csv`/`matriz.csv` del #76 (no están
+>   en esta máquina); (4) 6 tests de `tests/test_envio_borrador.py` (#338,
+>   Ivo) fallan contra la base local también en `dev` limpio: avisarle a Ivo.
+> - Facu no toma tareas de Seba por ahora ("otro día"). Si se retoma, las
+>   más pesadas son #336 (permisos RAYPAC) y #335 (barra fija + Atrás).
+> - Fuera del código: informe final de la PP, presentación y guion de la
+>   muestra del colegio (hablan Seba e Ivo) hechos como docs/artifacts de
+>   Facu, con copia .docx en sus Descargas. La diapositiva de números
+>   (128 tareas / 163 PRs / 221 commits al 18/11) queda desactualizada:
+>   pasar a "más de" o recalcular antes de la muestra.
 > - Ramas: cortarlas siempre de `origin/dev`, no de `main`.
 
 - **Última actualización:** 2026-10-22, cierre de sesión (Facu cambia de
