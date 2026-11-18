@@ -17,6 +17,11 @@ from CODIGO_FUENTE.services.remito import normalizar_remito, numero_para_input
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
 
+# #340: modelo para lo que no es una máquina (cargador, batería suelta...)
+MODELO_OTRA = "OTRA"
+MODELO_OTRA_MAX = 60
+TIPO_OTRA = "OTRO"
+
 
 CODIGO_DESFREEZE_AYUDA = "los últimos 4 dígitos del remito"
 
@@ -149,6 +154,20 @@ def raypac_new():
             contacto_cliente = request.form.get("contacto_cliente")
             email_cliente = request.form.get("email_cliente")
             guardar_cliente_nuevo = request.form.get("guardar_cliente_nuevo") == "1"
+
+            # #340: "OTRA" es algo que no es una máquina (un cargador, una batería
+            # suelta). Se guarda como modelo "OTRA: <lo que se envía>" para que
+            # salga igual en ticket, ficha, PDF y listados, y el tipo queda OTRO.
+            if modelo == MODELO_OTRA:
+                que_se_envia = " ".join((request.form.get("modelo_otra") or "").split()).upper()
+                if not que_se_envia:
+                    flash("Elegiste OTRA en el modelo: escribí qué se envía (ej. CARGADOR, BATERÍA).", "error")
+                    return render_template("raypac_form.html", clientes=_obtener_clientes(db))
+                if len(que_se_envia) > MODELO_OTRA_MAX:
+                    flash(f"Qué se envía no puede tener más de {MODELO_OTRA_MAX} caracteres.", "error")
+                    return render_template("raypac_form.html", clientes=_obtener_clientes(db))
+                modelo = f"{MODELO_OTRA}: {que_se_envia}"
+                tipo_maquina = TIPO_OTRA
 
             # Validación básica
             if not all([tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina, comercial, mail_comercial]):

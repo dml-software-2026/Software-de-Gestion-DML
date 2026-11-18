@@ -217,9 +217,12 @@
                 <div class="col-md-6">
                     <strong>N° de Ciclos:</strong> {{ ficha.n_ciclos or 0 }}
                 </div>
+                {# #340: con el modelo OTRA (cargador, batería suelta) el tipo de máquina no aplica #}
+                {% if not (raypac and (raypac.modelo_maquina or '').startswith('OTRA: ')) %}
                 <div class="col-md-6">
                     <strong>Tipo de Máquina:</strong> {{ raypac.tipo_maquina if raypac else 'A BATERIA' }}
                 </div>
+                {% endif %}
             </div>
             <div class="row mb-3">
                 <div class="col-md-6">
