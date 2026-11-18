@@ -189,9 +189,12 @@
                 {# sin esto, no había ningún botón para avanzar al siguiente
                    paso del flujo (crear ticket → crear ficha) - el usuario
                    tenía que volver a buscarlo en /raypac. #}
-                <a href="{{ url_for('dml.dml_new', raypac_id=ticket.raypac_id) }}" class="btn btn-success">
-                    <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML <i class="bi bi-arrow-right"></i>
-                </a>
+                {# #328: crea la ficha y va directo a la edición (POST) #}
+                <form method="POST" action="{{ url_for('dml.dml_new', raypac_id=ticket.raypac_id) }}" class="js-crear-ficha">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML <i class="bi bi-arrow-right"></i>
+                    </button>
+                </form>
                 {% endif %}
             </div>
             {% endif %}

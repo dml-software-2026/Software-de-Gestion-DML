@@ -215,9 +215,12 @@
             <i class="bi bi-file-earmark-text"></i> Ver Ficha DML <i class="bi bi-arrow-right"></i>
         </a>
         {% elif ticket %}
-        <a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-success">
-            <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML <i class="bi bi-arrow-right"></i>
-        </a>
+        {# #328: crea la ficha y va directo a la edición (POST) #}
+        <form method="POST" action="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="js-crear-ficha">
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML <i class="bi bi-arrow-right"></i>
+            </button>
+        </form>
         {% else %}
         {# #158: antes mandaba al listado /raypac en vez de ir directo al
            form real - el usuario tenía que volver a buscar el botón "Crear
