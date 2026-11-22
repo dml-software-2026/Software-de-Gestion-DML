@@ -16,7 +16,9 @@ estadisticas_bp = Blueprint("estadisticas", __name__)
 
 @estadisticas_bp.route("/estadisticas")
 @login_required
-@permission_required(read_roles=["DML_ST"], write_roles=["DML_REPUESTOS"])
+# #336: RAYPAC la ve de solo lectura (pedido del cliente), con los datos de DML
+# igual que DML_ST: su stock se ve desde Stock y no usa repuestos en reparaciones.
+@permission_required(read_roles=["DML_ST", "RAYPAC"], write_roles=["DML_REPUESTOS"])
 def estadisticas(readonly=False):
     """Dashboard de estadísticas de repuestos más utilizados."""
     user = get_current_user()
@@ -27,7 +29,7 @@ def estadisticas(readonly=False):
         ubicacion = request.args.get("ubicacion", "DML")
         ubicaciones_disponibles = ["RAYPAC", "DML"]
     else:
-        ubicacion = "DML"  # DML_REPUESTOS y DML_ST solo ven DML
+        ubicacion = "DML"  # DML_REPUESTOS, DML_ST y RAYPAC ven DML
         ubicaciones_disponibles = []
 
     # Top 10 repuestos más utilizados (solo tiene sentido para DML, donde se usan en reparaciones)

@@ -48,7 +48,7 @@
         {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'RAYPAC', 'DML_REPUESTOS', 'DML_ST'] %}
         <li class="nav-item">
           <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'envios' else '' }}" href="{{ url_for('envios.envios_list') }}">
-            <i class="bi bi-truck"></i>
+            <i class="bi bi-camion-fill"></i>{# mismo camión que Inicio (#279) #}
             <span class="nav-text">Envíos</span>
           </a>
         </li>
@@ -88,7 +88,7 @@
             <span class="nav-text">Stock</span>
           </a>
         </li>
-        {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'DML_REPUESTOS'] %}
+        {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'DML_ST', 'DML_REPUESTOS', 'RAYPAC'] %}
         <li class="nav-item">
           <a class="nav-link nav-link-enhanced{{ ' active' if request.blueprint == 'estadisticas' else '' }}" href="{{ url_for('estadisticas.estadisticas') }}">
             <i class="bi bi-graph-up-arrow"></i>
@@ -161,6 +161,16 @@
 </nav>
 
 <div class="container-fluid page-content">
+  {# #335: "Atrás" en todas las pantallas menos Inicio y el login (y la vista
+     pública del ticket sin sesión). Vuelve a la página anterior; si no hay
+     historial (link abierto en una pestaña nueva), va a Inicio. #}
+  {% if session.get('user_id') and request.endpoint not in ['auth.index', 'auth.login'] %}
+  <div class="back-bar">
+    <a href="{{ url_for('auth.index') }}" class="btn btn-sm btn-outline-secondary" id="btn-atras">
+      <i class="bi bi-arrow-left"></i> Atrás
+    </a>
+  </div>
+  {% endif %}
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
@@ -313,6 +323,22 @@
 </script>
 {% endif %}
 <script>
+// #335: botón "Atrás" de base.html. history.length > 1 no alcanza (cuenta
+// también páginas de otros sitios), así que se vuelve atrás solo si la
+// página anterior es de esta misma app; si no, el href lleva a Inicio.
+(function () {
+  const btn = document.getElementById('btn-atras');
+  if (!btn) return;
+  btn.addEventListener('click', function (e) {
+    let mismoSitio = false;
+    try { mismoSitio = document.referrer && new URL(document.referrer).origin === location.origin; } catch (err) { /* referrer inválido */ }
+    if (mismoSitio && history.length > 1) {
+      e.preventDefault();
+      history.back();
+    }
+  });
+})();
+
 function get_current_user() {
   // Función auxiliar para JavaScript si es necesaria
 }
