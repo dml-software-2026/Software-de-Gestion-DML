@@ -130,7 +130,7 @@ def ticket_nuevo(raypac_id):
                         <div class="info-row"><span class="label">Estado:</span> Pendiente de Revisión</div>
                     </div>
                     <p>Utilice este número de ticket para hacer seguimiento del estado de su equipo.</p>
-                    <p style="color: #7f8c8d; font-size: 12px; text-align: center; margin-top: 20px;">DML Electricidad Industrial SRL - Servicio Técnico</p>
+                    <p style="color: #7f8c8d; font-size: 12px; text-align: center; margin-top: 20px;">RAYPAC SRL - Servicio Técnico</p>
                 </div>
                 </body>
                 </html>
