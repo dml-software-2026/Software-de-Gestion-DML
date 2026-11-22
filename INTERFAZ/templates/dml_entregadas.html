@@ -9,25 +9,25 @@
             <h2>📦 Máquinas Entregadas - Acuse de Recibo</h2>
             <p class="text-muted">Registro de máquinas entregadas a clientes</p>
         </div>
-        <div class="col-md-4 text-right">
+        <div class="col-md-4 text-md-end">
             <a class="btn btn-secondary" href="{{ url_for('dml.dml_list') }}">
-                <i class="fas fa-arrow-left"></i> Volver a Fichas
+                <i class="bi bi-arrow-left"></i> Volver a Fichas
             </a>
         </div>
     </div>
 
     {% if fichas|length == 0 %}
     <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i> No hay fichas entregadas registradas aún.
+        <i class="bi bi-info-circle"></i> No hay fichas entregadas registradas aún.
     </div>
     {% else %}
     <div class="table-responsive">
         <table class="table table-hover table-striped">
-            <thead class="thead-dark">
+            <thead class="table-dark">
                 <tr>
                     <th>N° Ficha</th>
                     <th>Cliente</th>
-                    <th>Serie</th>
+                    <th>N° de Serie</th>
                     <th>Fecha Entrega</th>
                     <th>Recibido Por</th>
                     {% if user_role in ['ADMIN', 'RAYPAC'] %}
@@ -44,10 +44,16 @@
                     <td class="text-dark">{{ ficha.cliente }}</td>
                     <td class="text-dark"><code class="text-dark">{{ ficha.numero_serie }}</code></td>
                     <td class="text-dark">
+                        {# #334: dd/mm/aaaa. Sin acuse se muestra la fecha de
+                           egreso de DML (la que se carga al enviar a RAYPAC o
+                           al cerrar), aclarando que no es la de entrega.
+                           closed_at no sirve: no lo llena ningún flujo. #}
                         {% if ficha.fecha_entrega_cliente %}
-                            {{ ficha.fecha_entrega_cliente }}
+                            {{ ficha.fecha_entrega_cliente|fecha }}
+                        {% elif ficha.fecha_egreso %}
+                            {{ ficha.fecha_egreso|fecha }} <small class="text-muted">(egreso DML)</small>
                         {% else %}
-                            <span class="badge badge-warning">Sin fecha</span>
+                            <span class="badge bg-light text-muted border">Sin fecha</span>
                         {% endif %}
                     </td>
                     <td class="text-dark">
@@ -57,7 +63,7 @@
                             {# #333: DML la envió, falta el OK de RAYPAC #}
                             <span class="badge bg-warning text-dark">Pendiente de recepción</span>
                         {% else %}
-                            <span class="badge bg-secondary">No especificado</span>
+                            <span class="badge bg-secondary">Cerrada sin acuse</span>
                         {% endif %}
                     </td>
                     {% if user_role in ['ADMIN', 'RAYPAC'] %}
@@ -66,7 +72,7 @@
                     {% endif %}
                     <td>
                         <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-sm btn-info" title="Ver Ficha">
-                            <i class="fas fa-eye"></i> Ver
+                            <i class="bi bi-eye"></i> Ver
                         </a>
                         {# #264: el acuse lo registra RAYPAC, no DML - ADMIN mantiene el
                            acceso de excepción. Esta condición faltaba acá: el user_role in
@@ -75,7 +81,7 @@
                            a este botón. #}
                         {% if not ficha.recibido_por and user_role in ['ADMIN', 'RAYPAC'] %}
                         <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalAcuse{{ ficha.id }}" title="Registrar Acuse">
-                            <i class="fas fa-check"></i> Confirmar recepción
+                            <i class="bi bi-check-lg"></i> Confirmar recepción
                         </button>
                         {% endif %}
                     </td>
@@ -102,23 +108,23 @@
                 <div class="modal-body">
                     <div class="alert alert-info">
                         <strong>Cliente:</strong> {{ ficha.cliente }}<br>
-                        <strong>Serie:</strong> {{ ficha.numero_serie }}
+                        <strong>N° de Serie:</strong> {{ ficha.numero_serie }}
                     </div>
                     
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label for="fecha_entrega{{ ficha.id }}">Fecha de Entrega *</label>
                         <input type="date" class="form-control" id="fecha_entrega{{ ficha.id }}" name="fecha_entrega_cliente" 
                                value="{{ ficha.fecha_entrega_cliente or '' }}" required>
                     </div>
                     
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label for="recibido_por{{ ficha.id }}">Recibido Por (Nombre) *</label>
                         <input type="text" class="form-control" id="recibido_por{{ ficha.id }}" name="recibido_por" 
                                placeholder="Nombre de quien recibe la máquina" required>
                         <small class="form-text text-muted">Nombre completo de la persona que recibe la máquina</small>
                     </div>
                     
-                    <div class="form-group">
+                    <div class="mb-3">
                         <label for="observaciones_entrega{{ ficha.id }}">Observaciones de Entrega</label>
                         <textarea class="form-control" id="observaciones_entrega{{ ficha.id }}" name="observaciones_entrega" 
                                   rows="3" placeholder="Condiciones de entrega, documentos firmados, etc."></textarea>
@@ -127,7 +133,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-success">
-                        <i class="fas fa-check"></i> Confirmar Recepción
+                        <i class="bi bi-check-lg"></i> Confirmar Recepción
                     </button>
                 </div>
             </form>

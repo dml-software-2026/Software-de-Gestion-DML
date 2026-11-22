@@ -19,7 +19,9 @@ tickets_bp = Blueprint("tickets", __name__)
 
 @tickets_bp.route("/tickets/nuevo/<int:raypac_id>", methods=["GET", "POST"])
 @login_required
-@role_required("ADMIN", "DML_ST", "RAYPAC")
+# #336: RAYPAC no crea tickets (el botón ya se le ocultaba, pero la ruta
+# lo dejaba pasar si entraba por URL).
+@role_required("ADMIN", "DML_ST")
 def ticket_nuevo(raypac_id):
     """Crear ticket inicial desde RAYPAC freezado (nuevo flujo)."""
     user = get_current_user()
