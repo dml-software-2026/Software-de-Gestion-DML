@@ -18,6 +18,42 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+> **📍 Dónde quedamos (2026-11-22, víspera de la entrega final; la próxima
+> sesión es en OTRA máquina).**
+> - **Hecho hoy:** PR #363 (#335 barra fija y "Atrás", #336 RAYPAC solo lo
+>   suyo y ve Estadísticas, #334 Entregadas) **mergeado**, issues cerrados.
+>   Las tareas que eran de Seba se repartieron: Facu #334/#335/#336/#323/#299,
+>   Ivo #329/#324/#325, Seba #326/#339.
+> - **Entrega (2026-11-23):** la presenta **Seba**. **El merge `dev` → `main`
+>   lo hace Seba, y solo cuando todo esté listo: Claude Code no lo propone ni
+>   lo abre.** Seba tiene la guía de la demo: Claude Doc
+>   https://claude.ai/artifact/SKDWkm9TMvECeEFnWHc5Tz (orden de la demo,
+>   cambios desde el 28/10 y pendientes). Cuando Ivo/Seba mergeen lo suyo,
+>   actualizar ese mismo doc (estados y "(pendiente)"), no crear otro.
+> - **Prod:** `raypac-prod.dmlelectricidadind.com.ar`. La base de Supabase
+>   ("DML Base de Datos") estaba **pausada** por inactividad: se reactivó y se
+>   agregó un monitor de UptimeRobot a `/health` de prod (#299, hecho; antes
+>   solo había monitores de Dev). Prod sigue con el código del 28/10.
+> - **Lo que le queda a Facu, después de la entrega:** #346 (dejar prod lista)
+>   y #323 (mails en prod). Se hacen **cuando Seba haya pasado `dev` a `main`
+>   y el cliente devuelva sus datos**, siguiendo en orden la guía y el
+>   relevamiento de prod que están **comentados en el #346**. El cliente
+>   completa este Claude Doc (se lo manda Facu después de la reunión):
+>   https://claude.ai/artifact/R2FM3GJTSEkF78GMd2Ytgv (usuarios por rol,
+>   destinatarios por tipo de aviso, planilla de stock, último N° de ficha,
+>   fichas 581/582/604/606, backup sin movimientos). Contraseñas: se crea cada
+>   usuario con una provisoria y el ADMIN del cliente la cambia.
+> - **Ojo en el #346:**
+>   - En prod **todas** las fichas tienen `raypac_id`. Las creadas desde la app
+>     son las que tienen ticket: **840 a 845**. Confirmar con Facu si la 840 y
+>     la 841 son de prueba; si lo son, la última real es la 839.
+>   - Prod no tiene **ningún usuario RAYPAC**, solo los 4 del seed `@dml.local`.
+>   - `MAIL_DEV_REDIRECT` se saca **recién después** de limpiar los datos de
+>     prueba, porque si no los comerciales reales reciben mails de prueba.
+> - **Para revisar:** `.env.production` está versionado en un repo público,
+>   con claves como `SECRET_KEY` y `MAIL_PASSWORD`. No se pudo ver si los
+>   valores son reales; si lo son, cambiarlos en Render.
+
 > **✅ Hecho el 2026-11-02 (antes era el pendiente de la entrega del
 > 2026-10-28):** los puntos de `docs/NOTAS_ENTREGA_2026-10-28.md` ya están
 > en el kanban como **#305-#313** (Backlog), más el **#314** (fichas
