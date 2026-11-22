@@ -122,7 +122,8 @@ def raypac_list(readonly=False):
         "EN REPARACION": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "En Reparación"},  # alias sin tilde, ver #44
         "A LA ESPERA DE REPUESTOS": {"color": "#fd7e14", "texto_color": "#000000", "texto": "A la Espera de Repuestos"},
         "A LA ESPERA DE APROBACIÓN DE PRESUPUESTO": {"color": "#fd7e14", "texto_color": "#000000", "texto": "A la Espera de Aprobación de Presupuesto"},  # #260
-        "REPARACIÓN COMPLETADA": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "Reparación Completada"},
+        "REPARADA": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "Reparada"},  # #329
+        "REPARACIÓN COMPLETADA": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "Reparada"},  # alias legado, ver #329
         "MÁQUINA LISTA PARA RETIRAR": {"color": "#ffc107", "texto_color": "#000000", "texto": "Lista para Retirar"},
         "MÁQUINA ENTREGADA": {"color": "#28a745", "texto_color": "#ffffff", "texto": "Máquina Entregada"}
     }

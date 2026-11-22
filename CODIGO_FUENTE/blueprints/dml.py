@@ -45,7 +45,7 @@ ESTADOS_EDITABLES = [
     'A LA ESPERA DE REPUESTOS',
     'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO',  # #260
     'EN REPARACIÓN',
-    'REPARACIÓN COMPLETADA',
+    'REPARADA',  # #329 - antes 'REPARACIÓN COMPLETADA'
     'MÁQUINA LISTA PARA RETIRAR',
 ]
 
@@ -391,7 +391,8 @@ def dml_edit(id):
                 'EN REPARACION': 1,  # alias sin tilde, ver #44 - encoding legado en datos viejos
                 'A LA ESPERA DE REPUESTOS': 1,  # Mismo nivel que EN REPARACIÓN (puede ir y volver)
                 'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO': 1,  # #260 - idem, espera externa sin que DML pueda avanzar
-                'REPARACIÓN COMPLETADA': 2,
+                'REPARADA': 2,  # #329
+                'REPARACIÓN COMPLETADA': 2,  # alias legado de 'REPARADA', ver #329
                 'MÁQUINA LISTA PARA RETIRAR': 3,
                 'MÁQUINA ENTREGADA': 4,
                 'FINALIZADO': 5
