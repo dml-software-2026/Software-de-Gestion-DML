@@ -432,6 +432,19 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error migrando repuestos 'COLOCADO': {e}")
         db.rollback()
 
+    # Migración (#329): el estado 'REPARACIÓN COMPLETADA' pasó a llamarse
+    # 'REPARADA' (pedido del cliente). Idempotente: si ya no queda ninguno,
+    # no hace nada. El nombre viejo se sigue aceptando como alias donde se lee.
+    try:
+        db.execute("UPDATE dml_fichas SET estado_reparacion = 'REPARADA' WHERE estado_reparacion = 'REPARACIÓN COMPLETADA'")
+        db.execute("UPDATE dml_fichas_historial SET estado = 'REPARADA' WHERE estado = 'REPARACIÓN COMPLETADA'")
+        db.commit()
+        print("[MIGRATION] ✅ Estado 'REPARACIÓN COMPLETADA' pasado a 'REPARADA'")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error migrando el estado 'REPARACIÓN COMPLETADA': {e}")
+        db.rollback()
+
     # Migración: Agregar campos de estado a envios_repuestos
     try:
         print("[MIGRATION] Verificando campos de estado en envios_repuestos...")
