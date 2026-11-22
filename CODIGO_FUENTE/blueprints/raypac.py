@@ -1,7 +1,9 @@
 import re
+import sys
 from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
+from markupsafe import escape
 
 from CODIGO_FUENTE.decorators import (
     get_current_user,
@@ -13,6 +15,7 @@ from CODIGO_FUENTE.decorators import (
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.avisos import marcar_visto, reiniciar_vistos
 from CODIGO_FUENTE.services.flujo import build_flow_steps
+from CODIGO_FUENTE.services.mail import get_destinatarios, send_mail
 from CODIGO_FUENTE.services.remito import normalizar_remito, numero_para_input
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
@@ -366,8 +369,47 @@ def raypac_freeze(id):
     log_action(user['id'], "FREEZE", "raypac_entries", id, None,
               f"Freezado con remito {numero_remito} - Equipo enviado a DML")
 
-    flash(f"Máquina freezada y enviada a ST con el remito {numero_remito}.", "success")
+    mensaje = f"Máquina freezada y enviada a ST con el remito {numero_remito}."
+    if _avisar_nuevo_ingreso({**dict(entry), "numero_remito": numero_remito}) is False:
+        flash(f"{mensaje} No se pudo mandar el aviso por mail a DML (revisar logs).", "warning")
+    else:
+        flash(mensaje, "success")
     return redirect(url_for("raypac.raypac_view", id=id))
+
+
+def _avisar_nuevo_ingreso(entry):
+    """#324: mail a DML (destinatarios "Nuevo pedido o máquina ingresada")
+    cuando RAYPAC freeza y envía una máquina. Respuesta 3.1 de David.
+
+    Devuelve None si no hay destinatarios configurados, True si salieron
+    todos y False si alguno falló. Nunca rompe el freezado: ya está
+    commiteado cuando se llama."""
+    try:
+        destinatarios = get_destinatarios("NUEVO_INGRESO")
+        if not destinatarios:
+            return None
+
+        def campo(nombre):
+            return escape(entry.get(nombre) or "-")
+
+        diagnostico = escape(entry.get("diagnostico_ingreso") or "Sin diagnóstico cargado")
+        link = url_for("raypac.raypac_view", id=entry["id"], _external=True)
+        html = f"""
+        <h3>🚚 Nueva máquina enviada por RAYPAC</h3>
+        <p><strong>Cliente:</strong> {campo("cliente")}</p>
+        <p><strong>N° de serie:</strong> {campo("numero_serie")}</p>
+        <p><strong>Modelo:</strong> {campo("modelo_maquina")}</p>
+        <p><strong>Tipo de solicitud:</strong> {campo("tipo_solicitud")}</p>
+        <p><strong>Remito:</strong> {campo("numero_remito")}</p>
+        <p><strong>Diagnóstico de ingreso:</strong><br>{diagnostico}</p>
+        <p><a href="{link}">Ver el ingreso en el sistema</a></p>
+        """
+        asunto = f"🚚 Nueva máquina de RAYPAC: {entry.get('cliente') or ''} - serie {entry.get('numero_serie') or ''}"
+        resultados = [send_mail(email, asunto, html) for email in destinatarios]
+        return all(resultados)
+    except Exception as e:
+        print(f"Error enviando aviso de nuevo ingreso RAYPAC: {e}", file=sys.stderr, flush=True)
+        return False
 
 
 @raypac_bp.route("/<int:id>/unfreeze", methods=["POST"])

@@ -147,3 +147,56 @@ def test_desfreezar_con_ultimos_4_del_remito(client, ingresos_test):
     assert _entry(id_)['is_frozen']
     client.post(f"/raypac/{id_}/unfreeze", data={"unfreeze_code": "4321"})
     assert not _entry(id_)['is_frozen']
+
+
+# --- #324: aviso por mail a DML al freezar -------------------------------
+
+@pytest.fixture
+def mails(monkeypatch):
+    """Captura los mails del freezado sin mandarlos. `mails.ok` simula si Resend falla."""
+    from CODIGO_FUENTE.blueprints import raypac as raypac_mod
+
+    class Captura(list):
+        pass
+
+    enviados = Captura()
+    enviados.ok = True
+    enviados.destinatarios = ["dml-qa@example.com"]
+    monkeypatch.setattr(raypac_mod, "get_destinatarios",
+                        lambda tipo: enviados.destinatarios if tipo == "NUEVO_INGRESO" else [])
+    monkeypatch.setattr(raypac_mod, "send_mail",
+                        lambda to, subject, html, **k: enviados.append((to, subject, html)) or enviados.ok)
+    return enviados
+
+
+@necesita_db
+def test_freezar_avisa_por_mail_a_dml(client, ingresos_test, mails):
+    id_ = ingresos_test[0]
+    resp = client.post(f"/raypac/{id_}/freeze", data={"numero_remito": "4321"}, follow_redirects=True)
+    assert len(mails) == 1
+    to, subject, html = mails[0]
+    assert to == "dml-qa@example.com"
+    assert "Cliente de Prueba QA" in subject
+    entry = _entry(id_)
+    for dato in ("Cliente de Prueba QA", entry["numero_serie"], "ITA10", "00001-00004321", f"/raypac/{id_}"):
+        assert dato in html
+    assert "No se pudo mandar el aviso" not in resp.get_data(as_text=True)
+
+
+@necesita_db
+def test_freezar_si_falla_el_mail_igual_freeza(client, ingresos_test, mails):
+    mails.ok = False
+    id_ = ingresos_test[0]
+    resp = client.post(f"/raypac/{id_}/freeze", data={"numero_remito": "4321"}, follow_redirects=True)
+    assert _entry(id_)["is_frozen"]
+    assert "No se pudo mandar el aviso por mail a DML" in resp.get_data(as_text=True)
+
+
+@necesita_db
+def test_freezar_sin_destinatarios_no_manda_ni_avisa(client, ingresos_test, mails):
+    mails.destinatarios = []
+    id_ = ingresos_test[0]
+    resp = client.post(f"/raypac/{id_}/freeze", data={"numero_remito": "4321"}, follow_redirects=True)
+    assert _entry(id_)["is_frozen"]
+    assert mails == []
+    assert "No se pudo mandar el aviso" not in resp.get_data(as_text=True)
