@@ -491,6 +491,33 @@ document.addEventListener('submit', function (e) {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creando...';
   }
 });
+
+// Ojito de mostrar/ocultar contraseña (mismo diseño que el login, #189):
+// cualquier <input type="password" data-ojito> lo recibe solo.
+document.querySelectorAll('input[type="password"][data-ojito]').forEach(function (input) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'password-wrapper';
+  input.parentNode.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'password-toggle';
+  btn.innerHTML = '<i class="bi bi-eye"></i>';
+  const actualizar = function (mostrar) {
+    const texto = mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña';
+    btn.querySelector('i').className = mostrar ? 'bi bi-eye-slash' : 'bi bi-eye';
+    btn.setAttribute('aria-pressed', mostrar);
+    btn.setAttribute('aria-label', texto);
+    btn.title = texto;
+  };
+  actualizar(false);
+  btn.addEventListener('click', function () {
+    const mostrar = input.type === 'password';
+    input.type = mostrar ? 'text' : 'password';
+    actualizar(mostrar);
+  });
+  wrapper.appendChild(btn);
+});
 </script>
 </body>
 </html>
