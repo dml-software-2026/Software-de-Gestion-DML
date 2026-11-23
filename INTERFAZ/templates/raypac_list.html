@@ -133,6 +133,7 @@
                             </a>
                             {# #328: crea la ficha y va directo a la edición (POST) #}
                             <form method="POST" action="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="mt-1 js-crear-ficha">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-success">Crear Ficha</button>
                             </form>
                         {% elif entry.is_frozen and not entry.ticket_id %}

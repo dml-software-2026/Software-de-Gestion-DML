@@ -41,12 +41,14 @@
       <a class="btn btn-outline-primary" href="{{ url_for('pedidos.pedidos_edit', id=pedido.id) }}"><i class="bi bi-pencil"></i> Editar</a>
       <form method="POST" action="{{ url_for('pedidos.pedidos_cancelar', id=pedido.id) }}" class="d-inline"
             onsubmit="return confirmarAccion(event, '¿Cancelar el pedido #{{ pedido.id }}? DML deja de verlo como pendiente.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-outline-danger"><i class="bi bi-x-circle"></i> Cancelar pedido</button>
       </form>
       {% endif %}
       {% if puede_preparar %}
       <form method="POST" action="{{ url_for('pedidos.pedidos_preparar', id=pedido.id) }}" class="d-inline"
             onsubmit="return confirmarAccion(event, '¿Empezar a preparar el pedido #{{ pedido.id }}? Desde ahora RAYPAC ya no lo puede cambiar ni cancelar.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-outline-primary"><i class="bi bi-box-seam"></i> Marcar en preparación</button>
       </form>
       {% endif %}
@@ -69,7 +71,8 @@
     con lo enviado. Las diferencias quedan registradas para DML.
   </div>
   <form method="POST" id="recibir-form" action="{{ url_for('pedidos.pedidos_recibir', id=pedido.id) }}"
-        onsubmit="return confirmarAccion(event, '¿Confirmar la recepción del pedido #{{ pedido.id }}?');"></form>
+        onsubmit="return confirmarAccion(event, '¿Confirmar la recepción del pedido #{{ pedido.id }}?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
   {% endif %}
 
   <div class="table-responsive">

@@ -130,6 +130,7 @@
                             <a href="{{ url_for('stock.stock_edit', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" class="btn btn-sm btn-primary">Editar</a>
                             {% if user.role == 'ADMIN' %}
                             <form method="POST" action="{{ url_for('stock.stock_delete', codigo=row.codigo_repuesto, ubicacion=ubicacion) }}" style="display:inline-block; width:180px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="password" name="admin_password" class="form-control form-control-sm mb-1" placeholder="Contraseña" required>
                                 <button type="submit" class="btn btn-sm btn-danger w-100" onclick="return confirmarAccion(event, '¿Eliminar este repuesto?')">Eliminar</button>
                             </form>
@@ -155,6 +156,7 @@
 <div class="modal fade" id="modalUbicacion" tabindex="-1" aria-labelledby="modalUbicacionLabel" aria-hidden="true">
   <div class="modal-dialog">
     <form method="POST" class="modal-content" id="formUbicacion">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-header">
         <h5 class="modal-title" id="modalUbicacionLabel">Ubicación de <span id="modalUbicacionCodigo"></span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>

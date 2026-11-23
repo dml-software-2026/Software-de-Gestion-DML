@@ -15,6 +15,7 @@
 
   <form method="POST" id="pedido-form"
         onsubmit="return confirmarSiExcede(event);">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="mb-3">
       <label for="observaciones" class="form-label fw-bold">Observaciones <span class="text-muted fw-normal">(opcional)</span></label>
       <textarea class="form-control" id="observaciones" name="observaciones" rows="2" maxlength="500"

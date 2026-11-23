@@ -13,6 +13,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         {% if user.role == 'ADMIN' %}
                         <div class="alert alert-info">Solo ADMIN: confirmá con tu contraseña para editar stock.</div>
                         <div class="mb-3">

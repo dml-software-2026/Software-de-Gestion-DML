@@ -114,6 +114,7 @@
             </p>
             {% if user_role in ['ADMIN', 'DML_ST'] and entry.is_frozen %}
             <form method="POST" action="{{ url_for('raypac.raypac_recepcionar_dml', id=entry.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-success btn-sm" onclick="return confirmarAccion(event, '¿Confirmar recepción del equipo en DML?')">
                     <i class="bi bi-check-circle"></i> Dar de Alta en DML
                 </button>
@@ -132,6 +133,7 @@
             </p>
             {% if user_role == 'ADMIN' %}
             <form method="POST" action="{{ url_for('raypac.raypac_unfreeze', id=entry.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="input-group input-group-sm" style="max-width: 420px;">
                     <input type="text" name="unfreeze_code" class="form-control" placeholder="Código de desfreeze" maxlength="8" required>
                     <button type="submit" class="btn btn-warning"><i class="bi bi-unlock"></i> Desfreezar Definitivamente</button>
@@ -158,6 +160,7 @@
             {# #305: el remito lo carga RAYPAC a mano; alcanza con el número y se
                completa con ceros (4321 -> 00001-00004321). Puede repetirse. #}
             <form method="POST" action="{{ url_for('raypac.raypac_freeze', id=entry.id) }}" class="flex-grow-1 m-0" style="min-width: 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="input-group" style="max-width: 360px;">
                     <input type="text" name="numero_remito" class="form-control" placeholder="N° de remito (ej: 4321)"
                            value="{{ remito_precargado }}" inputmode="numeric" pattern="[0-9]{1,8}|[0-9]{4,5}-[0-9]{8}" maxlength="14" required
@@ -220,6 +223,7 @@
         {% elif ticket %}
         {# #328: crea la ficha y va directo a la edición (POST) #}
         <form method="POST" action="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="js-crear-ficha">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-success">
                 <i class="bi bi-file-earmark-plus"></i> Crear Ficha DML <i class="bi bi-arrow-right"></i>
             </button>
