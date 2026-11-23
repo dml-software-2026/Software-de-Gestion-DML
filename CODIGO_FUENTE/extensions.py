@@ -523,6 +523,14 @@ def migrate_db():
                 WHERE is_closed = TRUE AND enviada_raypac_at IS NULL
             """)
             print("[MIGRATION] Columna enviada_raypac_at agregada")
+        # #372: seguimiento del pago. Las fichas existentes (incluidas las
+        # históricas) quedan en DEBE por el DEFAULT.
+        if "numero_factura" not in column_names:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS numero_factura TEXT")
+        if "pago_raypac" not in column_names:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS pago_raypac TEXT NOT NULL DEFAULT 'DEBE'")
+        if "pago_tecnico" not in column_names:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS pago_tecnico TEXT NOT NULL DEFAULT 'DEBE'")
 
         db.commit()
         print("[MIGRATION] ✅ Campos de acuse de recibo verificados")
