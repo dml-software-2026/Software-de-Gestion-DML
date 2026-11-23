@@ -248,7 +248,7 @@
     </div>
 
     <!-- ACCIONES SECUNDARIAS (Ver Ticket / Descargar PDF siempre visibles,
-         igual que antes; Editar/Crear Ticket solo si no es modo solo
+         igual que antes; Editar solo si no es modo solo
          lectura). #158: "Cerrar Ficha" y "Registrar Acuse" - las acciones
          que avanzan al siguiente paso del flujo - se sacan de acá y pasan a
          la barra de abajo (Volver a la izquierda, siguiente paso a la
@@ -259,14 +259,6 @@
             <a href="{{ url_for('dml.dml_edit', id=ficha.id) }}" class="btn btn-primary">
                 <i class="bi bi-pencil"></i> Editar Ficha
             </a>
-            {% endif %}
-
-            {% if not readonly and not ficha.numero_ticket %}
-            <form method="POST" action="{{ url_for('dml.crear_ticket_endpoint', id=ficha.id) }}" class="d-inline">
-                <button type="submit" class="btn btn-warning">
-                    <i class="bi bi-ticket-perforated"></i> Crear Ticket
-                </button>
-            </form>
             {% endif %}
 
             {% if ficha.numero_ticket %}

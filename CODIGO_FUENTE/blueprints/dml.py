@@ -24,7 +24,7 @@ from CODIGO_FUENTE.decorators import (
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.flujo import build_flow_steps
 from CODIGO_FUENTE.services.mail import get_destinatarios, send_mail
-from CODIGO_FUENTE.services.numeracion import crear_ticket, generate_ficha_number
+from CODIGO_FUENTE.services.numeracion import generate_ficha_number
 from CODIGO_FUENTE.services.pdf import generar_pdf_ficha
 from CODIGO_FUENTE.services.stock import (
     actualizar_estadistica_repuesto,
@@ -696,76 +696,6 @@ def eliminar_repuesto(ficha_id, repuesto_id):
 
 
 # ======================== TICKETS (asociados a ficha) ========================
-
-@dml_bp.route("/<int:id>/crear-ticket", methods=["POST"])
-@login_required
-@role_required("ADMIN", "DML_ST")
-def crear_ticket_endpoint(id):
-    """Crea un ticket de seguimiento para una ficha DML."""
-    user = get_current_user()
-    db = get_db()
-
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
-    if not ficha:
-        flash("Ficha no encontrada.", "error")
-        return redirect(url_for("dml.dml_list"))
-
-    # Verificar si ya existe ticket
-    if ficha['numero_ticket']:
-        flash(f"Ya existe ticket creado: {ficha['numero_ticket']}", "info")
-        return redirect(url_for("dml.dml_view", id=id))
-
-    try:
-        # Obtener número de serie desde RAYPAC
-        raypac = db.execute(
-            "SELECT numero_serie, mail_comercial FROM raypac_entries WHERE id = %s",
-            (ficha['raypac_id'],)
-        ).fetchone()
-
-        if not raypac:
-            flash("No se encontró información de RAYPAC.", "error")
-            return redirect(url_for("dml.dml_view", id=id))
-
-        # Crear ticket
-        numero_ticket = crear_ticket(id, raypac['numero_serie'])
-
-        # Enviar ticket por email
-        if raypac['mail_comercial']:
-            html_body = f"""
-            <html>
-            <head><style>
-                body {{ font-family: Arial, sans-serif; }}
-                .ticket-box {{ border: 2px solid #2c3e50; padding: 20px; border-radius: 5px; }}
-                .ticket-num {{ font-size: 24px; font-weight: bold; color: #2c3e50; }}
-                .info-row {{ margin: 10px 0; }}
-                .label {{ font-weight: bold; color: #555; }}
-            </style></head>
-            <body>
-            <h2>🎫 TICKET DE SEGUIMIENTO GENERADO</h2>
-            <div class="ticket-box">
-                <div class="ticket-num">{numero_ticket}</div>
-                <div class="info-row"><span class="label">Número de Ficha:</span> {ficha['numero_ficha']}</div>
-                <div class="info-row"><span class="label">Número de Serie:</span> {raypac['numero_serie']}</div>
-                <div class="info-row"><span class="label">Estado:</span> {ficha['estado_reparacion']}</div>
-                <div class="info-row"><span class="label">Fecha de Ingreso:</span> {ficha['fecha_ingreso']}</div>
-            </div>
-            <p>Puede usar este número de ticket para hacer seguimiento de su equipo.</p>
-            <p style="color: #999; font-size: 12px;">DML Electricidad Industrial SRL</p>
-            </body>
-            </html>
-            """
-            send_mail(raypac['mail_comercial'],
-                     f"🎫 Ticket de Seguimiento: {numero_ticket}",
-                     html_body)
-
-        log_action(user['id'], "CREATE_TICKET", "tickets", id, None, numero_ticket)
-        flash(f"✅ Ticket creado exitosamente: {numero_ticket}", "success")
-
-    except Exception as e:
-        flash(f"Error al crear ticket: {e!s}", "error")
-
-    return redirect(url_for("dml.dml_view", id=id))
-
 
 @dml_bp.route("/<int:id>/close", methods=["POST"])
 @login_required
