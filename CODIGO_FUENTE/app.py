@@ -19,7 +19,13 @@ from CODIGO_FUENTE.blueprints.pedidos import pedidos_bp
 from CODIGO_FUENTE.blueprints.raypac import raypac_bp
 from CODIGO_FUENTE.blueprints.stock import stock_bp
 from CODIGO_FUENTE.blueprints.tickets import tickets_bp
-from CODIGO_FUENTE.config import BASE_DIR, MANO_DE_OBRA_OPCIONES, TECNICOS_ST, Config
+from CODIGO_FUENTE.config import (
+    BASE_DIR,
+    MANO_DE_OBRA_OPCIONES,
+    TECNICOS_ST,
+    Config,
+    validar_secret_key,
+)
 from CODIGO_FUENTE.decorators import get_current_user_jinja
 from CODIGO_FUENTE.extensions import close_db, get_db, init_db, preparar_base
 from CODIGO_FUENTE.services.fechas import fecha_ddmmaaaa
@@ -39,7 +45,8 @@ app = Flask(
     static_url_path="/static"
 )
 app.config.from_object(Config)
- 
+validar_secret_key(app.config["SECRET_KEY"], en_render=bool(os.environ.get("RENDER")))  # #376
+
 logger = logging.getLogger(__name__)
 
 # Hacer funciones de negocio disponibles en todos los templates Jinja2
