@@ -80,30 +80,6 @@ def _paso_flujo(ficha):
     return 2
 
 
-def codigo_edicion_ficha(numero_remito_salida):
-    """#333: código que pide editar una ficha ya recibida por RAYPAC: los
-    últimos 4 dígitos del remito de salida de DML (el que viaja con la
-    máquina de vuelta), mismo criterio que el desfreezado de un ingreso.
-    "00001-04222" -> "4222". Vacío si la ficha no tiene remito."""
-    digitos = "".join(c for c in (numero_remito_salida or "") if c.isdigit())
-    return digitos[-4:]
-
-
-def _ficha_desbloqueada(ficha_id):
-    """#333: RAYPAC/ADMIN desbloquearon esta ficha con el código en esta sesión."""
-    return ficha_id in session.get("fichas_desbloqueadas", [])
-
-
-def _paso_flujo(ficha):
-    """#158/#333: paso del tracker de 4 pasos. El 3ro ("Lista para retirar")
-    es cuando DML la envía a RAYPAC; el 4to, cuando RAYPAC da el OK."""
-    if ficha['fecha_entrega_cliente'] or ficha['is_closed']:
-        return 4
-    if ficha['enviada_raypac_at']:
-        return 3
-    return 2
-
-
 def registrar_estado(db, ficha_id, estado, usuario_id):
     """#171: deja asentado un cambio de estado_reparacion en el historial
     de la ficha. No hace commit - va en la misma transacción que el UPDATE
