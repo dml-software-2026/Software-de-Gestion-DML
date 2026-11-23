@@ -31,6 +31,9 @@ class Config:
 # (global de Jinja, ver app.py) y el backend rechaza cualquier otro valor.
 # Para sumar un técnico, agregarlo acá. Las fichas/tickets viejos con otro
 # texto no se migran: se siguen mostrando como están.
+# #375: largo mínimo de una contraseña (alta/edición de usuarios y "Cambiar mi contraseña")
+PASSWORD_MIN = 6
+
 TECNICOS_ST = ["Ricardo", "David"]
 
 # #331: mano de obra de la ficha, una sola opción por ficha (opcional). Las
