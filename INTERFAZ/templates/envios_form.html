@@ -4,7 +4,7 @@
 <div class="container mt-4">
   {# Mismo form para alta y edición (#57): envio = None en el alta. #}
   {% if envio %}
-  <h2 class="mb-3">Editar envío - Remito {{ envio.numero_remito }}</h2>
+  <h2 class="mb-3">Editar envío - {% if envio.numero_remito %}Remito {{ envio.numero_remito }}{% else %}Borrador (sin remito){% endif %}</h2>
   <p class="text-muted">El envío sigue en preparación: podés cambiar el remito y los repuestos hasta marcarlo como enviado.</p>
   {% else %}
   <h2 class="mb-3">Nuevo envío</h2>
@@ -30,18 +30,19 @@
       </div>
     </div>
     
-    <!-- Campo de remito OBLIGATORIO -->
+    <!-- Remito: opcional mientras es borrador, se pide al freezar (#338) -->
     <div class="card mb-4" style="border-left: 4px solid #ffc107;">
       <div class="card-body">
         <h5 class="card-title text-warning"><i class="bi bi-file-text-fill"></i> Número de Remito</h5>
         <div class="row">
           <div class="col-md-6">
-            <label for="numero_remito" class="form-label fw-bold">Remito RAYPAC <span class="text-danger">*</span></label>
+            <label for="numero_remito" class="form-label fw-bold">Remito RAYPAC <span class="text-muted fw-normal">(opcional por ahora)</span></label>
             <input type="text" class="form-control form-control-lg" id="numero_remito" name="numero_remito" 
                    value="{{ valores.numero_remito }}"
-                   placeholder="Ej: 4222 (últimos 4 dígitos) o 00001-04222 (completo)" required>
+                   placeholder="Ej: 4222 (últimos 4 dígitos) o 00001-04222 (completo)">
             <small class="text-muted">
-              Puedes ingresar solo los últimos 4 dígitos y el sistema auto-completará el formato.
+              Podés guardar el envío sin remito y cargarlo al freezarlo. Con los últimos dígitos alcanza:
+              el sistema completa el formato.
             </small>
           </div>
         </div>
@@ -51,37 +52,9 @@
     <h5 class="mb-3">Repuestos a enviar</h5>
     <div class="alert alert-info">
       <i class="bi bi-info-circle"></i> <strong>Importante:</strong> Todos los repuestos están disponibles para enviar (stock ilimitado). 
-      Selecciona los que necesitas enviar a DML e indica la cantidad. Si un repuesto no está en la lista, agrégalo manualmente abajo.
+      Selecciona los que necesitas enviar a DML e indica la cantidad. Usá el buscador para encontrarlos más rápido.
     </div>
     
-    <table class="table table-sm table-bordered align-middle">
-      <thead class="table-light">
-        <tr>
-          <th style="width: 15%">Código</th>
-          <th>Descripción</th>
-          <th style="width: 20%">Cantidad a enviar</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in stock %}
-        <tr>
-          <td><strong>{{ row.codigo_repuesto }}</strong></td>
-          <td>{{ row.item }}</td>
-          <td>
-            <input type="number" min="0" step="1"
-                   class="form-control" name="qty_{{ row.codigo_repuesto }}" placeholder="0"
-                   value="{{ valores.cantidades.get(row.codigo_repuesto, '') }}">
-          </td>
-        </tr>
-        {% endfor %}
-        {% if stock|length == 0 %}
-        <tr>
-          <td colspan="3" class="text-center text-muted">No hay repuestos registrados en el sistema.</td>
-        </tr>
-        {% endif %}
-      </tbody>
-    </table>
-
     {# Los códigos nuevos los da de alta solo DML (pedido de David): RAYPAC
        manda únicamente repuestos de la lista. #}
     {% if get_current_user().role == 'RAYPAC' %}
@@ -96,7 +69,7 @@
         <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Agregar Repuesto No Listado</h5>
       </div>
       <div class="card-body">
-        <p class="text-muted">Si el repuesto no está en la lista superior, puedes agregarlo manualmente.
+        <p class="text-muted">Si el repuesto no está en la lista de abajo, podés agregarlo manualmente.
           DML revisa el código y la descripción al recibir el envío y lo da de alta en su stock.</p>
         {% set adicionales = valores.adicionales or [('', '', '')] %}
         <div id="repuestos-adicionales">
@@ -212,6 +185,68 @@
     </div>
     {% endif %}
 
+    {# #337: barra fija con buscador, "solo seleccionados", no listado y Guardar,
+       para no tener que recorrer la lista entera ni bajar hasta el pie. #}
+    <div id="barra-envio" class="card card-body py-2 mb-3 shadow-sm">
+      <div class="row g-2 align-items-center">
+        <div class="col-12 col-lg">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="search" id="buscar-repuesto" class="form-control" autocomplete="off"
+                   placeholder="Buscar por código o descripción" aria-label="Buscar repuesto">
+          </div>
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="solo-seleccionados">
+            <label class="form-check-label" for="solo-seleccionados">Solo seleccionados</label>
+          </div>
+        </div>
+        <div class="col-auto small text-muted" id="resumen-seleccion" aria-live="polite"></div>
+        <div class="col-12 col-sm-auto ms-sm-auto d-flex gap-2 justify-content-end">
+          {% if get_current_user().role != 'RAYPAC' %}
+          <button type="button" class="btn btn-outline-success" id="btn-no-listado">
+            <i class="bi bi-plus-circle"></i> No listado
+          </button>
+          {% endif %}
+          <button type="submit" class="btn btn-primary">
+            {% if envio %}<i class="bi bi-check-circle"></i> Guardar cambios{% else %}<i class="bi bi-save"></i> Guardar envío{% endif %}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <table id="tabla-repuestos" class="table table-sm table-bordered align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 15%">Código</th>
+          <th>Descripción</th>
+          <th style="width: 20%">Cantidad a enviar</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stock %}
+        <tr class="fila-repuesto">
+          <td><strong>{{ row.codigo_repuesto }}</strong></td>
+          <td>{{ row.item }}</td>
+          <td>
+            <input type="number" min="0" step="1"
+                   class="form-control" name="qty_{{ row.codigo_repuesto }}" placeholder="0"
+                   value="{{ valores.cantidades.get(row.codigo_repuesto, '') }}">
+          </td>
+        </tr>
+        {% endfor %}
+        <tr id="sin-resultados" class="d-none">
+          <td colspan="3" class="text-center text-muted">Ningún repuesto coincide con la búsqueda.</td>
+        </tr>
+        {% if stock|length == 0 %}
+        <tr>
+          <td colspan="3" class="text-center text-muted">No hay repuestos registrados en el sistema.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+
     <div class="d-flex justify-content-between align-items-center">
       {% if envio %}
       <a class="btn btn-outline-secondary" href="{{ url_for('envios.envios_view', id=envio.id) }}"><i class="bi bi-arrow-left"></i> Cancelar</a>
@@ -223,4 +258,99 @@
     </div>
   </form>
 </div>
+
+<style>
+  /* #337: debajo de la barra negra (que también es sticky, ver #335) */
+  #barra-envio { position: sticky; top: var(--alto-navbar, 0px); z-index: 1010; }
+</style>
+
+<script>
+// #337: buscador y "solo seleccionados". Solo oculta filas: las cantidades
+// de las filas ocultas se siguen mandando al guardar.
+(function () {
+  const buscador = document.getElementById('buscar-repuesto');
+  const soloSeleccionados = document.getElementById('solo-seleccionados');
+  const resumen = document.getElementById('resumen-seleccion');
+  const sinResultados = document.getElementById('sin-resultados');
+  const filas = Array.from(document.querySelectorAll('#tabla-repuestos tr.fila-repuesto'));
+
+  function normalizar(texto) {
+    return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  }
+  filas.forEach(function (fila) {
+    fila.dataset.buscar = normalizar(fila.cells[0].textContent + ' ' + fila.cells[1].textContent);
+  });
+
+  function cantidad(input) {
+    const n = parseInt(input.value, 10);
+    return n > 0 ? n : 0;
+  }
+
+  function filtrar() {
+    const terminos = normalizar(buscador.value).split(/\s+/).filter(Boolean);
+    let visibles = 0;
+    filas.forEach(function (fila) {
+      const coincide = terminos.every(function (t) { return fila.dataset.buscar.includes(t); });
+      const elegido = !soloSeleccionados.checked || cantidad(fila.querySelector('input')) > 0;
+      fila.classList.toggle('d-none', !(coincide && elegido));
+      if (coincide && elegido) visibles++;
+    });
+    sinResultados.classList.toggle('d-none', visibles > 0 || filas.length === 0);
+  }
+
+  function actualizarResumen() {
+    let repuestos = 0, unidades = 0;
+    filas.forEach(function (fila) {
+      const n = cantidad(fila.querySelector('input'));
+      if (n > 0) { repuestos++; unidades += n; }
+    });
+    document.querySelectorAll('#repuestos-adicionales .repuesto-adicional').forEach(function (fila) {
+      const codigo = fila.querySelector('input[name^="codigo_adicional_"]').value.trim();
+      const n = cantidad(fila.querySelector('input[name^="cantidad_adicional_"]'));
+      if (codigo && n > 0) { repuestos++; unidades += n; }
+    });
+    resumen.textContent = repuestos === 0
+      ? 'Ningún repuesto seleccionado'
+      : repuestos + (repuestos === 1 ? ' repuesto' : ' repuestos') + ' · '
+        + unidades + (unidades === 1 ? ' unidad' : ' unidades');
+  }
+
+  buscador.addEventListener('input', filtrar);
+  // Enter en el buscador no manda el formulario
+  buscador.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+  soloSeleccionados.addEventListener('change', filtrar);
+  document.getElementById('envio-form').addEventListener('input', function (e) {
+    if (e.target !== buscador) actualizarResumen();
+  });
+
+  // "+ No listado": usa el renglón vacío si hay uno; si no, agrega otro.
+  const btnNoListado = document.getElementById('btn-no-listado');
+  if (btnNoListado) {
+    btnNoListado.addEventListener('click', function () {
+      let vacio = Array.from(document.querySelectorAll('#repuestos-adicionales input[name^="codigo_adicional_"]'))
+        .find(function (input) { return !input.value.trim(); });
+      if (!vacio) {
+        agregarFilaRepuesto();
+        vacio = document.querySelector('#repuestos-adicionales .repuesto-adicional:last-child input[name^="codigo_adicional_"]');
+      }
+      vacio.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      vacio.focus({ preventScroll: true });
+    });
+  }
+
+  // La barra va pegada al borde de arriba de la pantalla, o justo debajo de
+  // la barra negra mientras esa se vea (hoy se suelta al bajar, ver #335).
+  const nav = document.querySelector('nav.navbar');
+  function ubicarBarra() {
+    const abajoDeNav = nav ? Math.max(0, Math.round(nav.getBoundingClientRect().bottom)) : 0;
+    document.documentElement.style.setProperty('--alto-navbar', abajoDeNav + 'px');
+  }
+  window.addEventListener('scroll', ubicarBarra, { passive: true });
+  window.addEventListener('resize', ubicarBarra);
+  ubicarBarra();
+
+  filtrar();
+  actualizarResumen();
+})();
+</script>
 {% endblock %}

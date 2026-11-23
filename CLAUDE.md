@@ -18,6 +18,108 @@ tarea de "guardar contexto" por terminada hasta la confirmación del merge.
 **Regla para Claude Code:** al arrancar cualquier sesión, leer esta sección antes de
 asumir contexto de nada más.
 
+> **📍 Dónde quedamos (2026-11-22, víspera de la entrega final; la próxima
+> sesión es en OTRA máquina).**
+> - **Hecho hoy:** PR #363 (#335 barra fija y "Atrás", #336 RAYPAC solo lo
+>   suyo y ve Estadísticas, #334 Entregadas) **mergeado**, issues cerrados.
+>   Las tareas que eran de Seba se repartieron: Facu #334/#335/#336/#323/#299,
+>   Ivo #329/#324/#325, Seba #326/#339.
+> - **Entrega (2026-11-23):** la presenta **Seba**. **El merge `dev` → `main`
+>   lo hace Seba, y solo cuando todo esté listo: Claude Code no lo propone ni
+>   lo abre.** Seba tiene la guía de la demo: Claude Doc
+>   https://claude.ai/artifact/SKDWkm9TMvECeEFnWHc5Tz (orden de la demo,
+>   cambios desde el 28/10 y pendientes). Cuando Ivo/Seba mergeen lo suyo,
+>   actualizar ese mismo doc (estados y "(pendiente)"), no crear otro.
+> - **Prod:** `raypac-prod.dmlelectricidadind.com.ar`. La base de Supabase
+>   ("DML Base de Datos") estaba **pausada** por inactividad: se reactivó y se
+>   agregó un monitor de UptimeRobot a `/health` de prod (#299, hecho; antes
+>   solo había monitores de Dev). Prod sigue con el código del 28/10.
+> - **Lo que le queda a Facu, después de la entrega:** #346 (dejar prod lista)
+>   y #323 (mails en prod). Se hacen **cuando Seba haya pasado `dev` a `main`
+>   y el cliente devuelva sus datos**, siguiendo en orden la guía y el
+>   relevamiento de prod que están **comentados en el #346**. El cliente
+>   completa este Claude Doc (se lo manda Facu después de la reunión):
+>   https://claude.ai/artifact/R2FM3GJTSEkF78GMd2Ytgv (usuarios por rol,
+>   destinatarios por tipo de aviso, planilla de stock, último N° de ficha,
+>   fichas 581/582/604/606, backup sin movimientos). Contraseñas: se crea cada
+>   usuario con una provisoria y el ADMIN del cliente la cambia.
+> - **Ojo en el #346:**
+>   - En prod **todas** las fichas tienen `raypac_id`. Las creadas desde la app
+>     son las que tienen ticket: **840 a 845**. Confirmar con Facu si la 840 y
+>     la 841 son de prueba; si lo son, la última real es la 839.
+>   - Prod no tiene **ningún usuario RAYPAC**, solo los 4 del seed `@dml.local`.
+>   - `MAIL_DEV_REDIRECT` se saca **recién después** de limpiar los datos de
+>     prueba, porque si no los comerciales reales reciben mails de prueba.
+> - **Para revisar:** `.env.production` está versionado en un repo público,
+>   con claves como `SECRET_KEY` y `MAIL_PASSWORD`. No se pudo ver si los
+>   valores son reales; si lo son, cambiarlos en Render.
+
+> **✅ Hecho el 2026-11-02 (antes era el pendiente de la entrega del
+> 2026-10-28):** los puntos de `docs/NOTAS_ENTREGA_2026-10-28.md` ya están
+> en el kanban como **#305-#313** (Backlog), más el **#314** (fichas
+> históricas corregidas por el cliente). Facu pasó los archivos del
+> cliente: la planilla de stock al 31/08/2026 y la plantilla de ficha nueva
+> quedaron en `DOCUMENTOS DML/`. **Criterio de Facu:** ante contradicciones
+> entre archivos del cliente, manda la planilla de stock más nueva; algunos
+> archivos son de la cohorte anterior (fechas no confiables). Las
+> correcciones con datos de máquinas/clientes (`ingresos_con_error.csv`,
+> `Fechas, Modelos y una ficha invalida- corregido.xlsx`, `Codigos no
+> reconocidos - DATO ACTUALIZADO.csv`) **no se suben** (repo público, mismo
+> criterio que el `.gitignore` de `scripts/data/`): las tiene Facu, el
+> resumen está en el #314.
+>
+> **🎯 EN CURSO (actualizado 2026-11-15): última tanda, terminar todo el
+> kanban.** David respondió las preguntas y el cliente mandó observaciones
+> nuevas y una ficha corregida (3 .docx en Descargas de Facu, **no
+> versionados**: repo público). Resumen y mapeo a issues en
+> `docs/RESPUESTAS_Y_OBSERVACIONES_CLIENTE_2026-11-15.md`. Las respuestas
+> están comentadas en #305, #307-#309 y #311-#314. **Issues nuevos #323-#342**
+> (Backlog, con Size y Épica). #341 y #342 son sub-issues del #308. Plan
+> acordado con Facu: ir haciendo **todas** las tareas del kanban, una por
+> una (una tarea / un PR a la vez), hasta terminar.
+> - Hay que **contestarle a David** si el backup semanal se hace aunque no
+>   haya movimientos (#311; propuesta: sí, siempre).
+> - Las capturas de las observaciones son del usuario **ADMIN**: ver #336
+>   antes de tocar permisos de RAYPAC.
+> - Siguen valiendo de la revisión del 2026-11-09: en #305, al volver a
+>   cargar el remito a mano **no** restaurar la validación de remito único
+>   (se puede repetir); en #310, antes de cargar la planilla en prod, revisar
+>   si hubo movimientos después del 31/08; en #314, pedir el Excel de fichas
+>   actualizado para la entrega final.
+> - `CAMPOS DE INGRESO DML` **no** es stock: es la especificación de campos de 2025.
+>
+> **📍 Dónde quedamos (2026-11-18) - tareas de Facu del kanban terminadas.**
+> Mergeados a `dev` (y sus issues cerrados): los 7 PRs del 16/11, más
+> **#353** (#328: "Crear Ficha" crea la ficha y va directo a la edición,
+> nuevo orden de secciones, autoguardado de la ficha antes de tocar un
+> repuesto), **#354** (#331: mano de obra, una opción de
+> `MANO_DE_OBRA_OPCIONES` en `config.py`, opcional) y **#356** (#332: formato
+> del PDF, fechas dd/mm/aaaa con `services/fechas.py` / filtro `|fecha`,
+> archivo `FICHA_0000844.pdf`). Tests nuevos en `tests/test_crear_ficha.py`.
+> - Cerrados sin código: **#203** y **#205** (ya resueltos por #301 y #252).
+>   **#206 cerrado como "no se hace"**: decisión de Facu, los usuarios
+>   (incluidas las contraseñas) los maneja **solo ADMIN**; nadie cambia su
+>   propia contraseña porque DML necesita poder entrar al usuario de RAYPAC.
+>   No proponer perfil ni autoservicio de contraseñas.
+> - **Lo de Facu que queda:** #308 (padre de #341/#342 de Ivo; se propuso
+>   reasignársela a Ivo, sin respuesta) y **#346** (prod): va **después de la
+>   última entrega y del OK del cliente**, junto con Facu.
+> - Pendientes sueltos: (1) verificar en prod si la ficha 0000844 tenía
+>   observaciones que no salieron en el PDF (#332); (2) preguntarle al
+>   cliente si la mano de obra es obligatoria (#331, hoy opcional);
+>   (3) Ivo (#314) pidió los archivos del cliente: Facu se los pasa por fuera
+>   de GitHub, falta encontrar `maquinas.csv`/`matriz.csv` del #76 (no están
+>   en esta máquina); (4) 6 tests de `tests/test_envio_borrador.py` (#338,
+>   Ivo) fallan contra la base local también en `dev` limpio: avisarle a Ivo.
+> - Facu no toma tareas de Seba por ahora ("otro día"). Si se retoma, las
+>   más pesadas son #336 (permisos RAYPAC) y #335 (barra fija + Atrás).
+> - Fuera del código: informe final de la PP, presentación y guion de la
+>   muestra del colegio (hablan Seba e Ivo) hechos como docs/artifacts de
+>   Facu, con copia .docx en sus Descargas. La diapositiva de números
+>   (128 tareas / 163 PRs / 221 commits al 18/11) queda desactualizada:
+>   pasar a "más de" o recalcular antes de la muestra.
+> - Ramas: cortarlas siempre de `origin/dev`, no de `main`.
+
 - **Última actualización:** 2026-10-22, cierre de sesión (Facu cambia de
   máquina para la próxima sesión - por eso este checkpoint se pushea hoy).
 - **Ojo: el chat de esta sesión se borró a la mitad** (Facu lo cerró sin

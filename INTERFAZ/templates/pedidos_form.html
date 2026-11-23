@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}{% if pedido %}Editar pedido #{{ pedido.id }}{% else %}Nuevo pedido de repuestos{% endif %}{% endblock %}
+
+{% block content %}
+{# #341: RAYPAC le pide repuestos a DML sobre el stock de DML (solo la cantidad, sin ubicación). #}
+<div class="container mt-4">
+  {% if pedido %}
+  <h2 class="mb-1">Editar pedido #{{ pedido.id }}</h2>
+  <p class="text-muted">Lo podés corregir hasta que DML lo empiece a preparar.</p>
+  {% else %}
+  <h2 class="mb-1">Nuevo pedido de repuestos</h2>
+  <p class="text-muted">Cargá cuánto necesitás de cada repuesto. A DML le llega el aviso por la campanita y por mail.</p>
+  {% endif %}
+
+  <form method="POST" id="pedido-form"
+        onsubmit="return confirmarSiExcede(event);">
+    <div class="mb-3">
+      <label for="observaciones" class="form-label fw-bold">Observaciones <span class="text-muted fw-normal">(opcional)</span></label>
+      <textarea class="form-control" id="observaciones" name="observaciones" rows="2" maxlength="500"
+                placeholder="Ej: urgente, para la máquina de tal cliente">{{ valores.observaciones }}</textarea>
+    </div>
+
+    {# Misma barra fija que el envío de repuestos (#337) #}
+    <div id="barra-pedido" class="card card-body py-2 mb-3 shadow-sm">
+      <div class="row g-2 align-items-center">
+        <div class="col-12 col-lg">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="search" id="buscar-repuesto" class="form-control" autocomplete="off"
+                   placeholder="Buscar por código o descripción" aria-label="Buscar repuesto">
+          </div>
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="solo-seleccionados">
+            <label class="form-check-label" for="solo-seleccionados">Solo seleccionados</label>
+          </div>
+        </div>
+        <div class="col-auto small text-muted" id="resumen-seleccion" aria-live="polite"></div>
+        <div class="col-12 col-sm-auto ms-sm-auto d-flex justify-content-end">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send"></i> {% if pedido %}Guardar cambios{% else %}Enviar pedido{% endif %}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <table id="tabla-repuestos" class="table table-sm table-bordered align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 15%">Código</th>
+          <th>Descripción</th>
+          <th style="width: 12%" class="text-center">Hay en DML</th>
+          <th style="width: 18%">Cantidad a pedir</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stock %}
+        <tr class="fila-repuesto" data-stock="{{ row.cantidad }}">
+          <td><strong>{{ row.codigo_repuesto }}</strong></td>
+          <td>{{ row.item }}</td>
+          <td class="text-center">{{ row.cantidad }}</td>
+          <td>
+            <input type="number" min="0" step="1" class="form-control" placeholder="0"
+                   name="qty_{{ row.codigo_repuesto }}" value="{{ valores.cantidades.get(row.codigo_repuesto, '') }}"
+                   aria-label="Cantidad a pedir de {{ row.codigo_repuesto }}">
+            <small class="text-warning-emphasis d-none aviso-excede"><i class="bi bi-exclamation-triangle-fill"></i> Más de lo que hay</small>
+          </td>
+        </tr>
+        {% endfor %}
+        <tr id="sin-resultados" class="d-none">
+          <td colspan="4" class="text-center text-muted">Ningún repuesto coincide con la búsqueda.</td>
+        </tr>
+        {% if not stock %}
+        <tr><td colspan="4" class="text-center text-muted">No hay repuestos cargados en el stock de DML.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <a class="btn btn-outline-secondary"
+         href="{{ url_for('pedidos.pedidos_view', id=pedido.id) if pedido else url_for('pedidos.pedidos_list') }}">Volver</a>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-send"></i> {% if pedido %}Guardar cambios{% else %}Enviar pedido{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+
+<style>
+  #barra-pedido { position: sticky; top: var(--alto-navbar, 0px); z-index: 1010; }
+</style>
+
+<script>
+(function () {
+  const buscador = document.getElementById('buscar-repuesto');
+  const soloSeleccionados = document.getElementById('solo-seleccionados');
+  const resumen = document.getElementById('resumen-seleccion');
+  const sinResultados = document.getElementById('sin-resultados');
+  const filas = Array.from(document.querySelectorAll('#tabla-repuestos tr.fila-repuesto'));
+
+  function normalizar(texto) {
+    return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  }
+  filas.forEach(function (fila) {
+    fila.dataset.buscar = normalizar(fila.cells[0].textContent + ' ' + fila.cells[1].textContent);
+  });
+  function cantidad(fila) {
+    const n = parseInt(fila.querySelector('input').value, 10);
+    return n > 0 ? n : 0;
+  }
+  function excede(fila) {
+    return cantidad(fila) > parseInt(fila.dataset.stock, 10);
+  }
+
+  function filtrar() {
+    const terminos = normalizar(buscador.value).split(/\s+/).filter(Boolean);
+    let visibles = 0;
+    filas.forEach(function (fila) {
+      const ok = terminos.every(function (t) { return fila.dataset.buscar.includes(t); })
+        && (!soloSeleccionados.checked || cantidad(fila) > 0);
+      fila.classList.toggle('d-none', !ok);
+      if (ok) visibles++;
+    });
+    sinResultados.classList.toggle('d-none', visibles > 0 || filas.length === 0);
+  }
+
+  function actualizar() {
+    let repuestos = 0, unidades = 0;
+    filas.forEach(function (fila) {
+      const n = cantidad(fila);
+      if (n > 0) { repuestos++; unidades += n; }
+      fila.classList.toggle('table-warning', excede(fila));
+      fila.querySelector('.aviso-excede').classList.toggle('d-none', !excede(fila));
+    });
+    resumen.textContent = repuestos === 0
+      ? 'Ningún repuesto seleccionado'
+      : repuestos + (repuestos === 1 ? ' repuesto' : ' repuestos') + ' · ' + unidades + (unidades === 1 ? ' unidad' : ' unidades');
+  }
+
+  // Pedir más de lo que hay se permite (el stock puede estar desactualizado), pero se avisa.
+  window.confirmarSiExcede = function (event) {
+    const codigos = filas.filter(excede).map(function (fila) { return fila.cells[0].textContent.trim(); });
+    if (!codigos.length) return true;
+    return confirmarAccion(event, 'Pediste más de lo que hay en el stock de DML de: ' + codigos.join(', ')
+      + '. DML te va a avisar si no llega a juntarlo. ¿Enviar el pedido igual?');
+  };
+
+  buscador.addEventListener('input', filtrar);
+  buscador.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+  soloSeleccionados.addEventListener('change', filtrar);
+  document.getElementById('pedido-form').addEventListener('input', function (e) {
+    if (e.target !== buscador) actualizar();
+  });
+
+  // La barra va pegada arriba, o debajo de la barra negra mientras se vea (#337)
+  const nav = document.querySelector('nav.navbar');
+  function ubicarBarra() {
+    const abajoDeNav = nav ? Math.max(0, Math.round(nav.getBoundingClientRect().bottom)) : 0;
+    document.documentElement.style.setProperty('--alto-navbar', abajoDeNav + 'px');
+  }
+  window.addEventListener('scroll', ubicarBarra, { passive: true });
+  window.addEventListener('resize', ubicarBarra);
+  ubicarBarra();
+  filtrar();
+  actualizar();
+})();
+</script>
+{% endblock %}

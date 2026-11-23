@@ -11,10 +11,15 @@ from CODIGO_FUENTE.decorators import (
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.avisos import ids_sin_ver, marcar_visto, reiniciar_vistos
-from CODIGO_FUENTE.services.mail import get_destinatarios_activos, send_mail
+from CODIGO_FUENTE.services.mail import get_destinatarios, send_mail
 from CODIGO_FUENTE.services.stock import (
     actualizar_estado_alerta_stock,
     ajustar_stock_ubicacion,
+)
+from CODIGO_FUENTE.services.ubicacion_fisica import (
+    SIN_UBICACION,
+    UBICACION_FISICA_MAX,
+    normalizar_ubicacion_fisica,
 )
 
 envios_bp = Blueprint("envios", __name__, url_prefix="/envios")
@@ -126,48 +131,51 @@ def _envio_editable(envio):
     return envio['estado_envio'] == 'PREPARACION' and not envio['is_frozen']
 
 
-def _leer_form_envio(db, stock, envio_id=None):
-    """Valida el form de envios_form.html (alta y edición).
+def _normalizar_remito(db, texto, envio_id=None):
+    """Valida y completa un remito de envío de repuestos.
 
-    Devuelve (numero_remito, tipo_entrega, seleccionados) o None si hay un
-    error, que ya queda flasheado. envio_id excluye al propio envío del
-    chequeo de remito duplicado al editar.
+    Devuelve (numero_remito, None) o (None, mensaje de error). Acepta solo los
+    dígitos (se completa a 00001-XXXXXXXX) o el formato completo. No se puede
+    repetir en otro envío de repuestos (envio_id excluye al propio), pero sí
+    coincidir con el de un ingreso de máquina: viajan juntos (#338).
     """
-    tipo_entrega = request.form.get("tipo_entrega", "REPUESTOS")
-
-    # OBLIGATORIO: Número de remito manual
-    numero_remito_input = (request.form.get("numero_remito") or "").strip()
-
-    if not numero_remito_input:
-        flash("⚠️ El número de remito es OBLIGATORIO para enviar repuestos.", "error")
-        return None
-
-    # Auto-completar formato si solo ingresa 4 dígitos (últimos)
-    if re.match(r'^\d{1,8}$', numero_remito_input):
-        # Autocompletar con el prefijo estándar 00001-, siempre 8 dígitos del lado derecho
-        ultimo = numero_remito_input.zfill(8)  # Rellenar con ceros a la izquierda hasta completar 8 dígitos
-        numero_remito = f"00001-{ultimo}"  # Formato: 00001-XXXXXXXX (8 dígitos)
-        flash(f"📋 Remito auto-completado: {numero_remito}", "info")
-    elif re.match(r'^\d{4,5}-\d{8}$', numero_remito_input):
-        numero_remito = numero_remito_input
+    texto = (texto or "").strip()
+    if re.match(r'^\d{1,8}$', texto):
+        numero_remito = f"00001-{texto.zfill(8)}"  # 8 dígitos del lado derecho
+    elif re.match(r'^\d{4,5}-\d{8}$', texto):
+        numero_remito = texto
     else:
-        flash("⚠️ Formato de remito inválido. Ingresa solo los dígitos del remito (ej: 4222 o 2568) o el formato completo #####-######## (ej: 00001-00004222).", "error")
-        return None
+        return None, ("⚠️ Formato de remito inválido. Ingresa solo los dígitos del remito (ej: 4222 o 2568) "
+                      "o el formato completo #####-######## (ej: 00001-00004222).")
 
-    # Verificar que no exista ya en envios_repuestos
     existe = db.execute(
         "SELECT id FROM envios_repuestos WHERE numero_remito = %s AND id <> %s",
         (numero_remito, envio_id or 0)
     ).fetchone()
     if existe:
-        flash(f"⚠️ El número de remito {numero_remito} ya existe en otro envío de repuestos.", "error")
-        return None
+        return None, f"⚠️ El número de remito {numero_remito} ya existe en otro envío de repuestos."
+    return numero_remito, None
 
-    # Verificar que no exista en raypac_entries
-    existe_raypac = db.execute("SELECT id FROM raypac_entries WHERE numero_remito = %s", (numero_remito,)).fetchone()
-    if existe_raypac:
-        flash(f"⚠️ El número de remito {numero_remito} ya fue usado para enviar un equipo. Usa un remito diferente.", "error")
-        return None
+
+def _leer_form_envio(db, stock, envio_id=None):
+    """Valida el form de envios_form.html (alta y edición).
+
+    Devuelve (numero_remito, tipo_entrega, seleccionados) o None si hay un
+    error, que ya queda flasheado. El remito es opcional (#338): sin remito el
+    envío queda como borrador y se pide al freezar. envio_id excluye al propio
+    envío del chequeo de remito duplicado al editar.
+    """
+    tipo_entrega = request.form.get("tipo_entrega", "REPUESTOS")
+
+    numero_remito = None
+    numero_remito_input = (request.form.get("numero_remito") or "").strip()
+    if numero_remito_input:
+        numero_remito, error = _normalizar_remito(db, numero_remito_input, envio_id)
+        if error:
+            flash(error, "error")
+            return None
+        if numero_remito != numero_remito_input:
+            flash(f"📋 Remito auto-completado: {numero_remito}", "info")
 
     seleccionados = []
 
@@ -258,7 +266,8 @@ def _valores_desde_envio(envio, detalles, stock):
             cantidades[det['codigo_repuesto']] = cantidades.get(det['codigo_repuesto'], 0) + det['cantidad']
         else:
             adicionales.append((det['codigo_repuesto'], det['descripcion'] or '', det['cantidad']))
-    return {"numero_remito": envio['numero_remito'], "cantidades": cantidades, "adicionales": adicionales}
+    # #338: un borrador no tiene remito; vacío, no "None"
+    return {"numero_remito": envio['numero_remito'] or "", "cantidades": cantidades, "adicionales": adicionales}
 
 
 def _guardar_detalles(db, envio_id, seleccionados):
@@ -302,10 +311,14 @@ def envios_new():
             db.commit()
 
             log_action(user['id'], "CREATE", "envios_repuestos", envio_id, None,
-                      f"Remito {numero_remito} con {len(seleccionados)} items")
+                      f"Remito {numero_remito or '(borrador sin remito)'} con {len(seleccionados)} items")
 
-            flash(f"Envío {numero_remito} guardado en preparación. Revisalo y, cuando salga de RAYPAC, "
-                  "tocá \"Freezar y marcar como enviado\".", "success")
+            if numero_remito:
+                flash(f"Envío {numero_remito} guardado en preparación. Revisalo y, cuando salga de RAYPAC, "
+                      "tocá \"Freezar y marcar como enviado\".", "success")
+            else:
+                flash("Envío guardado como borrador, sin remito. Podés seguir editándolo; el remito se pide "
+                      "al tocar \"Freezar y marcar como enviado\".", "success")
             return redirect(url_for("envios.envios_view", id=envio_id))
         except Exception as e:
             db.rollback()
@@ -328,11 +341,14 @@ def envios_view(id):
         return redirect(url_for("envios.envios_list"))
     # Campanita de DML (#170): abrir el detalle saca el envío de "sin ver"
     marcar_visto(get_current_user(), "REPUESTO", id)
+    # #309 (c): con la ubicación actual del código en DML, para precargarla
+    # en la recepción.
     detalles = db.execute(
         """
-        SELECT d.*, m.item
+        SELECT d.*, m.item, su.codigo_ubicacion_fisica AS ubicacion_fisica_dml
         FROM envios_repuestos_detalles d
         LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto
+        LEFT JOIN stock_ubicaciones su ON su.codigo_repuesto = d.codigo_repuesto AND su.ubicacion = 'DML'
         WHERE d.envio_id = %s
         ORDER BY d.codigo_repuesto
         """,
@@ -420,6 +436,41 @@ def envios_confirmar(id):
         ).fetchone()
         revisados[det['id']] = (existente['codigo_repuesto'] if existente else codigo, descripcion, not existente)
 
+    # #309 (c): todo repuesto que entra al depósito queda con ubicación
+    # física. Se pide en cada renglón con algo recibido; viene precargada si
+    # el código ya tenía. Si el campo llega vacío se usa la que ya tenía el
+    # código (ej. un no listado que DML corrigió a un código existente).
+    ubicaciones = {}  # código final -> ubicación normalizada
+    ubicaciones_cambiadas = 0
+    for det in detalles:
+        if recibidos[det['id']] == 0:
+            continue
+        codigo = revisados[det['id']][0] if det['id'] in revisados else det['codigo_repuesto']
+        actual = db.execute(
+            "SELECT codigo_ubicacion_fisica FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = 'DML'",
+            (codigo,)
+        ).fetchone()
+        actual = normalizar_ubicacion_fisica(actual['codigo_ubicacion_fisica'] if actual else None)
+        ubicacion = normalizar_ubicacion_fisica(request.form.get(f"ubicacion_{det['id']}"))
+        if ubicacion == SIN_UBICACION:
+            ubicacion = actual
+        if ubicacion == SIN_UBICACION:
+            db.rollback()
+            flash(f"Falta la ubicación en el depósito de {codigo}: completala, o poné 0 en Recibido si no llegó.", "error")
+            return redirect(url_for("envios.envios_view", id=id))
+        if len(ubicacion) > UBICACION_FISICA_MAX:
+            db.rollback()
+            flash(f"La ubicación de {codigo} no puede tener más de {UBICACION_FISICA_MAX} caracteres.", "error")
+            return redirect(url_for("envios.envios_view", id=id))
+        if ubicaciones.get(codigo, ubicacion) != ubicacion:
+            db.rollback()
+            flash(f"{codigo} aparece en más de un renglón con ubicaciones distintas "
+                  f"({ubicaciones[codigo]} y {ubicacion}): dejá una sola.", "error")
+            return redirect(url_for("envios.envios_view", id=id))
+        if codigo not in ubicaciones and ubicacion != actual:
+            ubicaciones_cambiadas += 1
+        ubicaciones[codigo] = ubicacion
+
     try:
         codigos_nuevos = []
 
@@ -455,6 +506,11 @@ def envios_confirmar(id):
 
             if qty > 0:
                 ajustar_stock_ubicacion(codigo, "DML", qty)
+                db.execute(
+                    """UPDATE stock_ubicaciones SET codigo_ubicacion_fisica = %s
+                       WHERE codigo_repuesto = %s AND ubicacion = 'DML'""",
+                    (ubicaciones[codigo], codigo)
+                )
 
             db.execute(
                 "UPDATE envios_repuestos_detalles SET cantidad_recibida = %s WHERE id = %s",
@@ -497,7 +553,8 @@ def envios_confirmar(id):
 
     diferencias = [det for det in detalles if recibidos[det['id']] != det['cantidad']]
     log_action(user['id'], "CONFIRM", "envios_repuestos", id, None,
-               f"Recepción en DML ({len(diferencias)} diferencias con el remito)")
+               f"Recepción en DML ({len(diferencias)} diferencias con el remito, "
+               f"{ubicaciones_cambiadas} ubicaciones cargadas o cambiadas)")
 
     _avisar_recepcion_a_raypac(envio, detalles, recibidos)
     # Sin mail de "código nuevo": el alta la acaba de revisar alguien de DML
@@ -533,7 +590,8 @@ def _avisar_recepcion_a_raypac(envio, detalles, recibidos):
         <ul>{''.join(lineas)}</ul>
         <p>Los repuestos fueron cargados en stock DML con las cantidades recibidas.</p>
         """
-        send_mail("raypac@dml.local", f"Recepción remito {envio['numero_remito']} en DML", html_body)
+        for email in get_destinatarios("RECEPCION_REPUESTOS"):
+            send_mail(email, f"Recepción remito {envio['numero_remito']} en DML", html_body)
     except Exception as e:
         print(f"Error enviando mail de recepción a Raypac: {e}")
 
@@ -577,8 +635,8 @@ def envios_edit(id):
             db.commit()
 
             log_action(user['id'], "UPDATE", "envios_repuestos", id,
-                       f"Remito {envio['numero_remito']}",
-                       f"Remito {numero_remito} con {len(seleccionados)} items")
+                       f"Remito {envio['numero_remito'] or '(sin remito)'}",
+                       f"Remito {numero_remito or '(sin remito)'} con {len(seleccionados)} items")
 
             flash("✅ Envío actualizado.", "success")
             return redirect(url_for("envios.envios_view", id=id))
@@ -617,23 +675,34 @@ def envios_freeze(id):
         flash("El envío ya estaba marcado como enviado.", "warning")
         return redirect(url_for("envios.envios_view", id=id))
 
+    # #338: el remito se confirma (o se carga, si era un borrador) al freezar
+    numero_remito, error = _normalizar_remito(
+        db, request.form.get("numero_remito") or envio['numero_remito'], id
+    )
+    if error:
+        db.rollback()
+        if not (request.form.get("numero_remito") or envio['numero_remito']):
+            error = "⚠️ Para freezar el envío hace falta el número de remito."
+        flash(error, "error")
+        return redirect(url_for("envios.envios_view", id=id))
+
     try:
         # fecha_envio pasa a ser la de salida real, no la de cuando se cargó
         db.execute(
             """UPDATE envios_repuestos
-               SET is_frozen = TRUE, estado_envio = 'ENVIADO', fecha_envio = %s,
+               SET is_frozen = TRUE, estado_envio = 'ENVIADO', fecha_envio = %s, numero_remito = %s,
                    updated_at = CURRENT_TIMESTAMP
                WHERE id = %s""",
-            (datetime.now().strftime("%Y-%m-%d"), id)
+            (datetime.now().strftime("%Y-%m-%d"), numero_remito, id)
         )
         # Si había vuelto a preparación y sale de nuevo, es un envío nuevo
         # para la campanita de DML (#170): se le vuelve a mostrar a todos.
         reiniciar_vistos("REPUESTO", id)
         db.commit()
 
-        log_action(user['id'], "FREEZE", "envios_repuestos", id, "PREPARACION", "ENVIADO")
+        log_action(user['id'], "FREEZE", "envios_repuestos", id, "PREPARACION", f"ENVIADO, remito {numero_remito}")
 
-        _avisar_envio_despachado(envio)
+        _avisar_envio_despachado({**dict(envio), "numero_remito": numero_remito})
         flash("🔒 Envío freezado y marcado como enviado. DML ya le puede dar ingreso.", "success")
     except Exception as e:
         db.rollback()
@@ -663,7 +732,7 @@ def _avisar_envio_despachado(envio):
         <p>Tipo de entrega: {envio['tipo_entrega']}</p>
         <ul>{items_html}</ul>
         """
-        for email in get_destinatarios_activos():
+        for email in get_destinatarios("NUEVO_INGRESO"):
             send_mail(email, f"📦 Nuevo envío {envio['numero_remito']}", html)
     except Exception as e:
         print(f"Error enviando aviso de nuevo envío: {e}")

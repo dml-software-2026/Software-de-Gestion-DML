@@ -72,10 +72,7 @@ source venv/bin/activate
 # 4. Instalar dependencias
 pip install -r requirements.txt
 
-# 5. Cargar datos de prueba
-python seed_data_minimal.py
-
-# 6. Iniciar servidor
+# 5. Iniciar servidor
 python CODIGO_FUENTE/app.py
 ```
 

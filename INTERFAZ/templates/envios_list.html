@@ -2,10 +2,13 @@
 
 {% block content %}
 <div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <h2 class="mb-0">Envíos</h2>
     {% if get_current_user() and get_current_user()['role'] in ['ADMIN', 'RAYPAC'] %}
-    <a class="btn btn-success" href="{{ url_for('envios.envios_new') }}"><i class="bi bi-plus-circle"></i> Nuevo envío</a>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-success" href="{{ url_for('envios.envios_new') }}"><i class="bi bi-box-seam"></i> Enviar repuestos</a>
+      <a class="btn btn-primary" href="{{ url_for('raypac.raypac_new') }}"><i class="bi bi-plus-circle"></i> Enviar máquina (nuevo ingreso)</a>
+    </div>
     {% endif %}
   </div>
     <div class="mb-3">

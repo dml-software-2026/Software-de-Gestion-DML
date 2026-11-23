@@ -20,8 +20,8 @@
             <a class="btn btn-success" href="{{ url_for('raypac.raypac_new') }}">
                 <i class="fas fa-plus"></i> Nuevo Ingreso
             </a>
-            <a href="{{ url_for('estadisticas.export_raypac_csv') }}" class="btn btn-info btn-sm" title="Exportar a CSV">
-                <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+            <a href="{{ url_for('estadisticas.export_raypac_xlsx') }}" class="btn btn-info btn-sm" title="Descargar los ingresos en Excel">
+                <i class="bi bi-file-earmark-excel"></i> Descargar Excel
             </a>
             {% elif readonly %}
             <span class="badge badge-info" style="font-size: 14px;">Modo Solo Lectura</span>
@@ -131,7 +131,10 @@
                             <a href="{{ url_for('tickets.ticket_view', numero_ticket=entry.ticket_numero) }}" class="badge bg-light text-dark border text-decoration-none mb-1">
                                 <i class="bi bi-ticket-perforated"></i> {{ entry.ticket_numero }}
                             </a>
-                            <br><a href="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="btn btn-sm btn-success">Crear Ficha</a>
+                            {# #328: crea la ficha y va directo a la edición (POST) #}
+                            <form method="POST" action="{{ url_for('dml.dml_new', raypac_id=entry.id) }}" class="mt-1 js-crear-ficha">
+                                <button type="submit" class="btn btn-sm btn-success">Crear Ficha</button>
+                            </form>
                         {% elif entry.is_frozen and not entry.ticket_id %}
                             {% if entry.estado_envio_equipos == 'RECIBIDO' %}
                             <a href="{{ url_for('tickets.ticket_nuevo', raypac_id=entry.id) }}" class="btn btn-sm btn-primary">Crear Ticket</a>

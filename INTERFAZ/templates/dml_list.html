@@ -13,8 +13,8 @@
             <span class="badge badge-info" style="font-size: 14px; margin-right: 10px;">Modo Solo Lectura</span>
             {% endif %}
             {% if user_role in ['ADMIN', 'DML_ST'] %}
-            <a href="{{ url_for('estadisticas.export_fichas_csv') }}" class="btn btn-success btn-sm" title="Exportar a CSV">
-                <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+            <a href="{{ url_for('estadisticas.export_fichas_xlsx') }}" class="btn btn-success btn-sm" title="Descargar las fichas en Excel">
+                <i class="bi bi-file-earmark-excel"></i> Descargar Excel
             </a>
             {% endif %}
             <a href="{{ url_for('raypac.raypac_list') }}" class="btn btn-info">
@@ -39,7 +39,7 @@
                     <option value="A LA ESPERA DE REPUESTOS" {% if estado == 'A LA ESPERA DE REPUESTOS' %}selected{% endif %}>A LA ESPERA DE REPUESTOS</option>
                     <option value="A LA ESPERA DE APROBACIÓN DE PRESUPUESTO" {% if estado == 'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO' %}selected{% endif %}>A LA ESPERA DE APROBACIÓN DE PRESUPUESTO</option>
                     <option value="EN REPARACIÓN" {% if estado == 'EN REPARACIÓN' %}selected{% endif %}>EN REPARACIÓN</option>
-                    <option value="REPARACIÓN COMPLETADA" {% if estado == 'REPARACIÓN COMPLETADA' %}selected{% endif %}>REPARACIÓN COMPLETADA</option>
+                    <option value="REPARADA" {% if estado == 'REPARADA' %}selected{% endif %}>REPARADA</option>
                     <option value="MÁQUINA LISTA PARA RETIRAR" {% if estado == 'MÁQUINA LISTA PARA RETIRAR' %}selected{% endif %}>MÁQUINA LISTA PARA RETIRAR</option>
                 </select>
             </div>
@@ -81,6 +81,7 @@
                             'EN REPARACION': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                             'A LA ESPERA DE REPUESTOS': {'bg': '#fd7e14', 'border': '#fd7e14', 'text': '#000000'},
                             'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO': {'bg': '#fd7e14', 'border': '#fd7e14', 'text': '#000000'},
+                            'REPARADA': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                             'REPARACIÓN COMPLETADA': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                             'MÁQUINA LISTA PARA RETIRAR': {'bg': '#ffc107', 'border': '#ffc107', 'text': '#000000'},
                             'MÁQUINA ENTREGADA': {'bg': '#28a745', 'border': '#28a745', 'text': '#ffffff'}

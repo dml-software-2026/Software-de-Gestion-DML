@@ -27,6 +27,7 @@
                     'EN REPARACION': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                     'A LA ESPERA DE REPUESTOS': {'bg': '#fd7e14', 'border': '#fd7e14', 'text': '#000000'},
                     'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO': {'bg': '#fd7e14', 'border': '#fd7e14', 'text': '#000000'},
+                    'REPARADA': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                     'REPARACIÓN COMPLETADA': {'bg': '#0dcaf0', 'border': '#0dcaf0', 'text': '#000000'},
                     'MÁQUINA LISTA PARA RETIRAR': {'bg': '#ffc107', 'border': '#ffc107', 'text': '#000000'},
                     'MÁQUINA ENTREGADA': {'bg': '#28a745', 'border': '#28a745', 'text': '#ffffff'}
@@ -36,7 +37,10 @@
                     {{ ficha.estado_reparacion }}
                 </span>
                 {% if ficha.is_closed %}
-                <span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Ficha Finalizada</span>
+                <span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Recibida por RAYPAC</span>
+                {% elif ficha.enviada_raypac_at %}
+                {# #333: DML la envió, falta el OK de recepción de RAYPAC #}
+                <span class="badge bg-warning text-dark"><i class="bi bi-truck"></i> Enviada a RAYPAC - esperando recepción</span>
                 {% endif %}
             </p>
         </div>
@@ -136,7 +140,12 @@
                         {% for parte in partes %}
                         <tr>
                             <td>{{ parte.nombre_parte }}</td>
+                            {% if parte.nombre_parte == 'OTROS' %}
+                            {# #330: texto libre, completo y respetando los saltos de línea #}
+                            <td style="white-space: pre-wrap;">{{ parte.estado or '-' }}</td>
+                            {% else %}
                             <td><span class="badge bg-{{ parte_color.get(parte.estado, 'secondary') }}">{{ parte.estado or 'BUENO' }}</span></td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -209,9 +218,12 @@
                 <div class="col-md-6">
                     <strong>N° de Ciclos:</strong> {{ ficha.n_ciclos or 0 }}
                 </div>
+                {# #340: con el modelo OTRA (cargador, batería suelta) el tipo de máquina no aplica #}
+                {% if not (raypac and (raypac.modelo_maquina or '').startswith('OTRA: ')) %}
                 <div class="col-md-6">
                     <strong>Tipo de Máquina:</strong> {{ raypac.tipo_maquina if raypac else 'A BATERIA' }}
                 </div>
+                {% endif %}
             </div>
             <div class="row mb-3">
                 <div class="col-md-6">
@@ -219,6 +231,12 @@
                 </div>
                 <div class="col-md-6">
                     <strong>Mecanizado Adicional:</strong> {{ ficha.mecanizado_adic or 'No aplica' }}
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-12">
+                    {# #331 #}
+                    <strong>Mano de Obra:</strong> {{ ficha.mano_de_obra or 'No aplica' }}
                 </div>
             </div>
             <div class="row">
@@ -230,7 +248,7 @@
     </div>
 
     <!-- ACCIONES SECUNDARIAS (Ver Ticket / Descargar PDF siempre visibles,
-         igual que antes; Editar/Crear Ticket solo si no es modo solo
+         igual que antes; Editar solo si no es modo solo
          lectura). #158: "Cerrar Ficha" y "Registrar Acuse" - las acciones
          que avanzan al siguiente paso del flujo - se sacan de acá y pasan a
          la barra de abajo (Volver a la izquierda, siguiente paso a la
@@ -241,14 +259,6 @@
             <a href="{{ url_for('dml.dml_edit', id=ficha.id) }}" class="btn btn-primary">
                 <i class="bi bi-pencil"></i> Editar Ficha
             </a>
-            {% endif %}
-
-            {% if not readonly and not ficha.numero_ticket %}
-            <form method="POST" action="{{ url_for('dml.crear_ticket_endpoint', id=ficha.id) }}" class="d-inline">
-                <button type="submit" class="btn btn-warning">
-                    <i class="bi bi-ticket-perforated"></i> Crear Ticket
-                </button>
-            </form>
             {% endif %}
 
             {% if ficha.numero_ticket %}
@@ -271,6 +281,25 @@
         </div>
     </div>
 
+    {# #333: ficha ya recibida - RAYPAC (o ADMIN) la edita con el código #}
+    {% if ficha.is_closed and user_role in ['ADMIN', 'RAYPAC'] %}
+    <div class="card shadow-sm mb-4 border-warning">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('dml.dml_desbloquear', id=ficha.id) }}" class="m-0">
+                <label for="codigo_desbloqueo" class="form-label fw-bold"><i class="bi bi-unlock"></i> Editar la ficha recibida</label>
+                <div class="input-group" style="max-width: 420px;">
+                    <input type="password" class="form-control" id="codigo_desbloqueo" name="codigo" required
+                           autocomplete="off" placeholder="{{ 'Código o tu contraseña' if user_role == 'ADMIN' else 'Código' }}">
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-pencil"></i> Editar</button>
+                </div>
+                <small class="text-muted d-block mt-1">
+                    Código: los últimos 4 dígitos del remito de salida de DML{% if user_role == 'ADMIN' %} (o tu contraseña){% endif %}.
+                </small>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- NAVEGACIÓN: Volver siempre abajo a la izquierda, la acción que avanza
          al siguiente paso del flujo real (Cerrar Ficha / Registrar Acuse)
          abajo a la derecha cuando corresponde. -->
@@ -279,14 +308,15 @@
             <i class="bi bi-arrow-left"></i> Volver al listado
         </a>
 
-        {% if not readonly and not ficha.is_closed %}
+        {% if not readonly and not ficha.is_closed and not ficha.enviada_raypac_at %}
+        {# #333: antes "Cerrar Ficha". Ya no cierra: la ficha se sigue editando hasta el OK de RAYPAC. #}
         <form method="POST" action="{{ url_for('dml.dml_close', id=ficha.id) }}" class="d-inline"
-              onsubmit="return confirmarAccion(event, '¿Deseas FINALIZAR esta ficha? Se enviará notificación al comercial.');">
+              onsubmit="return confirmarAccion(event, '¿Enviar la ficha a RAYPAC? Se avisa por mail al comercial. DML la puede seguir editando hasta que RAYPAC confirme la recepción.');">
             <button type="submit" class="btn btn-danger">
-                <i class="bi bi-lock-fill"></i> Cerrar Ficha <i class="bi bi-arrow-right"></i>
+                <i class="bi bi-truck"></i> Enviar a RAYPAC <i class="bi bi-arrow-right"></i>
             </button>
         </form>
-        {% elif ficha.is_closed and not ficha.recibido_por and get_current_user()['role'] in ['ADMIN', 'RAYPAC'] %}
+        {% elif (ficha.enviada_raypac_at or ficha.is_closed) and not ficha.recibido_por and get_current_user()['role'] in ['ADMIN', 'RAYPAC'] %}
         {# al cerrar la ficha, los botones de acción de arriba desaparecen
            (is_closed) y no quedaba ningún acceso al siguiente paso del flujo
            real ("Registrar Acuse" en /dml/entregadas) - había que saber que
@@ -297,7 +327,7 @@
            se saca de la lista para no mostrar un acceso a un paso que no
            puede completar. #}
         <a href="{{ url_for('dml.dml_entregadas', open_acuse=ficha.id) }}" class="btn btn-success">
-            <i class="bi bi-clipboard-check"></i> Registrar Acuse <i class="bi bi-arrow-right"></i>
+            <i class="bi bi-clipboard-check"></i> Confirmar Recepción <i class="bi bi-arrow-right"></i>
         </a>
         {% endif %}
     </div>

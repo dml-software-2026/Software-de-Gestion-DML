@@ -186,6 +186,26 @@ def migrate_db():
             db.commit()
             print("[MIGRATION] Agregada columna codigo_ubicacion_fisica a stock_ubicaciones")
 
+        # #309: dejar todas las ubicaciones físicas con el mismo formato que
+        # guarda la app (ej. "E05 -F04 " -> "E05-F04"). Las cargadas por CSV
+        # antes del #309 venían con espacios sueltos. Idempotente: solo
+        # actualiza las que cambian; las que no son un código (ej. "USO
+        # TALLER") quedan igual.
+        from CODIGO_FUENTE.services.ubicacion_fisica import normalizar_ubicacion_fisica
+        filas_ubicacion = db.execute(
+            "SELECT id, codigo_ubicacion_fisica FROM stock_ubicaciones WHERE codigo_ubicacion_fisica IS NOT NULL"
+        ).fetchall()
+        cambios_ubicacion = [
+            (normalizar_ubicacion_fisica(f["codigo_ubicacion_fisica"]), f["id"])
+            for f in filas_ubicacion
+            if normalizar_ubicacion_fisica(f["codigo_ubicacion_fisica"]) != f["codigo_ubicacion_fisica"]
+        ]
+        for valor, id_fila in cambios_ubicacion:
+            db.execute("UPDATE stock_ubicaciones SET codigo_ubicacion_fisica = %s WHERE id = %s", (valor, id_fila))
+        if cambios_ubicacion:
+            db.commit()
+            print(f"[MIGRATION] Normalizadas {len(cambios_ubicacion)} ubicaciones físicas (#309)")
+
         # NOTA: las tablas tickets, ticket_historial, stock_alertas,
         # estadisticas_repuestos y freezing_log ya NO se crean acá.
         # Esos CREATE TABLE quedaron cubiertos por schema-postgre.sql,
@@ -301,6 +321,26 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error creando tabla usuarios_notificaciones: {e}")
         db.rollback()
 
+    try:
+        cols_notif = _columnas_de(db, "usuarios_notificaciones")
+        if "tipo" not in cols_notif:
+            db.execute("ALTER TABLE usuarios_notificaciones ADD COLUMN tipo TEXT NOT NULL DEFAULT 'STOCK_BAJO'")
+            db.execute("ALTER TABLE usuarios_notificaciones DROP CONSTRAINT IF EXISTS usuarios_notificaciones_email_key")
+            db.execute("""
+                INSERT INTO usuarios_notificaciones (email, nombre, activo, tipo)
+                SELECT email, nombre, activo, 'NUEVO_INGRESO'
+                FROM usuarios_notificaciones WHERE tipo = 'STOCK_BAJO'
+            """)
+        db.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS usuarios_notificaciones_email_tipo_key
+            ON usuarios_notificaciones (email, tipo)
+        """)
+        db.commit()
+        print("[MIGRATION] ✅ usuarios_notificaciones con tipo de aviso (#307)")
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando tipo a usuarios_notificaciones: {e}")
+        db.rollback()
+
     # Migración: Tabla avisos_vistos (campanita de DML, #170/#258)
     try:
         db.execute("""
@@ -316,6 +356,48 @@ def migrate_db():
         db.commit()
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error creando tabla avisos_vistos: {e}")
+        db.rollback()
+
+    # Migración: pedidos de repuestos de RAYPAC a DML (#341). Estados:
+    # PEDIDO -> EN_PREPARACION (esta parte) -> ENVIADO -> RECIBIDO (#342);
+    # CANCELADO si RAYPAC lo cancela antes de que DML lo empiece a preparar.
+    try:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS pedidos_repuestos (
+                id SERIAL PRIMARY KEY,
+                estado TEXT NOT NULL DEFAULT 'PEDIDO',
+                observaciones TEXT,
+                creado_por INTEGER REFERENCES users(id),
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS pedidos_repuestos_detalles (
+                id SERIAL PRIMARY KEY,
+                pedido_id INTEGER NOT NULL REFERENCES pedidos_repuestos(id) ON DELETE CASCADE,
+                codigo_repuesto TEXT NOT NULL,
+                cantidad INTEGER NOT NULL CHECK (cantidad > 0)
+            )
+        """)
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error creando las tablas de pedidos de repuestos: {e}")
+        db.rollback()
+
+    # Migración: envío del pedido de DML a RAYPAC con remito y recepción (#342).
+    # La recepción no suma al stock de RAYPAC (decisión de Ivo): solo deja
+    # registrado qué llegó y si hubo diferencias.
+    try:
+        for columna in ("numero_remito TEXT UNIQUE", "fecha_envio TIMESTAMPTZ",
+                        "enviado_por INTEGER REFERENCES users(id)", "fecha_recepcion TIMESTAMPTZ",
+                        "recibido_por INTEGER REFERENCES users(id)"):
+            db.execute(f"ALTER TABLE pedidos_repuestos ADD COLUMN IF NOT EXISTS {columna}")
+        db.execute("ALTER TABLE pedidos_repuestos_detalles ADD COLUMN IF NOT EXISTS cantidad_enviada INTEGER")
+        db.execute("ALTER TABLE pedidos_repuestos_detalles ADD COLUMN IF NOT EXISTS cantidad_recibida INTEGER")
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error agregando el envío a los pedidos de repuestos: {e}")
         db.rollback()
 
     # Migración: Tabla dml_fichas_historial (#171) - cambios de estado de
@@ -348,6 +430,19 @@ def migrate_db():
 
     except Exception as e:
         print(f"[MIGRATION] ⚠️  Error migrando repuestos 'COLOCADO': {e}")
+        db.rollback()
+
+    # Migración (#329): el estado 'REPARACIÓN COMPLETADA' pasó a llamarse
+    # 'REPARADA' (pedido del cliente). Idempotente: si ya no queda ninguno,
+    # no hace nada. El nombre viejo se sigue aceptando como alias donde se lee.
+    try:
+        db.execute("UPDATE dml_fichas SET estado_reparacion = 'REPARADA' WHERE estado_reparacion = 'REPARACIÓN COMPLETADA'")
+        db.execute("UPDATE dml_fichas_historial SET estado = 'REPARADA' WHERE estado = 'REPARACIÓN COMPLETADA'")
+        db.commit()
+        print("[MIGRATION] ✅ Estado 'REPARACIÓN COMPLETADA' pasado a 'REPARADA'")
+
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error migrando el estado 'REPARACIÓN COMPLETADA': {e}")
         db.rollback()
 
     # Migración: Agregar campos de estado a envios_repuestos
@@ -390,6 +485,16 @@ def migrate_db():
         print(f"[MIGRATION] ⚠️  Error agregando columnas a envios_repuestos_detalles: {e}")
         db.rollback()
 
+    # Migración: el envío de repuestos se puede guardar como borrador sin
+    # remito; el remito se pide al freezar (#338). El UNIQUE se mantiene
+    # (Postgres admite varios NULL).
+    try:
+        db.execute("ALTER TABLE envios_repuestos ALTER COLUMN numero_remito DROP NOT NULL")
+        db.commit()
+    except Exception as e:
+        print(f"[MIGRATION] ⚠️  Error dejando opcional el remito de envios_repuestos: {e}")
+        db.rollback()
+
     # Migración: Agregar campos de acuse de recibo a dml_fichas
     try:
         print("[MIGRATION] Verificando campos de acuse de recibo...")
@@ -402,6 +507,22 @@ def migrate_db():
         if "recibido_por" not in column_names:
             db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS recibido_por TEXT")
             print("[MIGRATION] ✅ Columna recibido_por agregada")
+
+        # #333: cuándo DML envió la ficha a RAYPAC ("Enviar a RAYPAC"). La
+        # ficha recién se cierra (is_closed) con el OK de recepción de RAYPAC.
+        # Las fichas ya cerradas antes del #333 se marcan como enviadas (no se
+        # reabren): quedan entregadas, igual que antes.
+        # #331: mano de obra (una de MANO_DE_OBRA_OPCIONES, o NULL)
+        if "mano_de_obra" not in column_names:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS mano_de_obra TEXT")
+        if "enviada_raypac_at" not in column_names:
+            db.execute("ALTER TABLE dml_fichas ADD COLUMN IF NOT EXISTS enviada_raypac_at TIMESTAMP")
+            db.execute("""
+                UPDATE dml_fichas
+                SET enviada_raypac_at = COALESCE(fecha_egreso::timestamp, updated_at, CURRENT_TIMESTAMP)
+                WHERE is_closed = TRUE AND enviada_raypac_at IS NULL
+            """)
+            print("[MIGRATION] Columna enviada_raypac_at agregada")
 
         db.commit()
         print("[MIGRATION] ✅ Campos de acuse de recibo verificados")
@@ -512,10 +633,12 @@ def migrate_db():
 
 def _huella_migraciones():
     """Huella de los archivos que definen migraciones y datos iniciales:
-    cambia sola cuando alguien toca migrate_db() o el seed."""
+    cambia sola cuando alguien toca migrate_db() o el seed (o la
+    normalización de ubicaciones físicas que usa una migración, #309)."""
     h = hashlib.sha256()
     base = os.path.dirname(os.path.abspath(__file__))
-    for archivo in ("extensions.py", os.path.join("services", "seed.py")):
+    for archivo in ("extensions.py", os.path.join("services", "seed.py"),
+                    os.path.join("services", "ubicacion_fisica.py")):
         with open(os.path.join(base, archivo), "rb") as f:
             h.update(f.read().replace(bytes([13, 10]), bytes([10])))  # CRLF -> LF
     return h.hexdigest()

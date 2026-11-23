@@ -3,6 +3,8 @@
 {% block title %}RAYPAC - Ingreso{% endblock %}
 
 {% block content %}
+{# #340: ingreso de algo que no es una máquina, guardado como "OTRA: ..." #}
+{% set es_otra = entry is defined and entry and (entry.modelo_maquina or '').startswith('OTRA: ') %}
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-8 offset-md-2">
@@ -49,14 +51,12 @@
                                 <input type="text" class="form-control" id="contacto_cliente" name="contacto_cliente" 
                                        value="{{ entry.contacto_cliente if entry else '' }}" 
                                        placeholder="Nombre del contacto">
-                                <small class="text-muted">Visible solo para RAYPAC y ADMIN</small>
                             </div>
                             <div class="col-md-6">
                                 <label for="email_cliente" class="form-label">Email del Cliente</label>
                                 <input type="email" class="form-control" id="email_cliente" name="email_cliente" 
                                        value="{{ entry.email_cliente if entry else '' }}"
                                        placeholder="correo@empresa.com">
-                                <small class="text-muted">Visible solo para RAYPAC y ADMIN</small>
                             </div>
                         </div>
 
@@ -65,6 +65,8 @@
                                 <label for="modelo_maquina" class="form-label">Modelo Máquina *</label>
                                 <select class="form-control js-select-enhance" id="modelo_maquina" name="modelo_maquina" required>
                                     <option value="">Selecciona</option>
+                                    {# #340: primera, para que se vea; lo que no es una máquina (cargador, batería suelta...) #}
+                                    <option value="OTRA" {% if es_otra %}selected{% endif %}>OTRA (cargador, batería suelta, etc.)</option>
                                     <option value="ITA10" {% if entry and entry.modelo_maquina == 'ITA10' %}selected{% endif %}>ITA10</option>
                                     <option value="ITA11" {% if entry and entry.modelo_maquina == 'ITA11' %}selected{% endif %}>ITA11</option>
                                     <option value="ITA12" {% if entry and entry.modelo_maquina == 'ITA12' %}selected{% endif %}>ITA12</option>
@@ -80,15 +82,24 @@
                                     <option value="CTT40" {% if entry and entry.modelo_maquina == 'CTT40' %}selected{% endif %}>CTT40</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6 {% if es_otra %}d-none{% endif %}" id="campo-tipo-maquina">
                                 <label for="tipo_maquina" class="form-label">Tipo Máquina *</label>
-                                <select class="form-control js-select-enhance" id="tipo_maquina" name="tipo_maquina" required>
+                                <select class="form-control js-select-enhance" id="tipo_maquina" name="tipo_maquina" {% if not es_otra %}required{% endif %}>
                                     <option value="">Selecciona</option>
                                     <option value="A BATERIA" {% if entry and entry.tipo_maquina == 'A BATERIA' %}selected{% endif %}>A BATERIA</option>
                                     <option value="MANUAL" {% if entry and entry.tipo_maquina == 'MANUAL' %}selected{% endif %}>MANUAL</option>
                                     <option value="NEUMÁTICA" {% if entry and entry.tipo_maquina == 'NEUMÁTICA' %}selected{% endif %}>NEUMÁTICA</option>
-                                    <option value="OTRO" {% if entry and entry.tipo_maquina == 'OTRO' %}selected{% endif %}>OTRO</option>
+                                    {# #340: el "OTRO" suelto se reemplaza por el modelo OTRA; solo queda para ingresos viejos que ya lo tienen #}
+                                    {% if entry and entry.tipo_maquina == 'OTRO' and not es_otra %}
+                                    <option value="OTRO" selected>OTRO</option>
+                                    {% endif %}
                                 </select>
+                            </div>
+                            <div class="col-md-6 {% if not es_otra %}d-none{% endif %}" id="campo-modelo-otra">
+                                <label for="modelo_otra" class="form-label">¿Qué se envía? *</label>
+                                <input type="text" class="form-control" id="modelo_otra" name="modelo_otra" maxlength="60"
+                                       value="{{ entry.modelo_maquina[6:] if es_otra else '' }}" placeholder="Ej: CARGADOR, BATERÍA"
+                                       {% if es_otra %}required{% endif %}>
                             </div>
                         </div>
 
@@ -179,6 +190,27 @@
 </div>
 
 <script>
+    // #340: con el modelo OTRA se pide qué se envía y el tipo de máquina no aplica
+    (function () {
+        const modelo = document.getElementById('modelo_maquina');
+        const campoTipo = document.getElementById('campo-tipo-maquina');
+        const tipo = document.getElementById('tipo_maquina');
+        const campoOtra = document.getElementById('campo-modelo-otra');
+        const otra = document.getElementById('modelo_otra');
+        function actualizar() {
+            const esOtra = modelo.value === 'OTRA';
+            campoTipo.classList.toggle('d-none', esOtra);
+            campoOtra.classList.toggle('d-none', !esOtra);
+            tipo.required = !esOtra;
+            otra.required = esOtra;
+        }
+        modelo.addEventListener('change', function () {
+            actualizar();
+            if (modelo.value === 'OTRA') otra.focus();
+        });
+        actualizar();
+    })();
+
     // Autocompletar email cuando se selecciona un comercial
     document.getElementById('comercial').addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];

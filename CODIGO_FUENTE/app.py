@@ -15,12 +15,20 @@ from CODIGO_FUENTE.blueprints.dml import dml_bp
 from CODIGO_FUENTE.blueprints.envios import envios_bp
 from CODIGO_FUENTE.blueprints.estadisticas import estadisticas_bp
 from CODIGO_FUENTE.blueprints.notificaciones import notificaciones_bp
+from CODIGO_FUENTE.blueprints.pedidos import pedidos_bp
 from CODIGO_FUENTE.blueprints.raypac import raypac_bp
 from CODIGO_FUENTE.blueprints.stock import stock_bp
 from CODIGO_FUENTE.blueprints.tickets import tickets_bp
-from CODIGO_FUENTE.config import BASE_DIR, Config
+from CODIGO_FUENTE.config import (
+    BASE_DIR,
+    MANO_DE_OBRA_OPCIONES,
+    TECNICOS_ST,
+    Config,
+    validar_secret_key,
+)
 from CODIGO_FUENTE.decorators import get_current_user_jinja
 from CODIGO_FUENTE.extensions import close_db, get_db, init_db, preparar_base
+from CODIGO_FUENTE.services.fechas import fecha_ddmmaaaa
 from CODIGO_FUENTE.services.stock import get_alert_badge
 
 # Nivel configurable por entorno: en Render se puede setear LOG_LEVEL=DEBUG
@@ -37,7 +45,8 @@ app = Flask(
     static_url_path="/static"
 )
 app.config.from_object(Config)
- 
+validar_secret_key(app.config["SECRET_KEY"], en_render=bool(os.environ.get("RENDER")))  # #376
+
 logger = logging.getLogger(__name__)
 
 # Hacer funciones de negocio disponibles en todos los templates Jinja2
@@ -45,7 +54,10 @@ app.jinja_env.globals.update(
     get_current_user=get_current_user_jinja,
     get_alert_badge=get_alert_badge,
     current_year=lambda: datetime.now().year,
+    tecnicos_st=TECNICOS_ST,  # #327
+    mano_de_obra_opciones=MANO_DE_OBRA_OPCIONES,  # #331
 )
+app.jinja_env.filters['fecha'] = fecha_ddmmaaaa  # #332: {{ valor|fecha }} -> dd/mm/aaaa
 
 # Cerrar la conexión a la BD al final de cada request
 app.teardown_appcontext(close_db)
@@ -61,6 +73,7 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(estadisticas_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(notificaciones_bp)
+app.register_blueprint(pedidos_bp)
 
 
 @app.route("/health")

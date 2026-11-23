@@ -1,7 +1,10 @@
+import sys
 from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
+from markupsafe import escape
 
+from CODIGO_FUENTE.config import TECNICOS_ST
 from CODIGO_FUENTE.decorators import (
     get_current_user,
     log_action,
@@ -18,7 +21,9 @@ tickets_bp = Blueprint("tickets", __name__)
 
 @tickets_bp.route("/tickets/nuevo/<int:raypac_id>", methods=["GET", "POST"])
 @login_required
-@role_required("ADMIN", "DML_ST", "RAYPAC")
+# #336: RAYPAC no crea tickets (el botón ya se le ocultaba, pero la ruta
+# lo dejaba pasar si entraba por URL).
+@role_required("ADMIN", "DML_ST")
 def ticket_nuevo(raypac_id):
     """Crear ticket inicial desde RAYPAC freezado (nuevo flujo)."""
     user = get_current_user()
@@ -64,11 +69,15 @@ def ticket_nuevo(raypac_id):
             servo = request.form.get("servo", "BUENO")
             rueda_arrastre = request.form.get("rueda_arrastre", "BUENO")
             resorte_manija = request.form.get("resorte_manija", "BUENO")
-            otros = request.form.get("otros", "BUENO")
+            otros = request.form.get("otros", "").strip()[:500]  # #330: texto libre
 
             # Validación
             if not tecnico_responsable:
                 flash("El técnico responsable es obligatorio.", "error")
+                return render_template("ticket_nuevo.html", raypac=raypac)
+            # #327: solo los técnicos de la lista (TECNICOS_ST, config.py)
+            if tecnico_responsable not in TECNICOS_ST:
+                flash("Técnico responsable inválido. Elegí uno de la lista.", "error")
                 return render_template("ticket_nuevo.html", raypac=raypac)
 
             # Generar número de ticket: TK-{serie}
@@ -125,7 +134,7 @@ def ticket_nuevo(raypac_id):
                         <div class="info-row"><span class="label">Estado:</span> Pendiente de Revisión</div>
                     </div>
                     <p>Utilice este número de ticket para hacer seguimiento del estado de su equipo.</p>
-                    <p style="color: #7f8c8d; font-size: 12px; text-align: center; margin-top: 20px;">DML Electricidad Industrial SRL - Servicio Técnico</p>
+                    <p style="color: #7f8c8d; font-size: 12px; text-align: center; margin-top: 20px;">RAYPAC SRL - Servicio Técnico</p>
                 </div>
                 </body>
                 </html>
@@ -134,13 +143,63 @@ def ticket_nuevo(raypac_id):
                          f"🎫 Ticket de Seguimiento: {numero_ticket}",
                          html_body)
 
-            flash(f"✅ Ticket {numero_ticket} creado exitosamente.", "success")
+            # #325: el cliente recibe el número para consultar por su equipo
+            # con el comercial. Si no hay mail o falla, el ticket queda igual.
+            mensaje = f"✅ Ticket {numero_ticket} creado exitosamente."
+            enviado_cliente = _mail_ticket_cliente(raypac, numero_ticket)
+            if enviado_cliente is None:
+                flash(f"{mensaje} El ingreso no tiene mail del cliente: no se le mandó el número de ticket.", "warning")
+            elif not enviado_cliente:
+                flash(f"{mensaje} No se pudo mandar el mail al cliente (revisar logs).", "warning")
+            else:
+                flash(f"{mensaje} Se le mandó el número de ticket al cliente por mail.", "success")
             return redirect(url_for("tickets.ticket_view", numero_ticket=numero_ticket))
 
         except Exception as e:
             flash(f"Error al crear ticket: {e!s}", "error")
 
     return render_template("ticket_nuevo.html", raypac=raypac)
+
+
+def _mail_ticket_cliente(raypac, numero_ticket):
+    """#325: mail al cliente final con el número de ticket, para que consulte
+    por su equipo con el comercial responsable. Texto para el cliente (sin
+    datos internos de DML), firmado por RAYPAC SRL como el ticket (#326).
+
+    Devuelve None si el ingreso no tiene mail del cliente, True si salió y
+    False si falló. Nunca rompe la creación del ticket."""
+    email_cliente = (raypac['email_cliente'] or "").strip()
+    if not email_cliente:
+        return None
+    try:
+        comercial = escape(raypac['comercial'] or "su comercial de RAYPAC")
+        contacto_comercial = (
+            f' (<a href="mailto:{escape(raypac["mail_comercial"])}">{escape(raypac["mail_comercial"])}</a>)'
+            if raypac['mail_comercial'] else ""
+        )
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f5f5f5;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px;">
+            <h2 style="color: #2c3e50;">Recibimos su equipo para servicio técnico</h2>
+            <p>Estimado/a {escape(raypac['cliente'] or "cliente")},</p>
+            <p>Su equipo ingresó a servicio técnico. Este es su número de ticket de seguimiento:</p>
+            <div style="border: 3px solid #2c3e50; padding: 20px; margin: 20px 0; border-radius: 8px; background-color: #ecf0f1;">
+                <div style="font-size: 32px; font-weight: bold; color: #e74c3c; text-align: center; margin: 10px 0;">{escape(numero_ticket)}</div>
+                <p style="margin: 8px 0;"><strong>Número de serie:</strong> {escape(raypac['numero_serie'] or "-")}</p>
+                <p style="margin: 8px 0;"><strong>Modelo:</strong> {escape(raypac['modelo_maquina'] or "-")}</p>
+            </div>
+            <p>Para consultar el estado de su equipo, comuníquese con su comercial responsable,
+               <strong>{comercial}</strong>{contacto_comercial}, indicando este número de ticket.</p>
+            <p style="color: #7f8c8d; font-size: 12px; text-align: center; margin-top: 20px;">RAYPAC SRL - Servicio Técnico</p>
+        </div>
+        </body>
+        </html>
+        """
+        return send_mail(email_cliente, f"Su número de ticket de seguimiento: {numero_ticket}", html_body)
+    except Exception as e:
+        print(f"Error enviando el ticket al cliente: {e}", file=sys.stderr, flush=True)
+        return False
 
 
 @tickets_bp.route("/tickets")
@@ -198,7 +257,7 @@ def ticket_view(numero_ticket):
     ticket = db.execute("""
         SELECT t.*,
                f.numero_ficha, f.estado_reparacion, f.diagnostico_inicial, f.diagnostico_reparacion,
-               f.is_closed, f.fecha_entrega_cliente,
+               f.is_closed, f.fecha_entrega_cliente, f.enviada_raypac_at,
                r.cliente, r.numero_serie, r.modelo_maquina, r.comercial
         FROM tickets t
         LEFT JOIN dml_fichas f ON t.ficha_id = f.id
@@ -218,9 +277,9 @@ def ticket_view(numero_ticket):
     # #158: tracker de 4 pasos, mismo criterio que dml_view() - acá el
     # ticket es la puerta de entrada, así que puede no tener ficha todavía
     # (a diferencia de dml_view, donde el ticket siempre está hecho).
-    if ticket['fecha_entrega_cliente']:
+    if ticket['fecha_entrega_cliente'] or ticket['is_closed']:
         current_step = 4
-    elif ticket['is_closed']:
+    elif ticket['enviada_raypac_at']:  # #333: DML la envió, falta el OK de RAYPAC
         current_step = 3
     elif ticket['numero_ficha']:
         current_step = 2

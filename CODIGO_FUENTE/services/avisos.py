@@ -3,6 +3,9 @@
 "Llegó" = salió de RAYPAC y DML todavía no lo recibió:
 - MAQUINA: ingreso RAYPAC freezado con estado_envio_equipos = 'ENVIADO'.
 - REPUESTO: envío de repuestos con estado_envio = 'ENVIADO' sin recepción.
+- PEDIDO: pedido de repuestos de RAYPAC que DML todavía no empezó a preparar (#341).
+- PEDIDO_ENVIADO: el camino inverso, para RAYPAC: pedido que DML le envió y
+  RAYPAC todavía no recibió (#342).
 
 El "visto" es por usuario (tabla avisos_vistos): que lo abra el técnico no
 lo saca de la campanita de Repuestos. Cada rol ve solo lo de su trabajo.
@@ -10,9 +13,10 @@ lo saca de la campanita de Repuestos. Cada rol ve solo lo de su trabajo.
 from CODIGO_FUENTE.extensions import get_db
 
 TIPOS_POR_ROL = {
-    "ADMIN": ("MAQUINA", "REPUESTO"),
+    "ADMIN": ("MAQUINA", "REPUESTO", "PEDIDO"),
     "DML_ST": ("MAQUINA",),
-    "DML_REPUESTOS": ("REPUESTO",),
+    "DML_REPUESTOS": ("REPUESTO", "PEDIDO"),
+    "RAYPAC": ("PEDIDO_ENVIADO",),
 }
 
 
@@ -69,7 +73,52 @@ def avisos_sin_ver(user):
             "fecha": r["fecha"],
         } for r in rows]
 
-    # fecha es DATE en las dos tablas; a igual fecha, el id más alto es el más nuevo
+    if "PEDIDO" in tipos:
+        rows = db.execute(
+            """
+            SELECT p.id, p.created_at::date AS fecha,
+                   (SELECT COUNT(*) FROM pedidos_repuestos_detalles d WHERE d.pedido_id = p.id) AS items
+            FROM pedidos_repuestos p
+            WHERE p.estado = 'PEDIDO'
+              AND NOT EXISTS (
+                  SELECT 1 FROM avisos_vistos v
+                  WHERE v.user_id = %s AND v.tipo = 'PEDIDO' AND v.ref_id = p.id
+              )
+            """,
+            (user["id"],)
+        ).fetchall()
+        avisos += [{
+            "tipo": "PEDIDO",
+            "id": r["id"],
+            "titulo": f"Pedido de repuestos #{r['id']}",
+            "detalle": f"{r['items']} repuesto(s) pedidos por RAYPAC",
+            "fecha": r["fecha"],
+        } for r in rows]
+
+    if "PEDIDO_ENVIADO" in tipos:
+        rows = db.execute(
+            """
+            SELECT p.id, p.numero_remito, p.fecha_envio::date AS fecha,
+                   (SELECT COUNT(*) FROM pedidos_repuestos_detalles d
+                    WHERE d.pedido_id = p.id AND d.cantidad_enviada > 0) AS items
+            FROM pedidos_repuestos p
+            WHERE p.estado = 'ENVIADO'
+              AND NOT EXISTS (
+                  SELECT 1 FROM avisos_vistos v
+                  WHERE v.user_id = %s AND v.tipo = 'PEDIDO_ENVIADO' AND v.ref_id = p.id
+              )
+            """,
+            (user["id"],)
+        ).fetchall()
+        avisos += [{
+            "tipo": "PEDIDO_ENVIADO",
+            "id": r["id"],
+            "titulo": f"DML envió el pedido #{r['id']}",
+            "detalle": f"Remito {r['numero_remito']} · {r['items']} repuesto(s)",
+            "fecha": r["fecha"],
+        } for r in rows]
+
+    # fecha es DATE en todas las consultas; a igual fecha, el id más alto es el más nuevo
     avisos.sort(key=lambda a: (str(a["fecha"] or ""), a["id"]), reverse=True)
     return avisos
 

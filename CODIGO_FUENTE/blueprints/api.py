@@ -7,7 +7,7 @@ from CODIGO_FUENTE.services.avisos import avisos_sin_ver
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 
-@api_bp.route("/verificar-stock/<codigo>")
+@api_bp.route("/verificar-stock/<path:codigo>")
 @login_required
 def verificar_stock_api(codigo):
     """API para verificar existencia y stock de un repuesto en tiempo real.
@@ -57,6 +57,8 @@ def avisos_api():
     for aviso in avisos:
         if aviso["tipo"] == "MAQUINA":
             aviso["url"] = url_for("raypac.raypac_view", id=aviso["id"])
+        elif aviso["tipo"] in ("PEDIDO", "PEDIDO_ENVIADO"):  # #341 / #342
+            aviso["url"] = url_for("pedidos.pedidos_view", id=aviso["id"])
         else:
             aviso["url"] = url_for("envios.envios_view", id=aviso["id"])
         aviso["clave"] = f"{aviso['tipo']}-{aviso['id']}"

@@ -8,9 +8,11 @@ from flask import (
     render_template,
     request,
     send_file,
+    session,
     url_for,
 )
 
+from CODIGO_FUENTE.config import MANO_DE_OBRA_OPCIONES, TECNICOS_ST
 from CODIGO_FUENTE.decorators import (
     get_current_user,
     log_action,
@@ -21,8 +23,8 @@ from CODIGO_FUENTE.decorators import (
 )
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.flujo import build_flow_steps
-from CODIGO_FUENTE.services.mail import send_mail
-from CODIGO_FUENTE.services.numeracion import crear_ticket, generate_ficha_number
+from CODIGO_FUENTE.services.mail import get_destinatarios, send_mail
+from CODIGO_FUENTE.services.numeracion import generate_ficha_number
 from CODIGO_FUENTE.services.pdf import generar_pdf_ficha
 from CODIGO_FUENTE.services.stock import (
     actualizar_estadistica_repuesto,
@@ -43,9 +45,33 @@ ESTADOS_EDITABLES = [
     'A LA ESPERA DE REPUESTOS',
     'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO',  # #260
     'EN REPARACIÓN',
-    'REPARACIÓN COMPLETADA',
+    'REPARADA',  # #329 - antes 'REPARACIÓN COMPLETADA'
     'MÁQUINA LISTA PARA RETIRAR',
 ]
+
+
+def codigo_edicion_ficha(numero_remito_salida):
+    """#333: código que pide editar una ficha ya recibida por RAYPAC: los
+    últimos 4 dígitos del remito de salida de DML (el que viaja con la
+    máquina de vuelta), mismo criterio que el desfreezado de un ingreso.
+    "00001-04222" -> "4222". Vacío si la ficha no tiene remito."""
+    digitos = "".join(c for c in (numero_remito_salida or "") if c.isdigit())
+    return digitos[-4:]
+
+
+def _ficha_desbloqueada(ficha_id):
+    """#333: RAYPAC/ADMIN desbloquearon esta ficha con el código en esta sesión."""
+    return ficha_id in session.get("fichas_desbloqueadas", [])
+
+
+def _paso_flujo(ficha):
+    """#158/#333: paso del tracker de 4 pasos. El 3ro ("Lista para retirar")
+    es cuando DML la envía a RAYPAC; el 4to, cuando RAYPAC da el OK."""
+    if ficha['fecha_entrega_cliente'] or ficha['is_closed']:
+        return 4
+    if ficha['enviada_raypac_at']:
+        return 3
+    return 2
 
 
 def registrar_estado(db, ficha_id, estado, usuario_id):
@@ -111,7 +137,8 @@ def dml_entregadas():
         FROM dml_fichas f
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
         WHERE f.estado_reparacion LIKE '%ENTREGAD%' OR f.is_closed = TRUE
-        ORDER BY f.fecha_entrega_cliente DESC, f.updated_at DESC
+           OR f.enviada_raypac_at IS NOT NULL  -- #333: enviadas, esperando el OK de RAYPAC
+        ORDER BY f.is_closed ASC, f.fecha_entrega_cliente DESC, f.updated_at DESC
     """).fetchall()
 
     return render_template("dml_entregadas.html", fichas=fichas, user_role=user['role'])
@@ -121,6 +148,12 @@ def dml_entregadas():
 @login_required
 @role_required("ADMIN", "DML_ST")
 def dml_new(raypac_id):
+    # #328: "Crear Ficha" ya no pasa por un formulario intermedio
+    # (dml_form.html, eliminado): crea la ficha con lo que ya se sabe y
+    # manda directo a la edición. Solo crea por POST (los botones son
+    # <form method="POST">) para que un refresh, un link pegado o un
+    # prefetch del navegador no generen fichas. Un GET (link viejo/pegado)
+    # vuelve a la ficha si ya existe, o al ingreso RAYPAC si no.
     user = get_current_user()
     db = get_db()
 
@@ -129,112 +162,92 @@ def dml_new(raypac_id):
         flash("Ingreso RAYPAC no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
-    # Buscar si existe un ticket asociado a este RAYPAC (nuevo flujo)
-    ticket = db.execute("SELECT * FROM tickets WHERE raypac_id = %s AND ficha_id IS NULL", (raypac_id,)).fetchone()
-
-    # #55: la ficha solo se puede crear despues de generar el ticket. El
-    # boton "Crear Ficha" ya esta oculto en la UI hasta que exista ticket
-    # (raypac_list.html, raypac_view.html), pero eso no alcanzaba si alguien
-    # pegaba esta URL directo - habia un "flujo antiguo" que creaba la ficha
-    # igual y recien despues el ticket, salteando la inspeccion visual y el
-    # mail al comercial. Se saca esa rama y se bloquea acá tambien.
+    # #55: la ficha solo se puede crear despues de generar el ticket (se
+    # bloquea acá también, no solo ocultando el botón). FOR UPDATE: dos
+    # clics seguidos en "Crear Ficha" esperan uno al otro, y el segundo ve
+    # el ficha_id que dejó el primero en vez de crear una ficha duplicada.
+    ticket = db.execute(
+        "SELECT * FROM tickets WHERE raypac_id = %s ORDER BY id DESC LIMIT 1"
+        + (" FOR UPDATE" if request.method == "POST" else ""),
+        (raypac_id,)
+    ).fetchone()
     if not ticket:
         flash("Debe crear un ticket primero antes de generar la ficha.", "error")
         return redirect(url_for("raypac.raypac_view", id=raypac_id))
 
-    if request.method == "POST":
-        try:
-            fecha_ingreso = request.form.get("fecha_ingreso") or datetime.now().strftime("%Y-%m-%d")
-            tecnico = request.form.get("tecnico")
-            # CAMBIO DAVID: No usar diagnostico_inicial, ya viene de RAYPAC (diagnostico_ingreso)
-            observaciones = request.form.get("observaciones")
-            n_ciclos = request.form.get("n_ciclos") or 0
-            tecnico_resp = request.form.get("tecnico_resp")
+    if ticket['ficha_id']:
+        db.rollback()  # libera el FOR UPDATE
+        return redirect(url_for("dml.dml_edit", id=ticket['ficha_id']))
 
-            # Validar que exista al menos un técnico (tecnico o tecnico_resp)
-            if not tecnico and not tecnico_resp:
-                flash("Completa los campos obligatorios: debe indicar un técnico responsable.", "error")
-                return render_template("dml_form.html", raypac=raypac, ticket=ticket)
+    if request.method != "POST":
+        return redirect(url_for("raypac.raypac_view", id=raypac_id))
 
-            # Asegurar que ambos campos tengan valor (tecnico es NOT NULL en BD)
-            if not tecnico_resp:
-                tecnico_resp = tecnico
-            if not tecnico:
-                tecnico = tecnico_resp
+    try:
+        # Fecha de ingreso = hoy (editable en la edición). No hay una fecha
+        # guardada del "Dar de Alta en DML" para tomar en su lugar, y la
+        # ficha se crea en DML después de recibir la máquina y hacer el ticket.
+        fecha_ingreso = datetime.now().strftime("%Y-%m-%d")
+        # El técnico viene del ticket (#327, obligatorio al crearlo).
+        tecnico = ticket['tecnico_responsable'] or ""
 
-            numero_ficha = generate_ficha_number()
+        numero_ficha = generate_ficha_number()
 
-            # Ya se validó arriba que el ticket existe - se asocia la ficha con él
-            row = db.execute("""
-                INSERT INTO dml_fichas
-                (numero_ficha, raypac_id, ticket_id, numero_ticket, fecha_ingreso, tecnico,
-                 observaciones, n_ciclos, tecnico_resp,
-                 estado_reparacion)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-            """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso, tecnico,
-                  observaciones, n_ciclos, tecnico_resp, 'A LA ESPERA DE REVISIÓN')).fetchone()
+        row = db.execute("""
+            INSERT INTO dml_fichas
+            (numero_ficha, raypac_id, ticket_id, numero_ticket, fecha_ingreso, tecnico,
+             n_ciclos, tecnico_resp, estado_reparacion)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (numero_ficha, raypac_id, ticket['id'], ticket['numero_ticket'], fecha_ingreso, tecnico,
+              0, tecnico or None, 'A LA ESPERA DE REVISIÓN')).fetchone()
 
-            ficha_id = row['id']
+        ficha_id = row['id']
 
-            registrar_estado(db, ficha_id, 'A LA ESPERA DE REVISIÓN', user['id'])
+        registrar_estado(db, ficha_id, 'A LA ESPERA DE REVISIÓN', user['id'])
 
-            # Actualizar ticket con el ficha_id
-            db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
+        db.execute("UPDATE tickets SET ficha_id = %s WHERE id = %s", (ficha_id, ticket['id']))
 
-            numero_ticket = ticket['numero_ticket']
+        # Partes estándar, con el estado que se cargó en la inspección
+        # visual del ticket.
+        ticket_to_parte = {
+            'ESTADO DEL EQUIPO': 'estado_equipo',
+            'CARCAZA': 'carcaza',
+            'CUBRE FEEDWHEEL': 'cubre_feedwheel',
+            'MANGO': 'mango',
+            'BOTONES': 'botones',
+            'MOTOR DE ARRASTRE': 'motor_arrastre',
+            'MOTOR DE SELLADO': 'motor_sellado',
+            'CUCHILLA': 'cuchilla',
+            'SERVO': 'servo',
+            'RUEDA DE ARRASTRE': 'rueda_arrastre',
+            'RESORTE DE MANIJA': 'resorte_manija',
+            'OTROS': 'otros',
+        }
+        for parte_nombre, ticket_col in ticket_to_parte.items():
+            valor = ticket[ticket_col] if ticket_col in ticket.keys() else None
+            if parte_nombre == "OTROS":
+                # #330: OTROS es texto libre; vacío si no se escribió nada en el ticket
+                estado = valor or ""
+            else:
+                estado = valor or "POR INSPECCIONAR"
+            db.execute(
+                "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
+                (ficha_id, parte_nombre, estado)
+            )
 
-            db.commit()
+        # Un solo commit: si algo falla no queda una ficha a medio crear
+        # (antes había un commit antes de las partes).
+        db.commit()
 
-            # Crear partes estándar
-            partes_nombres = [
-                "ESTADO DEL EQUIPO", "CARCAZA", "CUBRE FEEDWHEEL", "MANGO",
-                "BOTONES", "MOTOR DE ARRASTRE", "MOTOR DE SELLADO", "CUCHILLA",
-                "SERVO", "RUEDA DE ARRASTRE", "RESORTE DE MANIJA", "OTROS"
-            ]
+        log_action(user['id'], "CREATE", "dml_fichas", ficha_id, None,
+                   f"Ficha DML #{numero_ficha} - Ticket: {ticket['numero_ticket']}")
 
-            # Usar los estados del equipo completados en el ticket (inspección visual)
-            ticket_to_parte = {
-                'estado_equipo': 'ESTADO DEL EQUIPO',
-                'carcaza': 'CARCAZA',
-                'cubre_feedwheel': 'CUBRE FEEDWHEEL',
-                'mango': 'MANGO',
-                'botones': 'BOTONES',
-                'motor_arrastre': 'MOTOR DE ARRASTRE',
-                'motor_sellado': 'MOTOR DE SELLADO',
-                'cuchilla': 'CUCHILLA',
-                'servo': 'SERVO',
-                'rueda_arrastre': 'RUEDA DE ARRASTRE',
-                'resorte_manija': 'RESORTE DE MANIJA',
-                'otros': 'OTROS'
-            }
-
-            for parte_nombre in partes_nombres:
-                # Buscar el estado correspondiente en el ticket
-                estado = "POR INSPECCIONAR"
-                for ticket_col, parte_map in ticket_to_parte.items():
-                    if parte_map == parte_nombre and ticket_col in ticket.keys() and ticket[ticket_col]:
-                        estado = ticket[ticket_col]
-                        break
-
-                db.execute(
-                    "INSERT INTO dml_partes (ficha_id, nombre_parte, estado) VALUES (%s, %s, %s)",
-                    (ficha_id, parte_nombre, estado)
-                )
-
-            db.commit()
-
-            log_action(user['id'], "CREATE", "dml_fichas", ficha_id, None,
-                      f"Ficha DML #{numero_ficha} - Ticket: {numero_ticket}")
-
-            # CAMBIO DAVID: Redirigir directamente a EDICIÓN en lugar de vista
-            flash(f"Ficha #{numero_ficha} creada correctamente. Ticket: {numero_ticket}", "success")
-            return redirect(url_for("dml.dml_edit", id=ficha_id))
-        except Exception as e:
-            flash(f"Error: {e!s}", "error")
-            return render_template("dml_form.html", raypac=raypac, ticket=ticket)
-
-    return render_template("dml_form.html", raypac=raypac, ticket=ticket)
+        flash(f"Ficha #{numero_ficha} creada. Ticket: {ticket['numero_ticket']}", "success")
+        return redirect(url_for("dml.dml_edit", id=ficha_id))
+    except Exception as e:
+        db.rollback()
+        flash(f"No se pudo crear la ficha: {e!s}", "error")
+        return redirect(url_for("raypac.raypac_view", id=raypac_id))
 
 
 @dml_bp.route("/<int:id>")
@@ -271,12 +284,7 @@ def dml_view(id, readonly=False):
     # del lado DML (ver raypac_view() para el tramo de 3 pasos del lado
     # RAYPAC). Ticket creado siempre está en "done" acá: dml_new() exige un
     # ticket existente antes de poder crear la ficha.
-    if ficha['fecha_entrega_cliente']:
-        current_step = 4
-    elif ficha['is_closed']:
-        current_step = 3
-    else:
-        current_step = 2
+    current_step = _paso_flujo(ficha)
     flow_steps = build_flow_steps(
         ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
@@ -300,7 +308,7 @@ def dml_view(id, readonly=False):
 
 @dml_bp.route("/<int:id>/edit", methods=["GET", "POST"])
 @login_required
-@role_required("ADMIN", "DML_ST")
+@role_required("ADMIN", "DML_ST", "RAYPAC")
 def dml_edit(id):
     user = get_current_user()
     db = get_db()
@@ -310,20 +318,20 @@ def dml_edit(id):
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_list"))
 
-    if ficha['is_closed'] and not request.form.get("unfreeze_code"):
-        flash("Esta ficha está cerrada. Requiere código para editar.", "error")
+    # #333: DML (ADMIN/DML_ST) edita libre hasta que RAYPAC da el OK de
+    # recepción. Ya recibida (is_closed), solo la edita RAYPAC o ADMIN,
+    # después de desbloquearla con el código (dml_desbloquear()).
+    if ficha['is_closed']:
+        if user['role'] not in ("ADMIN", "RAYPAC") or not _ficha_desbloqueada(id):
+            flash("Esta ficha ya fue recibida por RAYPAC. Para editarla, RAYPAC (o ADMIN) "
+                  "tiene que desbloquearla con el código desde la ficha.", "error")
+            return redirect(url_for("dml.dml_view", id=id))
+    elif user['role'] == "RAYPAC":
+        flash("RAYPAC puede editar la ficha recién después de dar el OK de recepción.", "error")
         return redirect(url_for("dml.dml_view", id=id))
 
     if request.method == "POST":
         try:
-            unfreeze_code = request.form.get("unfreeze_code")
-            # #133: se confirma contra la contraseña del propio usuario
-            # logueado (mismo mecanismo que el login), no un código fijo
-            # separado que había que memorizar aparte.
-            if ficha['is_closed'] and not verify_admin_password(unfreeze_code):
-                flash("Código incorrecto.", "error")
-                return redirect(url_for("dml.dml_view", id=id))
-
             # Capturar SOLO los campos editables (no los de RAYPAC)
             fecha_ingreso = request.form.get("fecha_ingreso")
             # #176: "Fecha de Egreso" no es required (recién se completa al
@@ -348,17 +356,30 @@ def dml_edit(id):
                 horas = None  # texto no numérico (ej. "NO APLICA")
             numero_remito = request.form.get("numero_remito_salida") or None
             tecnico_resp = request.form.get("tecnico_resp") or ""
+            mano_de_obra = request.form.get("mano_de_obra") or None
 
             # #157: "MÁQUINA ENTREGADA" ya no es una opción del <select> (ver
             # dml_edit.html), pero valido igual por si llega un POST armado a
             # mano - el único camino a ese estado es "Cerrar Ficha", que corre
             # el checklist completo y marca is_closed=TRUE.
-            if estado == 'MÁQUINA ENTREGADA':
-                flash("Para marcar la ficha como entregada, usá el botón 'Cerrar Ficha'.", "error")
+            if ficha['is_closed']:
+                # #333: ya recibida por RAYPAC - el estado no se toca desde acá
+                estado = ficha['estado_reparacion']
+            elif estado == 'MÁQUINA ENTREGADA':
+                flash("La ficha queda entregada cuando RAYPAC confirma la recepción.", "error")
+                return redirect(url_for("dml.dml_edit", id=id))
+            elif estado not in ESTADOS_EDITABLES:
+                flash("Estado de reparación inválido. Elegí uno de la lista.", "error")
                 return redirect(url_for("dml.dml_edit", id=id))
 
-            if estado not in ESTADOS_EDITABLES:
-                flash("Estado de reparación inválido. Elegí uno de la lista.", "error")
+            # #327: técnico de la lista, vacío, o el texto viejo que ya tenía la ficha
+            if tecnico_resp and tecnico_resp not in TECNICOS_ST and tecnico_resp != (ficha['tecnico_resp'] or ""):
+                flash("Técnico responsable inválido. Elegí uno de la lista.", "error")
+                return redirect(url_for("dml.dml_edit", id=id))
+
+            # #331: una opción de la lista o vacío (opcional)
+            if mano_de_obra and mano_de_obra not in MANO_DE_OBRA_OPCIONES:
+                flash("Mano de obra inválida. Elegí una opción de la lista.", "error")
                 return redirect(url_for("dml.dml_edit", id=id))
 
             # Validación de flujo lógico de estados según documento David
@@ -370,7 +391,8 @@ def dml_edit(id):
                 'EN REPARACION': 1,  # alias sin tilde, ver #44 - encoding legado en datos viejos
                 'A LA ESPERA DE REPUESTOS': 1,  # Mismo nivel que EN REPARACIÓN (puede ir y volver)
                 'A LA ESPERA DE APROBACIÓN DE PRESUPUESTO': 1,  # #260 - idem, espera externa sin que DML pueda avanzar
-                'REPARACIÓN COMPLETADA': 2,
+                'REPARADA': 2,  # #329
+                'REPARACIÓN COMPLETADA': 2,  # alias legado de 'REPARADA', ver #329
                 'MÁQUINA LISTA PARA RETIRAR': 3,
                 'MÁQUINA ENTREGADA': 4,
                 'FINALIZADO': 5
@@ -391,12 +413,12 @@ def dml_edit(id):
                 SET fecha_ingreso=%s, fecha_egreso=%s,
                     estado_reparacion=%s, diagnostico_reparacion=%s, observaciones=%s,
                     n_ciclos=%s, mecanizado_adic=%s, horas_adic=%s, numero_remito_salida=%s,
-                    tecnico_resp=%s, updated_at=CURRENT_TIMESTAMP
+                    tecnico_resp=%s, mano_de_obra=%s, updated_at=CURRENT_TIMESTAMP
                 WHERE id = %s
             """, (fecha_ingreso, fecha_egreso,
                   estado, diagnostico_rep, observaciones,
                   n_ciclos, mecanizado, horas, numero_remito,
-                  tecnico_resp, id))
+                  tecnico_resp, mano_de_obra, id))
             # #171: solo si el estado cambió - guardar la ficha sin tocar el
             # estado (ej. solo observaciones) no es un paso nuevo del historial.
             if estado != ficha['estado_reparacion']:
@@ -404,9 +426,17 @@ def dml_edit(id):
             db.commit()
 
             # Actualizar partes
-            partes = db.execute("SELECT id FROM dml_partes WHERE ficha_id = %s ORDER BY id", (id,)).fetchall()
+            partes = db.execute("SELECT id, nombre_parte FROM dml_partes WHERE ficha_id = %s ORDER BY id", (id,)).fetchall()
             for idx, parte in enumerate(partes):
                 estado_parte = request.form.get(f"parte_{idx}")
+                if parte['nombre_parte'] == "OTROS":
+                    # #330: texto libre, se puede dejar vacío
+                    if estado_parte is not None:
+                        db.execute(
+                            "UPDATE dml_partes SET estado = %s WHERE id = %s",
+                            (estado_parte.strip()[:500], parte['id'])
+                        )
+                    continue
                 if estado_parte:
                     db.execute(
                         "UPDATE dml_partes SET estado = %s WHERE id = %s",
@@ -416,13 +446,18 @@ def dml_edit(id):
 
             log_action(user['id'], "UPDATE", "dml_fichas", id, None, "Actualización ficha")
 
+            # #333: el desbloqueo sirve para una edición; la próxima vuelve a pedir el código
+            if ficha['is_closed']:
+                session["fichas_desbloqueadas"] = [f for f in session.get("fichas_desbloqueadas", []) if f != id]
+
             flash("Ficha actualizada correctamente.", "success")
             return redirect(url_for("dml.dml_view", id=id))
         except Exception as e:
             db.rollback()  # Revertir la transacción en caso de error
             flash(f"Error: {e!s}", "error")
 
-    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s", (id,)).fetchall()
+    # ORDER BY id: el POST mapea parte_{idx} por este mismo orden
+    partes = db.execute("SELECT * FROM dml_partes WHERE ficha_id = %s ORDER BY id", (id,)).fetchall()
     repuestos = db.execute("SELECT * FROM dml_repuestos WHERE ficha_id = %s", (id,)).fetchall()
 
     # Convertir Row a dict para serialización JSON
@@ -432,12 +467,7 @@ def dml_edit(id):
 
     # #158: mismo tracker que dml_view() - Facu pidió que también se vea acá,
     # no solo en la vista de solo lectura.
-    if ficha['fecha_entrega_cliente']:
-        current_step = 4
-    elif ficha['is_closed']:
-        current_step = 3
-    else:
-        current_step = 2
+    current_step = _paso_flujo(ficha)
     flow_steps = build_flow_steps(
         ["Ticket creado", "Ficha en reparación", "Lista para retirar", "Acuse registrado"], current_step
     )
@@ -455,10 +485,16 @@ def agregar_repuesto(id):
     user = get_current_user()
     db = get_db()
 
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
+    # #306: FOR UPDATE bloquea la ficha hasta el commit. Si llegan dos POST
+    # seguidos (doble clic), el segundo espera acá a que termine el primero
+    # y después ve el repuesto ya cargado (chequeo de duplicado de abajo).
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s FOR UPDATE", (id,)).fetchone()
     if not ficha:
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_edit", id=id))
+    if ficha['is_closed']:
+        flash("La ficha ya fue recibida por RAYPAC: los repuestos no se modifican.", "error")
+        return redirect(url_for("dml.dml_view", id=id))
 
     codigo = request.form.get("codigo_repuesto", "").strip().upper()
     cantidad_utilizada = int(request.form.get("cantidad_utilizada", 1))
@@ -478,6 +514,18 @@ def agregar_repuesto(id):
         flash(f"Repuesto '{codigo}' no encontrado en la matriz de repuestos.", "error")
         return redirect(url_for("dml.dml_edit", id=id))
 
+    # #306: mismo criterio que dml_edit.html ("Este repuesto ya está agregado a
+    # la ficha"), ahora también en el backend: frena el doble POST y que el
+    # stock se descuente dos veces.
+    ya_cargado = db.execute(
+        "SELECT 1 FROM dml_repuestos WHERE ficha_id = %s AND codigo_repuesto = %s",
+        (id, codigo)
+    ).fetchone()
+    if ya_cargado:
+        db.rollback()  # suelta el FOR UPDATE
+        flash(f"El repuesto '{codigo}' ya está agregado a la ficha.", "warning")
+        return redirect(url_for("dml.dml_edit", id=id))
+
     # Verificar stock AUTOMÁTICAMENTE en ubicación DML
     stock = db.execute(
         "SELECT cantidad FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = 'DML'",
@@ -489,21 +537,25 @@ def agregar_repuesto(id):
         en_stock = 1
         en_falta = 0
         estado_repuesto = "EN STOCK"
-        # Descontar del stock en DML usando ajustar_stock_ubicacion
-        ajustar_stock_ubicacion(codigo, "DML", -cantidad_utilizada)
-        # Actualizar estadísticas de uso (solo cuando el repuesto se usa de verdad)
-        actualizar_estadistica_repuesto(codigo, cantidad_utilizada)
     else:
         en_stock = 0
         en_falta = 1
         estado_repuesto = "EN FALTA"
 
-    # Insertar repuesto
+    # Insertar repuesto. #306: va ANTES de tocar el stock porque
+    # actualizar_estadistica_repuesto() hace su propio commit (y eso suelta
+    # el FOR UPDATE): así el repuesto ya queda guardado junto con el descuento.
     db.execute("""
         INSERT INTO dml_repuestos
         (ficha_id, codigo_repuesto, descripcion, cantidad, cantidad_utilizada, estado_repuesto, en_stock, en_falta)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, (id, codigo, repuesto['item'], cantidad_utilizada, cantidad_utilizada, estado_repuesto, en_stock, en_falta))
+
+    if en_stock:
+        # Descontar del stock en DML usando ajustar_stock_ubicacion
+        ajustar_stock_ubicacion(codigo, "DML", -cantidad_utilizada)
+        # Actualizar estadísticas de uso (solo cuando el repuesto se usa de verdad)
+        actualizar_estadistica_repuesto(codigo, cantidad_utilizada)
     db.commit()
 
     # (se sacó la llamada a actualizar_estadistica_repuesto que estaba acá)
@@ -523,10 +575,20 @@ def agregar_repuesto(id):
     return redirect(url_for("dml.dml_edit", id=id))
 
 
+def _ficha_cerrada(ficha_id):
+    """#333: True si RAYPAC ya dio el OK de recepción de la ficha."""
+    fila = get_db().execute("SELECT is_closed FROM dml_fichas WHERE id = %s", (ficha_id,)).fetchone()
+    return bool(fila and fila['is_closed'])
+
+
 @dml_bp.route("/<int:ficha_id>/repuestos/mover-a-stock/<int:repuesto_id>", methods=["POST"])
 @login_required
 @role_required("ADMIN", "DML_ST", "DML_REPUESTOS")
 def mover_repuesto_a_stock(ficha_id, repuesto_id):
+    if _ficha_cerrada(ficha_id):
+        flash("La ficha ya fue recibida por RAYPAC: los repuestos no se modifican.", "error")
+        return redirect(url_for("dml.dml_view", id=ficha_id))
+
     """
     Mueve un repuesto de EN FALTA a EN STOCK cuando llega nueva disponibilidad.
     Descuenta del inventario y actualiza el estado.
@@ -595,6 +657,10 @@ def mover_repuesto_a_stock(ficha_id, repuesto_id):
 @login_required
 @role_required("ADMIN", "DML_ST")
 def eliminar_repuesto(ficha_id, repuesto_id):
+    if _ficha_cerrada(ficha_id):
+        flash("La ficha ya fue recibida por RAYPAC: los repuestos no se modifican.", "error")
+        return redirect(url_for("dml.dml_view", id=ficha_id))
+
     user = get_current_user()
     db = get_db()
 
@@ -631,81 +697,14 @@ def eliminar_repuesto(ficha_id, repuesto_id):
 
 # ======================== TICKETS (asociados a ficha) ========================
 
-@dml_bp.route("/<int:id>/crear-ticket", methods=["POST"])
-@login_required
-@role_required("ADMIN", "DML_ST")
-def crear_ticket_endpoint(id):
-    """Crea un ticket de seguimiento para una ficha DML."""
-    user = get_current_user()
-    db = get_db()
-
-    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
-    if not ficha:
-        flash("Ficha no encontrada.", "error")
-        return redirect(url_for("dml.dml_list"))
-
-    # Verificar si ya existe ticket
-    if ficha['numero_ticket']:
-        flash(f"Ya existe ticket creado: {ficha['numero_ticket']}", "info")
-        return redirect(url_for("dml.dml_view", id=id))
-
-    try:
-        # Obtener número de serie desde RAYPAC
-        raypac = db.execute(
-            "SELECT numero_serie, mail_comercial FROM raypac_entries WHERE id = %s",
-            (ficha['raypac_id'],)
-        ).fetchone()
-
-        if not raypac:
-            flash("No se encontró información de RAYPAC.", "error")
-            return redirect(url_for("dml.dml_view", id=id))
-
-        # Crear ticket
-        numero_ticket = crear_ticket(id, raypac['numero_serie'])
-
-        # Enviar ticket por email
-        if raypac['mail_comercial']:
-            html_body = f"""
-            <html>
-            <head><style>
-                body {{ font-family: Arial, sans-serif; }}
-                .ticket-box {{ border: 2px solid #2c3e50; padding: 20px; border-radius: 5px; }}
-                .ticket-num {{ font-size: 24px; font-weight: bold; color: #2c3e50; }}
-                .info-row {{ margin: 10px 0; }}
-                .label {{ font-weight: bold; color: #555; }}
-            </style></head>
-            <body>
-            <h2>🎫 TICKET DE SEGUIMIENTO GENERADO</h2>
-            <div class="ticket-box">
-                <div class="ticket-num">{numero_ticket}</div>
-                <div class="info-row"><span class="label">Número de Ficha:</span> {ficha['numero_ficha']}</div>
-                <div class="info-row"><span class="label">Número de Serie:</span> {raypac['numero_serie']}</div>
-                <div class="info-row"><span class="label">Estado:</span> {ficha['estado_reparacion']}</div>
-                <div class="info-row"><span class="label">Fecha de Ingreso:</span> {ficha['fecha_ingreso']}</div>
-            </div>
-            <p>Puede usar este número de ticket para hacer seguimiento de su equipo.</p>
-            <p style="color: #999; font-size: 12px;">DML Electricidad Industrial SRL</p>
-            </body>
-            </html>
-            """
-            send_mail(raypac['mail_comercial'],
-                     f"🎫 Ticket de Seguimiento: {numero_ticket}",
-                     html_body)
-
-        log_action(user['id'], "CREATE_TICKET", "tickets", id, None, numero_ticket)
-        flash(f"✅ Ticket creado exitosamente: {numero_ticket}", "success")
-
-    except Exception as e:
-        flash(f"Error al crear ticket: {e!s}", "error")
-
-    return redirect(url_for("dml.dml_view", id=id))
-
-
 @dml_bp.route("/<int:id>/close", methods=["POST"])
 @login_required
 @role_required("ADMIN", "DML_ST")
 def dml_close(id):
-    """Cierra/finaliza una ficha DML y notifica al comercial."""
+    """#333: "Enviar a RAYPAC". Corre el checklist de siempre, deja la ficha
+    en MÁQUINA LISTA PARA RETIRAR, cierra el ticket y avisa al comercial.
+    La ficha NO queda cerrada: DML la puede seguir editando hasta que RAYPAC
+    da el OK de recepción (dml_registrar_acuse()), que es lo que la cierra."""
     user = get_current_user()
     db = get_db()
 
@@ -714,11 +713,11 @@ def dml_close(id):
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_list"))
 
-    if ficha['is_closed']:
-        flash("Esta ficha ya está cerrada.", "info")
+    if ficha['is_closed'] or ficha['enviada_raypac_at']:
+        flash("Esta ficha ya se envió a RAYPAC.", "info")
         return redirect(url_for("dml.dml_view", id=id))
 
-    # VALIDACIONES OBLIGATORIAS antes de cerrar
+    # VALIDACIONES OBLIGATORIAS antes de enviar
     errores = []
 
     # 1. Validar remito de salida
@@ -754,7 +753,7 @@ def dml_close(id):
         errores.append(f"Hay repuestos EN FALTA que impiden el cierre: {codigos}")
 
     if errores:
-        flash("⚠️ No se puede cerrar la ficha. Campos requeridos faltantes:", "error")
+        flash("⚠️ No se puede enviar la ficha a RAYPAC. Campos requeridos faltantes:", "error")
         for error in errores:
             flash(f"• {error}", "error")
         return redirect(url_for("dml.dml_edit", id=id))
@@ -765,13 +764,16 @@ def dml_close(id):
         # dml_edit.html y de estados_orden/color map) en vez del 'ENTREGADA'
         # suelto que dejaba la ficha en un estado huerfano - mismo patron
         # de bug que el #44, pero en el flujo de cierre en vez del de alta.
+        # #333: ya no cierra la ficha - queda enviada, esperando el OK de RAYPAC.
         fecha_egreso = datetime.now().strftime("%Y-%m-%d")
         db.execute("""
             UPDATE dml_fichas
-            SET is_closed = TRUE, fecha_egreso = %s, estado_reparacion = 'MÁQUINA ENTREGADA'
+            SET enviada_raypac_at = CURRENT_TIMESTAMP, fecha_egreso = %s,
+                estado_reparacion = 'MÁQUINA LISTA PARA RETIRAR', updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (fecha_egreso, id))
-        registrar_estado(db, id, 'MÁQUINA ENTREGADA', user['id'])
+        if ficha['estado_reparacion'] != 'MÁQUINA LISTA PARA RETIRAR':
+            registrar_estado(db, id, 'MÁQUINA LISTA PARA RETIRAR', user['id'])
 
         # Cerrar el ticket asociado (ya cumplió su función de seguimiento)
         if ficha['numero_ticket']:
@@ -832,18 +834,22 @@ def dml_close(id):
             """
             mail_sent = send_mail(raypac['mail_comercial'],
                                  f"✅ Máquina Lista: Ficha #{ficha['numero_ficha']:07d}",
-                                 html_body)
+                                 html_body,
+                                 cc=get_destinatarios("MAQUINA_LISTA"))
             mail_status = "enviada" if mail_sent else "fallida (revisar logs)"
         else:
             mail_status = "sin email configurado"
 
-        log_action(user['id'], "CLOSE", "dml_fichas", id, None,
-                  f"Ficha finalizada - Notificación {mail_status} - Comercial: {raypac['comercial'] if raypac else 'N/A'}")
+        log_action(user['id'], "UPDATE", "dml_fichas", id, None,
+                  f"Ficha enviada a RAYPAC - Notificación {mail_status} - Comercial: {raypac['comercial'] if raypac else 'N/A'}")
 
-        flash(f"✅ Ficha #{ficha['numero_ficha']} cerrada y marcada como ENTREGADA. Notificación {mail_status}.", "success")
+        categoria = "success" if mail_status == "enviada" else "warning"
+        flash(f"✅ Ficha #{ficha['numero_ficha']} enviada a RAYPAC. Queda esperando que RAYPAC confirme la recepción. "
+              f"Notificación {mail_status}.", categoria)
         return redirect(url_for("dml.dml_view", id=id))
     except Exception as e:
-        flash(f"Error al cerrar ficha: {e!s}", "error")
+        db.rollback()
+        flash(f"Error al enviar la ficha: {e!s}", "error")
         return redirect(url_for("dml.dml_view", id=id))
 
 
@@ -860,11 +866,15 @@ def dml_registrar_acuse(id):
         flash("Ficha no encontrada.", "error")
         return redirect(url_for("dml.dml_entregadas"))
 
-    # 'ENTREGADA' queda como alias legado: fichas cerradas antes de este fix
-    # (#156) quedaron con ese valor suelto en vez del canonico 'MÁQUINA
-    # ENTREGADA'. Mismo criterio de alias que dejo el #44.
-    if ficha['estado_reparacion'] not in ('MÁQUINA ENTREGADA', 'ENTREGADA'):
-        flash("Solo se puede registrar acuse de fichas marcadas como entregadas.", "error")
+    # #333: el OK de recepción es para fichas que DML ya envió. Las cerradas
+    # antes del #333 (estado 'MÁQUINA ENTREGADA', o el alias legado
+    # 'ENTREGADA' del #156) también pueden registrarlo, como hasta ahora.
+    if not (ficha['enviada_raypac_at'] or ficha['is_closed']
+            or ficha['estado_reparacion'] in ('MÁQUINA ENTREGADA', 'ENTREGADA')):
+        flash("DML todavía no envió esta ficha a RAYPAC.", "error")
+        return redirect(url_for("dml.dml_view", id=id))
+    if ficha['recibido_por']:
+        flash("La recepción de esta ficha ya está registrada.", "info")
         return redirect(url_for("dml.dml_view", id=id))
 
     try:
@@ -876,10 +886,12 @@ def dml_registrar_acuse(id):
             flash("La fecha de entrega y el nombre de quien recibe son obligatorios.", "error")
             return redirect(url_for("dml.dml_entregadas"))
 
-        # Actualizar acuse de recibo
+        # #333: el OK de RAYPAC cierra el circuito: la ficha queda entregada
+        # (is_closed) y desde acá solo la edita RAYPAC/ADMIN con código.
         db.execute("""
             UPDATE dml_fichas
             SET fecha_entrega_cliente = %s, recibido_por = %s,
+                is_closed = TRUE, estado_reparacion = 'MÁQUINA ENTREGADA',
                 observaciones = CASE
                     WHEN observaciones IS NOT NULL AND observaciones != ''
                     THEN observaciones || ' | ENTREGA: ' || %s
@@ -888,18 +900,55 @@ def dml_registrar_acuse(id):
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (fecha_entrega, recibido_por, observaciones, observaciones, id))
+        if ficha['estado_reparacion'] != 'MÁQUINA ENTREGADA':
+            registrar_estado(db, id, 'MÁQUINA ENTREGADA', user['id'])
 
         db.commit()
 
         log_action(user['id'], "UPDATE", "dml_fichas", id, None,
                   f"Acuse de recibo registrado - Recibido por: {recibido_por}")
 
-        flash(f"✅ Acuse de recibo registrado correctamente para Ficha #{ficha['numero_ficha']}.", "success")
+        flash(f"✅ Recepción confirmada: la Ficha #{ficha['numero_ficha']} queda entregada.", "success")
 
     except Exception as e:
-        flash(f"Error al cerrar ficha: {e!s}", "error")
+        db.rollback()
+        flash(f"Error al registrar la recepción: {e!s}", "error")
 
     return redirect(url_for("dml.dml_view", id=id))
+
+
+@dml_bp.route("/<int:id>/desbloquear", methods=["POST"])
+@login_required
+@role_required("ADMIN", "RAYPAC")
+def dml_desbloquear(id):
+    """#333: habilita editar una ficha ya recibida. RAYPAC pone los últimos 4
+    dígitos del remito de salida (como el desfreezado); ADMIN puede usar ese
+    código o su propia contraseña (#133)."""
+    user = get_current_user()
+    db = get_db()
+    ficha = db.execute("SELECT * FROM dml_fichas WHERE id = %s", (id,)).fetchone()
+    if not ficha:
+        flash("Ficha no encontrada.", "error")
+        return redirect(url_for("dml.dml_entregadas"))
+
+    if not ficha['is_closed']:
+        flash("La ficha todavía no fue recibida por RAYPAC: no hace falta desbloquearla.", "info")
+        return redirect(url_for("dml.dml_view", id=id))
+
+    codigo = request.form.get("codigo", "").strip()
+    codigo_correcto = codigo_edicion_ficha(ficha['numero_remito_salida'])
+    valido = bool(codigo_correcto) and codigo == codigo_correcto
+    if not valido and user['role'] == "ADMIN":
+        valido = verify_admin_password(codigo)
+    if not valido:
+        flash("Código incorrecto. Son los últimos 4 dígitos del remito de salida de DML.", "error")
+        return redirect(url_for("dml.dml_view", id=id))
+
+    desbloqueadas = [f for f in session.get("fichas_desbloqueadas", []) if f != id]
+    session["fichas_desbloqueadas"] = desbloqueadas + [id]
+    log_action(user['id'], "UPDATE", "dml_fichas", id, None, "Ficha recibida desbloqueada para editar")
+    db.commit()
+    return redirect(url_for("dml.dml_edit", id=id))
 
 
 # ======================== PDF DE FICHA ========================
@@ -939,7 +988,7 @@ def descargar_ficha_pdf(id):
     # Devolver PDF
     return send_file(BytesIO(pdf_bytes), mimetype='application/pdf',
                     as_attachment=True,
-                    download_name=f"ficha_{ficha['numero_ficha']:07d}.pdf")
+                    download_name=f"FICHA_{ficha['numero_ficha']:07d}.pdf")  # #332: en mayúscula
 
 
 @dml_bp.route("/<int:id>/enviar-pdf", methods=["POST"])
@@ -970,7 +1019,7 @@ def enviar_ficha_pdf(id):
     <p>Sistema de Gestión DML</p>
     """
     enviado = send_mail(user['email'], f"Ficha DML #{numero}", html_body,
-                        attachments=[(f"ficha_{numero}.pdf", pdf_bytes)])
+                        attachments=[(f"FICHA_{numero}.pdf", pdf_bytes)])  # #332
 
     if enviado:
         log_action(user['id'], "SEND_FICHA_PDF", "dml_fichas", id, None,

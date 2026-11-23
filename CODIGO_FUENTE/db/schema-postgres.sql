@@ -183,7 +183,7 @@ CREATE TABLE logs_auditoria (
  
 CREATE TABLE envios_repuestos (
     id SERIAL PRIMARY KEY,
-    numero_remito TEXT UNIQUE NOT NULL,
+    numero_remito TEXT UNIQUE,  -- NULL = borrador sin remito (#338)
     fecha_envio DATE NOT NULL,
     fecha_recepcion DATE,
     estado TEXT DEFAULT 'PENDIENTE',
@@ -206,6 +206,35 @@ CREATE TABLE envios_repuestos_detalles (
     cantidad_recibida INTEGER,    -- lo que DML contó al recibir; NULL hasta la recepción (#57)
     FOREIGN KEY (envio_id) REFERENCES envios_repuestos (id) ON DELETE CASCADE
 );
+
+-- Pedidos de repuestos de RAYPAC a DML (#341).
+-- estado: PEDIDO -> EN_PREPARACION -> ENVIADO -> RECIBIDO (#342), o CANCELADO.
+CREATE TABLE pedidos_repuestos (
+    id SERIAL PRIMARY KEY,
+    estado TEXT NOT NULL DEFAULT 'PEDIDO',
+    observaciones TEXT,
+    creado_por INTEGER,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    numero_remito TEXT UNIQUE,    -- remito de DML al enviar (#342)
+    fecha_envio TIMESTAMPTZ,
+    enviado_por INTEGER,
+    fecha_recepcion TIMESTAMPTZ,  -- cuando RAYPAC confirma la recepción (#342)
+    recibido_por INTEGER,
+    FOREIGN KEY (creado_por) REFERENCES users (id),
+    FOREIGN KEY (enviado_por) REFERENCES users (id),
+    FOREIGN KEY (recibido_por) REFERENCES users (id)
+);
+
+CREATE TABLE pedidos_repuestos_detalles (
+    id SERIAL PRIMARY KEY,
+    pedido_id INTEGER NOT NULL,
+    codigo_repuesto TEXT NOT NULL,
+    cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+    cantidad_enviada INTEGER,     -- lo que DML mandó (puede ser menos que lo pedido, #342)
+    cantidad_recibida INTEGER,    -- lo que RAYPAC contó al recibir; NULL hasta la recepción (#342)
+    FOREIGN KEY (pedido_id) REFERENCES pedidos_repuestos (id) ON DELETE CASCADE
+);
  
 -- dml_fichas: depende de raypac_entries.
 -- La FK a tickets(id) (columna ticket_id) es circular con tickets,
@@ -224,6 +253,7 @@ CREATE TABLE dml_fichas (
     n_ciclos INTEGER,
     mecanizado_adic TEXT,
     horas_adic REAL,
+    mano_de_obra TEXT,  -- #331: una de MANO_DE_OBRA_OPCIONES (config.py)
     tipo_trabajo TEXT NOT NULL DEFAULT 'REPARACIÓN',
     tecnico_resp TEXT NOT NULL,
     fecha_egreso DATE,
@@ -237,6 +267,7 @@ CREATE TABLE dml_fichas (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     fecha_entrega_cliente TIMESTAMP,
     recibido_por TEXT,
+    enviada_raypac_at TIMESTAMP,  -- #333: "Enviar a RAYPAC"; se cierra con el OK de RAYPAC
     ticket_id INTEGER,
     FOREIGN KEY (raypac_id) REFERENCES raypac_entries (id) ON DELETE CASCADE
 );

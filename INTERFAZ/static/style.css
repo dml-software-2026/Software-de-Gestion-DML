@@ -2,8 +2,17 @@
    sea el contenido de la página (si no, en pantallas grandes con poco
    contenido queda un hueco blanco del navegador debajo del footer, que
    no es parte del layout). */
-html, body {
+/* #335: min-height (no height). Con height: 100% el body medía lo mismo
+   que la ventana y el contenido lo desbordaba: la navbar sticky-top no
+   puede salir de su contenedor, así que pasado el primer alto de pantalla
+   se iba con el scroll. Con min-height el body crece con el contenido y
+   el footer sigue pegado al piso en las páginas cortas. */
+html {
     height: 100%;
+}
+
+body {
+    min-height: 100%;
 }
 
 body {
@@ -331,6 +340,13 @@ a:focus-visible > .home-card i {
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M0 3.5A1.5 1.5 0 0 1 1.5 2h9A1.5 1.5 0 0 1 12 3.5V5h1.02a1.5 1.5 0 0 1 1.17.563l1.481 1.85a1.5 1.5 0 0 1 .329.938V10.5a1.5 1.5 0 0 1-1.5 1.5H14a2 2 0 1 1-4 0H5a2 2 0 1 1-3.998-.085A1.5 1.5 0 0 1 0 10.5v-7zM12.8 6h1.15l1.25 1.6V8h-2.4zM3 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm9 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z'/%3E%3C/svg%3E") no-repeat center / contain;
 }
 
+/* En la navbar los íconos de fuente ocupan el alto de línea (1.5em), no
+   1em: sin esto el botón de Envíos quedaba más bajo que los demás. El
+   dibujo sigue de 1em (mask con contain, centrado). */
+.nav-link-enhanced .bi-camion-fill {
+    height: 1.5em;
+}
+
 .d-block.bi-camion-fill {
     margin-left: auto;
     margin-right: auto;
@@ -373,4 +389,11 @@ a:focus-visible > .home-card i {
     outline: 2px solid #0d6efd;
     outline-offset: 2px;
     border-radius: 2px;
+}
+
+/* #335: botón "Atrás" genérico, debajo de la navbar en todas las pantallas
+   menos Inicio y el login. */
+.back-bar {
+    margin-top: -0.75rem;
+    margin-bottom: 0.75rem;
 }

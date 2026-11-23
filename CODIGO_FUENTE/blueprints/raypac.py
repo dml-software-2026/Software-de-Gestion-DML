@@ -1,7 +1,9 @@
 import re
+import sys
 from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
+from markupsafe import escape
 
 from CODIGO_FUENTE.decorators import (
     get_current_user,
@@ -13,23 +15,36 @@ from CODIGO_FUENTE.decorators import (
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.avisos import marcar_visto, reiniciar_vistos
 from CODIGO_FUENTE.services.flujo import build_flow_steps
+from CODIGO_FUENTE.services.mail import get_destinatarios, send_mail
+from CODIGO_FUENTE.services.remito import normalizar_remito, numero_para_input
 
 raypac_bp = Blueprint("raypac", __name__, url_prefix="/raypac")
 
+# #340: modelo para lo que no es una máquina (cargador, batería suelta...)
+MODELO_OTRA = "OTRA"
+MODELO_OTRA_MAX = 60
+TIPO_OTRA = "OTRO"
 
-def codigo_desfreeze(numero_remito):
-    """Código que pide "Desfreezar Definitivamente" y cómo explicárselo al
-    ADMIN. Devuelve (codigo, explicacion).
 
-    #259: el remito pasó a ser el número de serie de la máquina -> código =
-    sus últimos 4 caracteres. Los ingresos viejos, freezados con un remito
-    en formato 00001-XXXXXXXX, siguen pidiendo lo que va después del guión
-    (CAMBIO DAVID original).
+CODIGO_DESFREEZE_AYUDA = "los últimos 4 dígitos del remito"
+
+
+def codigos_desfreeze(numero_remito):
+    """Códigos que acepta "Desfreezar Definitivamente" para un remito.
+
+    #305: el código son los últimos 4 dígitos del remito (así lo describe el
+    cliente). Sirve igual para los ingresos freezados en la época del #292,
+    cuyo "remito" era el N° de serie: sus últimos 4 caracteres. Por
+    compatibilidad, los remitos 00001-XXXXXXXX aceptan también los 8 dígitos
+    después del guión, que era el código antes del #292.
     """
-    remito = numero_remito or ""
+    remito = (numero_remito or "").strip().upper()
+    if not remito:
+        return set()
+    codigos = {remito[-4:]}
     if re.match(r'^\d{4,5}-\d{8}$', remito):
-        return remito.split('-')[-1], "los 8 dígitos del remito después del guión"
-    return remito[-4:], "los últimos 4 caracteres del N° de serie"
+        codigos.add(remito.split('-')[-1])
+    return codigos
 
 
 def _obtener_clientes(db):
@@ -110,7 +125,8 @@ def raypac_list(readonly=False):
         "EN REPARACION": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "En Reparación"},  # alias sin tilde, ver #44
         "A LA ESPERA DE REPUESTOS": {"color": "#fd7e14", "texto_color": "#000000", "texto": "A la Espera de Repuestos"},
         "A LA ESPERA DE APROBACIÓN DE PRESUPUESTO": {"color": "#fd7e14", "texto_color": "#000000", "texto": "A la Espera de Aprobación de Presupuesto"},  # #260
-        "REPARACIÓN COMPLETADA": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "Reparación Completada"},
+        "REPARADA": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "Reparada"},  # #329
+        "REPARACIÓN COMPLETADA": {"color": "#0dcaf0", "texto_color": "#000000", "texto": "Reparada"},  # alias legado, ver #329
         "MÁQUINA LISTA PARA RETIRAR": {"color": "#ffc107", "texto_color": "#000000", "texto": "Lista para Retirar"},
         "MÁQUINA ENTREGADA": {"color": "#28a745", "texto_color": "#ffffff", "texto": "Máquina Entregada"}
     }
@@ -143,14 +159,28 @@ def raypac_new():
             email_cliente = request.form.get("email_cliente")
             guardar_cliente_nuevo = request.form.get("guardar_cliente_nuevo") == "1"
 
+            # #340: "OTRA" es algo que no es una máquina (un cargador, una batería
+            # suelta). Se guarda como modelo "OTRA: <lo que se envía>" para que
+            # salga igual en ticket, ficha, PDF y listados, y el tipo queda OTRO.
+            if modelo == MODELO_OTRA:
+                que_se_envia = " ".join((request.form.get("modelo_otra") or "").split()).upper()
+                if not que_se_envia:
+                    flash("Elegiste OTRA en el modelo: escribí qué se envía (ej. CARGADOR, BATERÍA).", "error")
+                    return render_template("raypac_form.html", clientes=_obtener_clientes(db))
+                if len(que_se_envia) > MODELO_OTRA_MAX:
+                    flash(f"Qué se envía no puede tener más de {MODELO_OTRA_MAX} caracteres.", "error")
+                    return render_template("raypac_form.html", clientes=_obtener_clientes(db))
+                modelo = f"{MODELO_OTRA}: {que_se_envia}"
+                tipo_maquina = TIPO_OTRA
+
             # Validación básica
             if not all([tipo_solicitud, cliente, numero_serie, modelo, tipo_maquina, comercial, mail_comercial]):
                 flash("Por favor completa todos los campos obligatorios.", "error")
                 return render_template("raypac_form.html", clientes=_obtener_clientes(db))
 
-            # #259: la misma máquina puede entrar varias veces (el N° de serie
-            # es también el remito), así que ya no se bloquea un N° de serie
-            # repetido - solo se avisa, por si fue una carga duplicada sin querer.
+            # #259: la misma máquina puede entrar varias veces, así que no se
+            # bloquea un N° de serie repetido - solo se avisa, por si fue una
+            # carga duplicada sin querer.
             ingresos_previos = db.execute(
                 "SELECT COUNT(*) AS n FROM raypac_entries WHERE numero_serie = %s", (numero_serie,)
             ).fetchone()['n']
@@ -233,7 +263,8 @@ def raypac_view(id, readonly=False):
 
     return render_template("raypac_view.html", entry=entry, user_role=user['role'], readonly=readonly,
                             ticket=ticket, ficha=ficha, flow_steps=flow_steps,
-                            codigo_desfreeze_ayuda=codigo_desfreeze(entry['numero_remito'])[1])
+                            codigo_desfreeze_ayuda=CODIGO_DESFREEZE_AYUDA,
+                            remito_precargado=numero_para_input(entry['numero_remito']))
 
 
 @raypac_bp.route("/<int:id>/edit", methods=["GET", "POST"])
@@ -305,12 +336,17 @@ def raypac_freeze(id):
         flash("Registro no encontrado.", "error")
         return redirect(url_for("raypac.raypac_list"))
 
-    # #259: el remito del envío a DML es el número de serie de la máquina (ya
-    # no se carga a mano). Se puede repetir: la misma máquina puede entrar
-    # varias veces, así que no se valida que sea único.
-    numero_remito = (entry['numero_serie'] or "").strip()
-    if not numero_remito:
-        flash("⚠️ El ingreso no tiene número de serie. Editalo y cargalo antes de freezar.", "error")
+    if entry['is_frozen']:
+        flash("El registro ya está freezado.", "error")
+        return redirect(url_for("raypac.raypac_view", id=id))
+
+    # #305: el remito lo carga RAYPAC a mano (el #292 había puesto el N° de
+    # serie, fue un malentendido del #259). Obligatorio: "toda máquina viene
+    # con remito" (David, 2026-11-15). Se puede repetir: varias máquinas
+    # viajan con el mismo remito, así que no se valida que sea único.
+    numero_remito, error = normalizar_remito(request.form.get("numero_remito"))
+    if error:
+        flash(error, "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     db.execute("""
@@ -334,8 +370,47 @@ def raypac_freeze(id):
     log_action(user['id'], "FREEZE", "raypac_entries", id, None,
               f"Freezado con remito {numero_remito} - Equipo enviado a DML")
 
-    flash("Máquina freezada y enviada a ST.", "success")
+    mensaje = f"Máquina freezada y enviada a ST con el remito {numero_remito}."
+    if _avisar_nuevo_ingreso({**dict(entry), "numero_remito": numero_remito}) is False:
+        flash(f"{mensaje} No se pudo mandar el aviso por mail a DML (revisar logs).", "warning")
+    else:
+        flash(mensaje, "success")
     return redirect(url_for("raypac.raypac_view", id=id))
+
+
+def _avisar_nuevo_ingreso(entry):
+    """#324: mail a DML (destinatarios "Nuevo pedido o máquina ingresada")
+    cuando RAYPAC freeza y envía una máquina. Respuesta 3.1 de David.
+
+    Devuelve None si no hay destinatarios configurados, True si salieron
+    todos y False si alguno falló. Nunca rompe el freezado: ya está
+    commiteado cuando se llama."""
+    try:
+        destinatarios = get_destinatarios("NUEVO_INGRESO")
+        if not destinatarios:
+            return None
+
+        def campo(nombre):
+            return escape(entry.get(nombre) or "-")
+
+        diagnostico = escape(entry.get("diagnostico_ingreso") or "Sin diagnóstico cargado")
+        link = url_for("raypac.raypac_view", id=entry["id"], _external=True)
+        html = f"""
+        <h3>🚚 Nueva máquina enviada por RAYPAC</h3>
+        <p><strong>Cliente:</strong> {campo("cliente")}</p>
+        <p><strong>N° de serie:</strong> {campo("numero_serie")}</p>
+        <p><strong>Modelo:</strong> {campo("modelo_maquina")}</p>
+        <p><strong>Tipo de solicitud:</strong> {campo("tipo_solicitud")}</p>
+        <p><strong>Remito:</strong> {campo("numero_remito")}</p>
+        <p><strong>Diagnóstico de ingreso:</strong><br>{diagnostico}</p>
+        <p><a href="{link}">Ver el ingreso en el sistema</a></p>
+        """
+        asunto = f"🚚 Nueva máquina de RAYPAC: {entry.get('cliente') or ''} - serie {entry.get('numero_serie') or ''}"
+        resultados = [send_mail(email, asunto, html) for email in destinatarios]
+        return all(resultados)
+    except Exception as e:
+        print(f"Error enviando aviso de nuevo ingreso RAYPAC: {e}", file=sys.stderr, flush=True)
+        return False
 
 
 @raypac_bp.route("/<int:id>/unfreeze", methods=["POST"])
@@ -357,9 +432,8 @@ def raypac_unfreeze(id):
 
     unfreeze_code = request.form.get("unfreeze_code", "").strip()
 
-    codigo_correcto, explicacion = codigo_desfreeze(entry['numero_remito'])
-    if unfreeze_code.upper() != codigo_correcto.upper():
-        flash(f"⚠️ Código incorrecto. Use {explicacion} ({entry['numero_remito']}).", "error")
+    if unfreeze_code.upper() not in codigos_desfreeze(entry['numero_remito']):
+        flash(f"⚠️ Código incorrecto. Use {CODIGO_DESFREEZE_AYUDA} ({entry['numero_remito']}).", "error")
         return redirect(url_for("raypac.raypac_view", id=id))
 
     # Al desfreezar, el envío a DML queda sin confirmar de nuevo (vuelve a
