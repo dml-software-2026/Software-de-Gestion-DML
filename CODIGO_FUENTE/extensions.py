@@ -200,9 +200,18 @@ def migrate_db():
             for f in filas_ubicacion
             if normalizar_ubicacion_fisica(f["codigo_ubicacion_fisica"]) != f["codigo_ubicacion_fisica"]
         ]
-        for valor, id_fila in cambios_ubicacion:
-            db.execute("UPDATE stock_ubicaciones SET codigo_ubicacion_fisica = %s WHERE id = %s", (valor, id_fila))
+        # Un solo UPDATE para todas: antes era uno por fila, y en prod (cientos
+        # de filas, base lejos de Render) pasaba los 120 s del timeout de
+        # gunicorn -> el worker moría, la migración se deshacía y la app
+        # quedaba caída reintentándola en cada request (2026-11-23).
         if cambios_ubicacion:
+            execute_values(
+                db.cursor(),
+                """UPDATE stock_ubicaciones AS s SET codigo_ubicacion_fisica = v.valor
+                   FROM (VALUES %s) AS v(valor, id) WHERE s.id = v.id""",
+                cambios_ubicacion,
+                page_size=1000,
+            )
             db.commit()
             print(f"[MIGRATION] Normalizadas {len(cambios_ubicacion)} ubicaciones físicas (#309)")
 
