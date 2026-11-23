@@ -138,7 +138,15 @@ def dml_entregadas():
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
         WHERE f.estado_reparacion LIKE '%ENTREGAD%' OR f.is_closed = TRUE
            OR f.enviada_raypac_at IS NOT NULL  -- #333: enviadas, esperando el OK de RAYPAC
-        ORDER BY f.is_closed ASC, f.fecha_entrega_cliente DESC, f.updated_at DESC
+        -- #373: arriba las que esperan el OK de RAYPAC; después, la última
+        -- enviada primero. enviada_raypac_at tiene hora (desempata las del
+        -- mismo día); las históricas no lo tienen y usan su fecha de salida.
+        -- NULLS LAST: en Postgres DESC pone los NULL primero, y las fichas sin
+        -- fecha tapaban a las nuevas.
+        ORDER BY f.is_closed ASC,
+                 COALESCE(f.enviada_raypac_at, f.fecha_egreso::timestamp,
+                          f.fecha_entrega_cliente::timestamp, f.closed_at::timestamp) DESC NULLS LAST,
+                 f.numero_ficha DESC
     """).fetchall()
 
     return render_template("dml_entregadas.html", fichas=fichas, user_role=user['role'])
