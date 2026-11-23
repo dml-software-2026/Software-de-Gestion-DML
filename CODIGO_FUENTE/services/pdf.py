@@ -21,6 +21,7 @@ from reportlab.platypus import (
 from CODIGO_FUENTE.config import BASE_DIR
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.fechas import fecha_ddmmaaaa
+from CODIGO_FUENTE.services.ubicacion_fisica import SIN_UBICACION
 
 # Mismo logo que usa la navbar de la app (INTERFAZ/static/logo.png) - #263.
 LOGO_PATH = os.path.join(BASE_DIR, "INTERFAZ", "static", "logo.png")
@@ -35,6 +36,45 @@ def _cell(text, style):
     y el estado nuevo del #260, más largo que el resto)."""
     valor = "" if text is None else str(text)
     return Paragraph(xml_escape(valor), style)
+
+
+def _logo_dml():
+    """Logo de DML reescalado y recomprimido para embeberlo en un PDF, o None.
+
+    Ese archivo pesa ~480KB (resolución pensada para la navbar) - se reescala
+    a un tamaño chico y se recomprime a JPEG, si no cada PDF quedaba +600KB
+    más pesado por una imagen que en la hoja se ve del tamaño de una
+    estampilla. Si el archivo no está o algo falla al procesarlo, se sigue
+    sin el logo en vez de romper la descarga del PDF.
+    """
+    try:
+        if not os.path.exists(LOGO_PATH):
+            return None
+        pil_logo = PILImage.open(LOGO_PATH).convert("RGB")
+        ancho_px = 330
+        alto_px = round(ancho_px * pil_logo.height / pil_logo.width)
+        pil_logo = pil_logo.resize((ancho_px, alto_px), PILImage.LANCZOS)
+        logo_buffer = BytesIO()
+        pil_logo.save(logo_buffer, format="JPEG", quality=88)
+        logo_buffer.seek(0)
+        return Image(logo_buffer, width=1.1*inch, height=1.1*inch * alto_px / ancho_px)
+    except Exception:
+        return None
+
+
+def _fila_empresa(empresa_style):
+    """#332: nombre de la empresa en cuerpo 14 y negrita, a la izquierda del
+    logo y en la misma fila, por encima del recuadro del encabezado (puesto
+    al lado del título, el logo cortaba el recuadro - pedido de Facu, #263).
+    Sin logo, va solo. La comparten la ficha y el pedido de repuestos (#374)."""
+    empresa = Paragraph("SERVICIO TECNICO DML ELECTRICIDAD INDUSTRIAL SRL", empresa_style)
+    fila = Table([[empresa, _logo_dml() or ""]], colWidths=[5.8*inch, 1.3*inch])
+    fila.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('LEFTPADDING', (0, 0), (0, 0), 0),
+    ]))
+    return fila
 
 
 def generar_pdf_ficha(ficha_id: int) -> bytes:
@@ -100,40 +140,9 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
         ('FONTSIZE', (0, 0), (-1, -1), 9),
     ]))
 
-    # Logo de DML arriba a la derecha de la hoja (mismo archivo que la
-    # navbar de la app, INTERFAZ/static/logo.png), en su propia fila por
-    # encima del recuadro del título - puesto al lado del título (intento
-    # anterior) quedaba "cortando" el recuadro, pedido de Facu. Ese archivo
-    # pesa ~480KB (resolución pensada para la navbar) - se reescala acá a
-    # un tamaño chico y se recomprime a JPEG antes de embeberlo, si no cada
-    # PDF quedaba +600KB más pesado por una imagen que en la hoja se ve del
-    # tamaño de una estampilla. Si el archivo no está o algo falla al
-    # procesarlo, se sigue sin el logo en vez de romper la descarga del PDF.
-    logo_img = None
-    try:
-        if os.path.exists(LOGO_PATH):
-            pil_logo = PILImage.open(LOGO_PATH).convert("RGB")
-            ancho_px = 330
-            alto_px = round(ancho_px * pil_logo.height / pil_logo.width)
-            pil_logo = pil_logo.resize((ancho_px, alto_px), PILImage.LANCZOS)
-            logo_buffer = BytesIO()
-            pil_logo.save(logo_buffer, format="JPEG", quality=88)
-            logo_buffer.seek(0)
-            logo_img = Image(logo_buffer, width=1.1*inch, height=1.1*inch * alto_px / ancho_px)
-    except Exception:
-        logo_img = None
-
-    # #332: nombre de la empresa en cuerpo 14 y negrita, a la izquierda del
-    # logo y en la misma fila, por encima del recuadro del encabezado (así
-    # el logo no corta el recuadro, ver arriba). Sin logo, va solo.
-    empresa = Paragraph("SERVICIO TECNICO DML ELECTRICIDAD INDUSTRIAL SRL", empresa_style)
-    empresa_row = Table([[empresa, logo_img or ""]], colWidths=[5.8*inch, 1.3*inch])
-    empresa_row.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('LEFTPADDING', (0, 0), (0, 0), 0),
-    ]))
-    story.append(empresa_row)
+    # Empresa + logo de DML arriba, en su propia fila por encima del recuadro
+    # del título (ver _fila_empresa y _logo_dml).
+    story.append(_fila_empresa(empresa_style))
     story.append(Spacer(1, 0.08*inch))
 
     story.append(header_table)
@@ -319,6 +328,104 @@ def generar_pdf_ficha(ficha_id: int) -> bytes:
     story.append(Spacer(1, 0.15*inch))
 
     # Generar PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def generar_pdf_pedido(pedido_id: int) -> bytes:
+    """#374: hoja para preparar un pedido de repuestos de RAYPAC en el depósito
+    de DML: qué repuestos, cuántos hay que enviar y dónde están (ubicación
+    física en el depósito de DML). Solo la descargan ADMIN y DML_REPUESTOS:
+    RAYPAC no ve la ubicación del stock de DML (#308). None si no existe.
+    """
+    db = get_db()
+    pedido = db.execute("""
+        SELECT p.*, u.nombre AS creado_por_nombre
+        FROM pedidos_repuestos p
+        LEFT JOIN users u ON u.id = p.creado_por
+        WHERE p.id = %s
+    """, (pedido_id,)).fetchone()
+    if not pedido:
+        return None
+    detalles = db.execute("""
+        SELECT d.codigo_repuesto, d.cantidad, COALESCE(m.item, '') AS item,
+               su.codigo_ubicacion_fisica
+        FROM pedidos_repuestos_detalles d
+        LEFT JOIN matriz_repuestos m ON m.codigo_repuesto = d.codigo_repuesto
+        LEFT JOIN stock_ubicaciones su ON su.codigo_repuesto = d.codigo_repuesto AND su.ubicacion = 'DML'
+        WHERE d.pedido_id = %s
+        ORDER BY d.codigo_repuesto
+    """, (pedido_id,)).fetchall()
+
+    buffer = BytesIO()
+    # Mismo margen de 1,5 cm que la ficha (#263)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=1.5*cm, bottomMargin=1.5*cm,
+                            leftMargin=1.5*cm, rightMargin=1.5*cm)
+    styles = getSampleStyleSheet()
+    heading_style = ParagraphStyle('HeadingBox', parent=styles['Heading2'], fontSize=11,
+                                   textColor=colors.darkblue, spaceAfter=3, fontName='Helvetica-Bold')
+    small_style = ParagraphStyle('Small', parent=styles['Normal'], fontSize=8)
+    cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=8.5, leading=10)
+    cell_style_bold = ParagraphStyle('CellBold', parent=cell_style, fontName='Helvetica-Bold')
+    rep_cell_style = ParagraphStyle('RepCell', parent=styles['Normal'], fontSize=8, leading=9.5, alignment=TA_CENTER)
+    rep_desc_style = ParagraphStyle('RepDesc', parent=rep_cell_style, alignment=0)
+    empresa_style = ParagraphStyle('Empresa', parent=styles['Normal'], fontSize=14, leading=17,
+                                   fontName='Helvetica-Bold')
+
+    story = [_fila_empresa(empresa_style), Spacer(1, 0.08*inch)]
+
+    # Encabezado: N° Pedido | número | PEDIDO DE REPUESTOS (mismo esquema que la ficha)
+    header_table = Table([[
+        Paragraph("<b>N° Pedido</b>", small_style),
+        Paragraph(f"<b>{pedido['id']:07d}</b>", small_style),
+        Paragraph("<b>PEDIDO DE REPUESTOS DE RAYPAC</b>", ParagraphStyle('Centered', parent=small_style, alignment=1)),
+    ]], colWidths=[1.4*inch, 1.4*inch, 4.3*inch])
+    header_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story += [header_table, Spacer(1, 0.15*inch)]
+
+    info_rows = [
+        [_cell("Fecha del pedido:", cell_style_bold), _cell(fecha_ddmmaaaa(pedido['created_at']), cell_style)],
+        [_cell("Pidió:", cell_style_bold), _cell(pedido['creado_por_nombre'] or "", cell_style)],
+    ]
+    if pedido['observaciones']:
+        info_rows.append([_cell("Observaciones:", cell_style_bold), _cell(pedido['observaciones'], cell_style)])
+    info_table = Table(info_rows, colWidths=[2.2*inch, 4.9*inch])
+    info_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    story += [info_table, Spacer(1, 0.15*inch)]
+
+    # Anchos medidos con stringWidth() contra el peor caso real de la base
+    # (2026-11-23, Helvetica 8pt): código ~1.0in, descripción ~2.34in,
+    # ubicación ~0.85in. Igual van con _cell() por si aparece uno más largo.
+    story.append(Paragraph("REPUESTOS A ENVIAR", heading_style))
+    rep_rows = [["CÓDIGO", "DESCRIPCIÓN", "CANTIDAD", "UBICACIÓN"]]
+    for d in detalles:
+        rep_rows.append([
+            _cell((d['codigo_repuesto'] or "").upper(), rep_cell_style),
+            _cell((d['item'] or "").upper(), rep_desc_style),
+            _cell(d['cantidad'], rep_cell_style),
+            _cell(d['codigo_ubicacion_fisica'] or SIN_UBICACION, rep_cell_style),
+        ])
+    rep_table = Table(rep_rows, colWidths=[1.5*inch, 3.6*inch, 0.9*inch, 1.1*inch],
+                      repeatRows=1)  # repite el encabezado si la tabla sigue en otra hoja
+    rep_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#808080')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8.5),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(rep_table)
+
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
