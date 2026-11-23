@@ -100,6 +100,7 @@ def export_fichas_xlsx():
     fichas = db.execute("""
         SELECT f.numero_ficha, f.fecha_ingreso, f.fecha_egreso, f.estado_reparacion,
                f.tecnico, f.tecnico_resp, f.n_ciclos, f.numero_remito_salida,
+               f.numero_factura, f.pago_raypac, f.pago_tecnico,
                r.cliente, r.numero_serie, r.modelo_maquina
         FROM dml_fichas f
         LEFT JOIN raypac_entries r ON f.raypac_id = r.id
@@ -108,11 +109,12 @@ def export_fichas_xlsx():
 
     encabezados = ['N° Ficha', 'Cliente', 'N° de Serie', 'Modelo', 'Estado',
                    'Fecha Ingreso', 'Fecha Egreso', 'Técnico', 'Responsable',
-                   'N° Ciclos', 'Remito Salida']
+                   'N° Ciclos', 'Remito Salida', 'N° Factura', 'Pago RAYPAC', 'Pago Técnico']  # #372
     filas = [
         [f['numero_ficha'], f['cliente'], f['numero_serie'], f['modelo_maquina'],
          f['estado_reparacion'], f['fecha_ingreso'], f['fecha_egreso'],
-         f['tecnico'], f['tecnico_resp'], f['n_ciclos'], f['numero_remito_salida']]
+         f['tecnico'], f['tecnico_resp'], f['n_ciclos'], f['numero_remito_salida'],
+         f['numero_factura'], f['pago_raypac'], f['pago_tecnico']]
         for f in fichas
     ]
     return respuesta_xlsx("fichas_dml", "Fichas DML", encabezados, filas)

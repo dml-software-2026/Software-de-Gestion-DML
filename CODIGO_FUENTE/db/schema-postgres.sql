@@ -268,6 +268,9 @@ CREATE TABLE dml_fichas (
     fecha_entrega_cliente TIMESTAMP,
     recibido_por TEXT,
     enviada_raypac_at TIMESTAMP,  -- #333: "Enviar a RAYPAC"; se cierra con el OK de RAYPAC
+    numero_factura TEXT,  -- #372: seguimiento del pago, se edita en /dml/entregadas
+    pago_raypac TEXT NOT NULL DEFAULT 'DEBE',  -- #372: 'DEBE' / 'PAGADO'
+    pago_tecnico TEXT NOT NULL DEFAULT 'DEBE',  -- #372: 'DEBE' / 'PAGADO'
     ticket_id INTEGER,
     FOREIGN KEY (raypac_id) REFERENCES raypac_entries (id) ON DELETE CASCADE
 );
