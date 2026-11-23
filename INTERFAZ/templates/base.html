@@ -11,6 +11,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+{# En el login no va la barra (no hay nada que navegar todavía). En la vista
+   pública del ticket sí, por el logo de DML. #}
+{% if request.endpoint != 'auth.login' %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top">
   <div class="container-fluid">
     <a class="navbar-brand d-flex align-items-center" href="{{ url_for('auth.index') }}">
@@ -164,6 +167,7 @@
     </div>
   </div>
 </nav>
+{% endif %}
 
 <div class="container-fluid page-content">
   {# #335: "Atrás" en todas las pantallas menos Inicio y el login (y la vista
