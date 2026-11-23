@@ -9,13 +9,15 @@ stock de RAYPAC (decisión de Ivo): solo registra las diferencias.
 """
 import re
 import sys
+from io import BytesIO
 
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, flash, redirect, render_template, request, send_file, session, url_for
 
 from CODIGO_FUENTE.decorators import get_current_user, log_action, login_required, role_required
 from CODIGO_FUENTE.extensions import get_db
 from CODIGO_FUENTE.services.avisos import ids_sin_ver, marcar_visto, reiniciar_vistos
 from CODIGO_FUENTE.services.mail import get_destinatarios, send_mail
+from CODIGO_FUENTE.services.pdf import generar_pdf_pedido
 from CODIGO_FUENTE.services.stock import actualizar_estado_alerta_stock, ajustar_stock_ubicacion, verificar_alerta_stock
 
 pedidos_bp = Blueprint("pedidos", __name__, url_prefix="/pedidos")
@@ -211,9 +213,25 @@ def pedidos_view(id):
     pendiente = pedido["estado"] == "PEDIDO"
     return render_template("pedidos_view.html", pedido=pedido, detalles=_detalles(db, id),
                            puede_editar=pendiente and user["role"] in ROLES_PIDEN,
+                           puede_pdf=user["role"] in ROLES_PREPARAN,
                            puede_preparar=pendiente and user["role"] in ROLES_PREPARAN,
                            puede_enviar=pedido["estado"] in ENVIABLES and user["role"] in ROLES_PREPARAN,
                            puede_recibir=pedido["estado"] == "ENVIADO" and user["role"] in ROLES_PIDEN)
+
+
+@pedidos_bp.route("/<int:id>/pdf")
+@login_required
+@role_required(*ROLES_PREPARAN)
+def pedidos_pdf(id):
+    """#374: hoja para juntar el pedido en el depósito (qué, cuánto y dónde está).
+    Solo DML (ROLES_PREPARAN): lleva la ubicación física, que RAYPAC no ve (#308)."""
+    pdf_bytes = generar_pdf_pedido(id)
+    if not pdf_bytes:
+        flash("Pedido no encontrado.", "error")
+        return redirect(url_for("pedidos.pedidos_list"))
+    log_action(get_current_user()["id"], "DOWNLOAD_PEDIDO_PDF", "pedidos_repuestos", id, None, f"Pedido #{id}")
+    return send_file(BytesIO(pdf_bytes), mimetype="application/pdf", as_attachment=True,
+                     download_name=f"PEDIDO_{id:07d}.pdf")
 
 
 @pedidos_bp.route("/<int:id>/edit", methods=["GET", "POST"])
