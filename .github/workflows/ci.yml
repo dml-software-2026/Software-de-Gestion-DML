@@ -12,20 +12,46 @@ on:
   push:
     branches: [dev, main]   # Y pushes directos (aunque la branch protection ya los bloquea)
 
-# Todas las corridas usan la misma base de Dev (secret DATABASE_URL): si dos
-# corren a la vez, los tests de una ven los datos de prueba de la otra y
-# fallan sin motivo (pasó el 18/11 al mergear dos PRs seguidos). Con esto
-# hacen fila: la nueva espera a que termine la que está corriendo.
-# Ojo: GitHub deja una sola en espera; si llega una tercera, la que esperaba
-# se cancela y hay que volver a correrla (Re-run).
+# Cada corrida levanta su propia base Postgres vacía (ver "services" abajo),
+# así que varias pueden correr a la vez sin pisarse. Antes todas usaban la
+# base de Dev en Supabase: tardaban ~10 min, hacían fila de a una y GitHub
+# cancelaba la que esperaba cuando llegaba otra (2026-11-23).
+# Solo se cancela una corrida vieja de la MISMA rama/PR cuando llega un
+# push nuevo (ya no sirve).
 concurrency:
-  group: ci-base-dev
-  cancel-in-progress: false
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # Un solo job llamado "check" — todo lo que valida corre acá adentro
   check:
     runs-on: ubuntu-latest   # GitHub nos da una VM Linux gratis por 2 min por run
+
+    # Base Postgres propia de esta corrida (se borra al terminar).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dml_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Datos de prueba, no son secretos: la base existe solo durante la corrida.
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dml_test
+      PGPASSWORD: postgres
+      SEED_ADMIN_PASSWORD: admin-ci
+      SEED_RAYPAC_PASSWORD: raypac-ci
+      SEED_TECNICO_PASSWORD: tecnico-ci
+      SEED_REPUESTOS_PASSWORD: repuestos-ci
+      TEST_USER_EMAIL: admin@dml.local
+      TEST_USER_PASSWORD: admin-ci
 
     steps:
       # PASO 1 — bajar el código del repo a la VM
@@ -71,9 +97,12 @@ jobs:
 
       # PASO 7 — correr tests automatizados
       # Valida comportamiento real (login, flujos), no solo que la app importe.
+      # Antes de los tests: schema + migraciones + datos iniciales en la base
+      # vacía de esta corrida (lo mismo que hay que hacer en una base local nueva).
+      - name: Preparar la base de prueba
+        run: |
+          psql -h localhost -U postgres -d dml_test -v ON_ERROR_STOP=1 -q -f CODIGO_FUENTE/db/schema-postgres.sql
+          python -c "from CODIGO_FUENTE.app import app; from CODIGO_FUENTE.extensions import preparar_base; app.app_context().push(); preparar_base()"
+
       - name: Correr tests con pytest
-        env:
-          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
-          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pytest tests/
