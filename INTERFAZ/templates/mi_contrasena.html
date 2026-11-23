@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Cambiar mi contraseña{% endblock %}
+
+{% block content %}
+{# #375: RAYPAC cambia su propia contraseña. Mismo ojito que el login (#189). #}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="bi bi-key"></i> Cambiar mi contraseña</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" autocomplete="off">
+                        {% for campo, etiqueta, ayuda in [
+                            ('actual', 'Contraseña actual', ''),
+                            ('nueva', 'Contraseña nueva', 'Mínimo ' ~ password_min ~ ' caracteres.'),
+                            ('repetir', 'Repetir la contraseña nueva', '')] %}
+                        <div class="mb-3">
+                            <label for="{{ campo }}" class="form-label">{{ etiqueta }}</label>
+                            <div class="password-wrapper">
+                                <input type="password" class="form-control" id="{{ campo }}" name="{{ campo }}" required
+                                       {% if campo != 'actual' %}minlength="{{ password_min }}" autocomplete="new-password"{% else %}autocomplete="current-password"{% endif %}>
+                                <button type="button" class="password-toggle js-ver-password"
+                                        aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            {% if ayuda %}<small class="form-text text-muted">{{ ayuda }}</small>{% endif %}
+                        </div>
+                        {% endfor %}
+
+                        <div class="d-flex flex-wrap justify-content-between gap-2">
+                            <a href="{{ url_for('auth.index') }}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Cambiar contraseña</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.js-ver-password').forEach(function (boton) {
+    boton.addEventListener('click', function () {
+        const input = boton.parentNode.querySelector('input');
+        const mostrar = input.type === 'password';
+        const texto = mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña';
+        input.type = mostrar ? 'text' : 'password';
+        boton.querySelector('i').className = mostrar ? 'bi bi-eye-slash' : 'bi bi-eye';
+        boton.setAttribute('aria-pressed', mostrar);
+        boton.setAttribute('aria-label', texto);
+        boton.title = texto;
+    });
+});
+</script>
+{% endblock %}
