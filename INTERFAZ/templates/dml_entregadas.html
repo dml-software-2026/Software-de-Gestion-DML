@@ -30,6 +30,11 @@
                     <th>N° de Serie</th>
                     <th>Fecha Entrega</th>
                     <th>Recibido Por</th>
+                    {# #372: seguimiento del pago. RAYPAC ve lo suyo (factura y su
+                       pago) en solo lectura; el pago al técnico es interno de DML. #}
+                    <th>N° Factura</th>
+                    <th>Pago RAYPAC</th>
+                    {% if ve_pago_tecnico %}<th>Pago Técnico</th>{% endif %}
                     {% if user_role in ['ADMIN', 'RAYPAC'] %}
                     <th>Contacto</th>
                     <th>Email</th>
@@ -66,11 +71,39 @@
                             <span class="badge bg-secondary">Cerrada sin acuse</span>
                         {% endif %}
                     </td>
+                    {% if edita_pago %}
+                    <td>
+                        <div class="pago-campo">
+                            <input type="text" class="form-control form-control-sm js-pago" maxlength="50"
+                                   data-url="{{ url_for('dml.dml_pago', id=ficha.id) }}" data-campo="numero_factura"
+                                   value="{{ ficha.numero_factura or '' }}" placeholder="Sin factura"
+                                   aria-label="N° de factura de la ficha {{ ficha.numero_ficha }}">
+                        </div>
+                    </td>
+                    {% for campo in ['pago_raypac', 'pago_tecnico'] %}
+                    <td>
+                        <div class="pago-campo pago-{{ ficha[campo]|lower }}">
+                            <select class="form-select form-select-sm js-select-enhance js-pago"
+                                    data-url="{{ url_for('dml.dml_pago', id=ficha.id) }}" data-campo="{{ campo }}"
+                                    aria-label="{{ 'Pago RAYPAC' if campo == 'pago_raypac' else 'Pago técnico' }} de la ficha {{ ficha.numero_ficha }}">
+                                {% for opcion in PAGO_OPCIONES %}
+                                <option value="{{ opcion }}" {{ 'selected' if ficha[campo] == opcion }}>{{ opcion }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </td>
+                    {% endfor %}
+                    {% else %}
+                    <td class="text-dark">{{ ficha.numero_factura or '-' }}</td>
+                    <td><span class="badge {{ 'bg-success' if ficha.pago_raypac == 'PAGADO' else 'bg-danger' }}">{{ ficha.pago_raypac }}</span></td>
+                    {% endif %}
                     {% if user_role in ['ADMIN', 'RAYPAC'] %}
                     <td class="text-dark">{{ ficha.contacto_cliente or '-' }}</td>
                     <td class="text-dark">{{ ficha.email_cliente or '-' }}</td>
                     {% endif %}
-                    <td>
+                    {# #372: con las columnas de pago (ADMIN) la tabla es más ancha y
+                       "Confirmar recepción" se partía en dos renglones #}
+                    <td class="text-nowrap">
                         <a href="{{ url_for('dml.dml_view', id=ficha.id) }}" class="btn btn-sm btn-info" title="Ver Ficha">
                             <i class="bi bi-eye"></i> Ver
                         </a>
@@ -145,6 +178,77 @@
 {# #158: si se llega desde el botón "Registrar Acuse" de dml_view.html
    (?open_acuse=<id>), abrir directo el modal de esa ficha en vez de que
    el usuario tenga que volver a encontrar la fila en la tabla. #}
+{% if edita_pago %}
+{# #372: cada cambio de factura/pago se guarda solo (sin botón Guardar) y
+   sin desbloquear la ficha. Si falla, vuelve al valor anterior y avisa. #}
+<script>
+// Desplegable de pago en las últimas filas: si el menú no entra debajo
+// dentro de la tabla (que tiene scroll propio), se abre para arriba en vez
+// de estirar la tabla y forzar a scrollear. Corre después del click del
+// propio desplegable (enhanceSelect en base.html), que es el que lo muestra.
+document.addEventListener('click', function (e) {
+    const toggle = e.target.closest('.pago-campo .dml-select-toggle');
+    if (!toggle) return;
+    const menu = toggle.parentNode.querySelector('.dml-select-menu');
+    if (!menu || !menu.classList.contains('show')) return;
+    menu.classList.remove('pago-menu-arriba');
+    const limite = toggle.closest('.table-responsive').getBoundingClientRect().bottom;
+    if (menu.getBoundingClientRect().bottom > limite) menu.classList.add('pago-menu-arriba');
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.js-pago').forEach(function (campo) {
+        let guardado = campo.value;
+        const caja = campo.closest('.pago-campo');
+
+        function marcar(estado) {
+            caja.classList.remove('pago-guardando', 'pago-ok', 'pago-error');
+            if (estado) caja.classList.add('pago-' + estado);
+        }
+
+        campo.addEventListener('change', function () {
+            const valor = campo.value.trim();
+            if (valor === guardado) return;
+            marcar('guardando');
+            const datos = new FormData();
+            datos.append('campo', campo.dataset.campo);
+            datos.append('valor', valor);
+            fetch(campo.dataset.url, { method: 'POST', body: datos, credentials: 'same-origin' })
+                .then(function (r) {
+                    // Sin permiso o sin sesión el server redirige a una página HTML, no devuelve JSON
+                    return r.json().catch(function () { return { ok: false, error: 'No se pudo guardar (¿se cerró la sesión?).' }; });
+                })
+                .then(function (data) {
+                    if (!data.ok) throw new Error(data.error || 'No se pudo guardar.');
+                    guardado = data.valor;
+                    if (campo.tagName === 'INPUT') campo.value = data.valor;
+                    if (campo.tagName === 'SELECT') {
+                        caja.classList.remove('pago-debe', 'pago-pagado');
+                        caja.classList.add('pago-' + data.valor.toLowerCase());
+                    }
+                    const aviso = caja.querySelector('.pago-aviso');
+                    if (aviso) aviso.remove();
+                    marcar('ok');
+                    setTimeout(function () { caja.classList.remove('pago-ok'); }, 1500);
+                })
+                .catch(function (err) {
+                    campo.value = guardado;
+                    campo.dispatchEvent(new Event('change'));  // resincroniza el desplegable (vuelve a entrar acá sin cambios)
+                    marcar('error');
+                    let aviso = caja.querySelector('.pago-aviso');
+                    if (!aviso) {
+                        aviso = document.createElement('small');
+                        aviso.className = 'pago-aviso text-danger d-block';
+                        caja.appendChild(aviso);
+                    }
+                    aviso.textContent = err.message;
+                });
+        });
+    });
+});
+</script>
+{% endif %}
+
 {% if request.args.get('open_acuse') %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {

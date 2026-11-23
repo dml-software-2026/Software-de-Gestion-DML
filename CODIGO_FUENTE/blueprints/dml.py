@@ -4,6 +4,7 @@ from io import BytesIO
 from flask import (
     Blueprint,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -48,6 +49,11 @@ ESTADOS_EDITABLES = [
     'REPARADA',  # #329 - antes 'REPARACIÓN COMPLETADA'
     'MÁQUINA LISTA PARA RETIRAR',
 ]
+
+# #372: seguimiento del pago, se edita directo en /dml/entregadas.
+PAGO_OPCIONES = ("DEBE", "PAGADO")
+ROLES_EDITAN_PAGO = ("ADMIN", "DML_ST")
+NUMERO_FACTURA_MAX = 50
 
 
 def codigo_edicion_ficha(numero_remito_salida):
@@ -149,7 +155,46 @@ def dml_entregadas():
                  f.numero_ficha DESC
     """).fetchall()
 
-    return render_template("dml_entregadas.html", fichas=fichas, user_role=user['role'])
+    return render_template("dml_entregadas.html", fichas=fichas, user_role=user['role'],
+                           PAGO_OPCIONES=PAGO_OPCIONES,
+                           edita_pago=user['role'] in ROLES_EDITAN_PAGO,
+                           ve_pago_tecnico=user['role'] in ROLES_EDITAN_PAGO)
+
+
+@dml_bp.route("/<int:id>/pago", methods=["POST"])
+@login_required
+@role_required(*ROLES_EDITAN_PAGO)
+def dml_pago(id):
+    """#372: cambia N° FACTURA, PAGO RAYPAC o PAGO TECNICO de una ficha.
+
+    Lo llama el listado de Entregadas por fetch, un campo por vez. Funciona
+    aunque la ficha esté cerrada: el pago llega después de la entrega, y
+    estos 3 campos no abren el resto de la ficha (que sigue bloqueada, #333).
+    Devuelve JSON: {ok, valor} o {ok: False, error}.
+    """
+    user = get_current_user()
+    campo = request.form.get("campo", "")
+    valor = " ".join((request.form.get("valor") or "").split())
+
+    if campo in ("pago_raypac", "pago_tecnico"):
+        if valor not in PAGO_OPCIONES:
+            return jsonify(ok=False, error="El pago tiene que ser PAGADO o DEBE."), 400
+    elif campo == "numero_factura":
+        if len(valor) > NUMERO_FACTURA_MAX:
+            return jsonify(ok=False, error=f"El N° de factura no puede tener más de {NUMERO_FACTURA_MAX} caracteres."), 400
+    else:
+        return jsonify(ok=False, error="Campo inválido."), 400
+
+    db = get_db()
+    # campo sale de la lista fija de arriba, no del usuario tal cual: sin riesgo de inyección
+    anterior = db.execute(f"SELECT {campo} FROM dml_fichas WHERE id = %s", (id,)).fetchone()
+    if not anterior:
+        return jsonify(ok=False, error="Ficha no encontrada."), 404
+    db.execute(f"UPDATE dml_fichas SET {campo} = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+               (valor or None, id))
+    db.commit()
+    log_action(user['id'], "UPDATE", "dml_fichas", id, anterior[campo], f"{campo}: {valor or '(vacío)'}")
+    return jsonify(ok=True, valor=valor)
 
 
 @dml_bp.route("/new/<int:raypac_id>", methods=["GET", "POST"])

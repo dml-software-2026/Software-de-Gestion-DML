@@ -3,9 +3,21 @@ import os
 import sys
 from io import BytesIO
 
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    jsonify,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from werkzeug.security import generate_password_hash
 
+from CODIGO_FUENTE.config import PASSWORD_MIN
 from CODIGO_FUENTE.decorators import (
     get_current_user,
     log_action,
@@ -86,6 +98,15 @@ def cargar_stock_desde_web():
     return render_template("cargar_stock.html", planilla=nombre_planilla, existe=True, resultado=resultado)
 
 
+def _mostrar_password(email, password, nuevo):
+    """#375: pantalla con la contraseña recién puesta, para que ADMIN se la
+    pase al usuario. no-store: que el navegador no la guarde en caché (si no,
+    volvería a aparecer con "Atrás")."""
+    resp = make_response(render_template("usuario_password_ok.html", email=email, password=password, nuevo=nuevo))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @admin_bp.route("/usuarios/nueva", methods=["GET", "POST"])
 @login_required
 @role_required("ADMIN")
@@ -96,7 +117,7 @@ def usuario_new():
     if request.method == "POST":
         try:
             email = request.form.get("email")
-            password = request.form.get("password")
+            password = (request.form.get("password") or "").strip()  # #375: igual que el login
             nombre = request.form.get("nombre")
             role = request.form.get("role")
 
@@ -104,6 +125,10 @@ def usuario_new():
 
             if not all([email, password, role]):
                 flash("Completa los campos obligatorios.", "error")
+                return render_template("usuario_form.html", roles=roles)
+
+            if len(password) < PASSWORD_MIN:
+                flash(f"La contraseña tiene que tener al menos {PASSWORD_MIN} caracteres.", "error")
                 return render_template("usuario_form.html", roles=roles)
 
             existe = db.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone()
@@ -120,8 +145,9 @@ def usuario_new():
 
             log_action(user['id'], "CREATE", "users", None, None, f"{email} - {role}")
 
-            flash(f"Usuario {email} creado.", "success")
-            return redirect(url_for("admin.usuarios_list"))
+            # #375: las contraseñas se guardan cifradas y después no se pueden
+            # ver: se le muestra a ADMIN ahora, una sola vez, para pasársela.
+            return _mostrar_password(email, password, nuevo=True)
         except Exception as e:
             flash(f"Error: {e!s}", "error")
 
@@ -150,6 +176,10 @@ def usuario_edit(id):
                 flash("Selecciona un rol.", "error")
                 return redirect(url_for("admin.usuario_edit", id=id))
 
+            if new_password and len(new_password) < PASSWORD_MIN:
+                flash(f"La contraseña tiene que tener al menos {PASSWORD_MIN} caracteres.", "error")
+                return redirect(url_for("admin.usuario_edit", id=id))
+
             if new_password:
                 hash_pwd = generate_password_hash(new_password)
                 db.execute(
@@ -166,7 +196,8 @@ def usuario_edit(id):
             log_action(user['id'], "UPDATE", "users", id, None, f"{usuario['email']}")
 
             if new_password:
-                flash("Usuario actualizado y contraseña cambiada.", "success")
+                # #375: mostrarla ahora, una sola vez (ver usuario_new)
+                return _mostrar_password(usuario['email'], new_password, nuevo=False)
             else:
                 flash("Usuario actualizado.", "success")
             return redirect(url_for("admin.usuarios_list"))

@@ -196,3 +196,51 @@ def test_listado_y_formulario(client, mails, repuesto, creados):
     client.post(f"/pedidos/{pedido['id']}/cancelar")
     assert f"#{pedido['id']}</strong>" not in client.get("/pedidos").get_data(as_text=True)
     assert f"#{pedido['id']}</strong>" in client.get("/pedidos?estado=todos").get_data(as_text=True)
+
+
+@pytest.fixture
+def pdf_sin_comprimir(monkeypatch):
+    """El PDF sin comprimir, para poder buscar el texto adentro (#374)."""
+    from reportlab import rl_config
+    monkeypatch.setattr(rl_config, "pageCompression", 0)
+
+
+@necesita_db
+def test_pdf_del_pedido_para_el_deposito(client, mails, repuesto, creados, pdf_sin_comprimir):
+    """#374: DML descarga la hoja con qué repuestos, cuántos y su ubicación física."""
+    codigo, _ = repuesto
+    with app.app_context():
+        ubicacion = get_db().execute(
+            "SELECT codigo_ubicacion_fisica FROM stock_ubicaciones WHERE codigo_repuesto = %s AND ubicacion = 'DML'",
+            (codigo,)).fetchone()['codigo_ubicacion_fisica']
+    loguear_como(client, "RAYPAC")
+    pedido = crear_pedido(client, creados, codigo, 3)
+
+    for role in ("DML_REPUESTOS", "ADMIN"):
+        loguear_como(client, role)
+        assert "Descargar PDF" in client.get(f"/pedidos/{pedido['id']}").get_data(as_text=True)
+        r = client.get(f"/pedidos/{pedido['id']}/pdf")
+        assert r.status_code == 200 and r.mimetype == "application/pdf"
+        assert f"PEDIDO_{pedido['id']:07d}.pdf" in r.headers["Content-Disposition"]
+        contenido = r.get_data()
+        assert contenido.startswith(b"%PDF")
+        assert codigo.upper().encode() in contenido and ubicacion.encode() in contenido
+
+
+@necesita_db
+def test_pdf_del_pedido_no_lo_descargan_raypac_ni_el_tecnico(client, mails, repuesto, creados):
+    """#374: la hoja lleva la ubicación física, que RAYPAC no ve (#308); el técnico no entra a Pedidos."""
+    codigo, _ = repuesto
+    loguear_como(client, "RAYPAC")
+    pedido = crear_pedido(client, creados, codigo, 1)
+    assert "Descargar PDF" not in client.get(f"/pedidos/{pedido['id']}").get_data(as_text=True)
+    assert client.get(f"/pedidos/{pedido['id']}/pdf").status_code == 302
+    loguear_como(client, "DML_ST")
+    assert client.get(f"/pedidos/{pedido['id']}/pdf").status_code == 302
+
+
+@necesita_db
+def test_pdf_de_un_pedido_que_no_existe(client):
+    loguear_como(client, "DML_REPUESTOS")
+    r = client.get("/pedidos/999999999/pdf")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/pedidos")

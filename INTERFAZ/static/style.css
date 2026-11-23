@@ -397,3 +397,39 @@ a:focus-visible > .home-card i {
     margin-top: -0.75rem;
     margin-bottom: 0.75rem;
 }
+
+/* #372: seguimiento del pago en /dml/entregadas. El desplegable se pinta
+   según el valor (DEBE rojo, PAGADO verde) y el borde avisa si se guardó. */
+.pago-campo {
+    min-width: 8rem;
+}
+.pago-debe .dml-select-toggle {
+    background-color: var(--bs-danger-bg-subtle);
+    color: var(--bs-danger-text-emphasis);
+    border-color: var(--bs-danger-border-subtle);
+    font-weight: 600;
+}
+.pago-pagado .dml-select-toggle {
+    background-color: var(--bs-success-bg-subtle);
+    color: var(--bs-success-text-emphasis);
+    border-color: var(--bs-success-border-subtle);
+    font-weight: 600;
+}
+.pago-guardando .form-control,
+.pago-guardando .dml-select-toggle {
+    opacity: 0.6;
+}
+.pago-ok .form-control,
+.pago-ok .dml-select-toggle {
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-success-rgb), 0.35);
+}
+.pago-error .form-control,
+.pago-error .dml-select-toggle {
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-danger-rgb), 0.35);
+}
+/* Últimas filas: el menú se abre para arriba (ver dml_entregadas.html) */
+.dml-select-menu.pago-menu-arriba {
+    top: auto;
+    bottom: 100%;
+    margin-bottom: 0.125rem;
+}
