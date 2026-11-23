@@ -19,6 +19,11 @@ class Config:
     # #311: clave que manda el workflow de GitHub para pedir el backup semanal.
     # Sin esta variable, /admin/backup/auto no hace nada.
     BACKUP_AUTO_TOKEN = os.getenv("BACKUP_AUTO_TOKEN")
+    # #379: la cookie de sesión no viaja en formularios que vienen de otros
+    # sitios (Lax) y, en Render (siempre HTTPS), solo viaja por HTTPS. En
+    # local es http, por eso Secure va solo con la variable RENDER.
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = bool(os.getenv("RENDER"))
 
 
 # #327: técnicos del ST de DML. Única fuente de la lista: ticket_nuevo.html
