@@ -9,6 +9,7 @@
 <table class="table table-striped table-hover {% if inactivos %}text-muted{% endif %}">
     <thead class="{% if inactivos %}table-secondary{% else %}table-dark{% endif %}">
         <tr>
+            <th>Nombre</th>
             <th>Email</th>
             <th>Rol</th>
             <th>Estado</th>
@@ -19,6 +20,7 @@
     <tbody>
         {% for u in lista %}
         <tr>
+            <td>{{ u.nombre or '-' }}</td>
             <td>
                 {{ u.email }}
                 {% if u.id == user.id %}<span class="badge bg-light text-dark border ms-1">vos</span>{% endif %}

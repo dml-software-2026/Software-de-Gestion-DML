@@ -118,12 +118,12 @@ def usuario_new():
         try:
             email = request.form.get("email")
             password = (request.form.get("password") or "").strip()  # #375: igual que el login
-            nombre = request.form.get("nombre")
+            nombre = (request.form.get("nombre") or "").strip()
             role = request.form.get("role")
 
             roles = ["ADMIN", "RAYPAC", "DML_ST", "DML_REPUESTOS"]
 
-            if not all([email, password, role]):
+            if not all([email, password, nombre, role]):
                 flash("Completa los campos obligatorios.", "error")
                 return render_template("usuario_form.html", roles=roles)
 
@@ -170,10 +170,15 @@ def usuario_edit(id):
     if request.method == "POST":
         try:
             role = request.form.get("role")
+            nombre = (request.form.get("nombre") or "").strip()
             new_password = (request.form.get("password") or "").strip()
 
             if not role:
                 flash("Selecciona un rol.", "error")
+                return redirect(url_for("admin.usuario_edit", id=id))
+
+            if not nombre:
+                flash("Completá el nombre.", "error")
                 return redirect(url_for("admin.usuario_edit", id=id))
 
             if new_password and len(new_password) < PASSWORD_MIN:
@@ -183,13 +188,13 @@ def usuario_edit(id):
             if new_password:
                 hash_pwd = generate_password_hash(new_password)
                 db.execute(
-                    "UPDATE users SET role = %s, password_hash = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                    (role, hash_pwd, id)
+                    "UPDATE users SET role = %s, nombre = %s, password_hash = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (role, nombre, hash_pwd, id)
                 )
             else:
                 db.execute(
-                    "UPDATE users SET role = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                    (role, id)
+                    "UPDATE users SET role = %s, nombre = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (role, nombre, id)
                 )
             db.commit()
 

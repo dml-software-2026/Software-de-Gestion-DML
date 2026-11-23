@@ -20,6 +20,12 @@
                         </div>
 
                         <div class="mb-3">
+                            <label for="nombre" class="form-label">Nombre:</label>
+                            <input type="text" class="form-control" id="nombre" name="nombre" required maxlength="100"
+                                   value="{{ target_user.nombre or '' }}">
+                        </div>
+
+                        <div class="mb-3">
                             <label for="role" class="form-label">Rol:</label>
                             <select class="form-select js-select-enhance" id="role" name="role" required>
                                 {% for r in roles %}

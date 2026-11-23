@@ -129,16 +129,16 @@ def test_admin_ve_la_contrasena_al_crear_y_al_cambiarla(client, admin_id):
 
         with app.app_context():
             user_id = get_db().execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone()['id']
-        r = client.post(f"/admin/usuarios/{user_id}/edit", data={"role": "RAYPAC", "password": "reseteada456"})
+        r = client.post(f"/admin/usuarios/{user_id}/edit", data={"role": "RAYPAC", "nombre": "Prueba", "password": "reseteada456"})
         assert r.status_code == 200 and 'value="reseteada456"' in r.get_data(as_text=True)
         assert check_password_hash(hash_de(email), "reseteada456")
 
         # Sin contraseña nueva: guarda el rol y vuelve al listado, sin mostrar nada
-        r = client.post(f"/admin/usuarios/{user_id}/edit", data={"role": "RAYPAC", "password": ""})
+        r = client.post(f"/admin/usuarios/{user_id}/edit", data={"role": "RAYPAC", "nombre": "Prueba", "password": ""})
         assert r.status_code == 302
 
         # Menos de 6 caracteres: no se cambia
-        client.post(f"/admin/usuarios/{user_id}/edit", data={"role": "RAYPAC", "password": "abc"})
+        client.post(f"/admin/usuarios/{user_id}/edit", data={"role": "RAYPAC", "nombre": "Prueba", "password": "abc"})
         assert check_password_hash(hash_de(email), "reseteada456")
     finally:
         borrar_usuario(email)
@@ -149,7 +149,7 @@ def test_admin_no_crea_usuario_con_contrasena_corta(client, admin_id):
     email = f"test-375-{uuid.uuid4().hex[:8]}@dml.test"
     try:
         loguear(client, admin_id)
-        client.post("/admin/usuarios/nueva", data={"email": email, "password": "abc", "role": "RAYPAC"})
+        client.post("/admin/usuarios/nueva", data={"email": email, "password": "abc", "nombre": "Prueba", "role": "RAYPAC"})
         assert hash_de(email) is None
     finally:
         borrar_usuario(email)
