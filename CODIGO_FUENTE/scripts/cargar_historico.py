@@ -159,8 +159,10 @@ def validar_fila(row, matriz, fichas_vistas_csv):
         return False, errors, None
 
     entregadas = str(row.get("entregadas")).strip().upper() if not pd.isna(row.get("entregadas")) else ""
-    estado_reparacion = "MAQUINA ENTREGADA" if entregadas in ("SI", "OK") else "A LA ESPERA DE REVISION"
-
+    if entregadas not in ("SI", "OK"):
+        return False, ["Ficha no entregada: cargar cuando este entregada"], None
+    estado_reparacion = "MÁQUINA ENTREGADA"
+    
     try:
         n_ciclos = int(row.get("n_ciclos")) if not pd.isna(row.get("n_ciclos")) else None
     except (ValueError, TypeError):
@@ -192,11 +194,14 @@ def insertar_ficha(cur, data):
         """
         INSERT INTO raypac_entries
             (fecha_recepcion, tipo_solicitud, cliente, numero_serie,
-             modelo_maquina, tipo_maquina, comercial, mail_comercial, numero_remito)
-        VALUES (%s, 'HISTORICO', %s, %s, %s, 'HISTORICO', 'HISTORICO', 'historico@dml.local', %s)
+             modelo_maquina, tipo_maquina, comercial, mail_comercial, numero_remito,
+             is_frozen, frozen_at, estado_envio_equipos, fecha_envio_equipos)
+        VALUES (%s, 'HISTORICO', %s, %s, %s, 'HISTORICO', 'HISTORICO', 'historico@dml.local', %s,
+                TRUE, %s, 'RECIBIDO', %s)
         RETURNING id
         """,
-        (data["fecha_ingreso"], data["cliente"], data["serie"], data["modelo"], data["numero_remito"]),
+        (data["fecha_ingreso"], data["cliente"], data["serie"], data["modelo"], data["numero_remito"],
+         data["fecha_ingreso"], data["fecha_ingreso"]),
     )
     raypac_id = cur.fetchone()["id"]
 
@@ -205,14 +210,17 @@ def insertar_ficha(cur, data):
         INSERT INTO dml_fichas
             (numero_ficha, raypac_id, fecha_ingreso, tecnico, observaciones,
              diagnostico_reparacion, estado_reparacion, n_ciclos,
-             tecnico_resp, fecha_egreso)
-        VALUES (%s, %s, %s, 'HISTORICO', %s, %s, %s, %s, 'HISTORICO', %s)
+             tecnico_resp, fecha_egreso, is_closed, closed_at,
+             fecha_entrega_cliente, recibido_por)
+        VALUES (%s, %s, %s, 'HISTORICO', %s, %s, %s, %s, 'HISTORICO', %s,
+                TRUE, %s, %s, 'HISTORICO')
         ON CONFLICT (numero_ficha) DO NOTHING
         RETURNING id
         """,
         (
             data["ficha_n"], raypac_id, data["fecha_ingreso"], data["observacion"],
             data["reparacion"], data["estado_reparacion"], data["n_ciclos"], data["fecha_egreso"],
+            data["fecha_egreso"], data["fecha_egreso"],
         ),
     )
     ficha_row = cur.fetchone()
