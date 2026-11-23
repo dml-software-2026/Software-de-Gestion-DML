@@ -9,8 +9,11 @@ else:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+DEFAULT_SECRET_KEY = "dev-secret-change-me"
+
+
 class Config:
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
+    SECRET_KEY = os.getenv("SECRET_KEY", DEFAULT_SECRET_KEY)
     DATABASE = os.path.join(BASE_DIR, "dml.db")
     DATABASE_URL = os.getenv("DATABASE_URL")
     RESEND_API_KEY = os.getenv("RESEND_API_KEY")
@@ -24,6 +27,22 @@ class Config:
     # local es http, por eso Secure va solo con la variable RENDER.
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = bool(os.getenv("RENDER"))
+
+
+def validar_secret_key(secret_key, en_render):
+    """#376: en Render la app no arranca sin una SECRET_KEY propia.
+
+    SECRET_KEY firma las cookies de sesión. El default de arriba está
+    publicado en el repo (público): con él, cualquiera puede armarse una
+    sesión de ADMIN sin contraseña. Pasó en prod y dev hasta el 2026-11-23.
+    Render define sola la variable RENDER; en local se sigue permitiendo
+    el default para no complicar el setup."""
+    if en_render and (not secret_key or secret_key == DEFAULT_SECRET_KEY):
+        raise RuntimeError(
+            "Falta la variable de entorno SECRET_KEY (o tiene el valor por "
+            "defecto). Cargarla en Render: Environment -> Add variable -> "
+            "SECRET_KEY -> Generate."
+        )
 
 
 # #327: técnicos del ST de DML. Única fuente de la lista: ticket_nuevo.html
