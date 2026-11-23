@@ -13,6 +13,7 @@
 
   <form method="POST" id="enviar-form"
         onsubmit="return confirmarAccion(event, '¿Enviar el pedido #{{ pedido.id }}? Se descuenta del stock de DML y ya no se puede cambiar.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="card mb-4" style="border-left: 4px solid #ffc107;">
       <div class="card-body">
         <label for="numero_remito" class="form-label fw-bold">Remito de DML <span class="text-danger">*</span></label>

@@ -11,6 +11,7 @@
             <h2 class="mb-4">{% if entry %}Editar{% else %}Nuevo Ingreso{% endif %} RAYPAC</h2>
 
             <form method="POST" id="raypac-form" class="needs-validation">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <div class="row mb-3">

@@ -274,6 +274,7 @@
             {# #171: el mismo PDF, por mail al usuario logueado #}
             <form method="POST" action="{{ url_for('dml.enviar_ficha_pdf', id=ficha.id) }}" class="m-0"
                   onsubmit="return confirmarAccion(event, 'Se va a enviar el PDF de esta ficha a {{ user_email }}. ¿Continuar?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-outline-secondary">
                     <i class="bi bi-envelope"></i> Recibir PDF por mail
                 </button>
@@ -286,6 +287,7 @@
     <div class="card shadow-sm mb-4 border-warning">
         <div class="card-body">
             <form method="POST" action="{{ url_for('dml.dml_desbloquear', id=ficha.id) }}" class="m-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <label for="codigo_desbloqueo" class="form-label fw-bold"><i class="bi bi-unlock"></i> Editar la ficha recibida</label>
                 <div class="input-group" style="max-width: 420px;">
                     <input type="password" class="form-control" id="codigo_desbloqueo" name="codigo" required
@@ -312,6 +314,7 @@
         {# #333: antes "Cerrar Ficha". Ya no cierra: la ficha se sigue editando hasta el OK de RAYPAC. #}
         <form method="POST" action="{{ url_for('dml.dml_close', id=ficha.id) }}" class="d-inline"
               onsubmit="return confirmarAccion(event, '¿Enviar la ficha a RAYPAC? Se avisa por mail al comercial. DML la puede seguir editando hasta que RAYPAC confirme la recepción.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-danger">
                 <i class="bi bi-truck"></i> Enviar a RAYPAC <i class="bi bi-arrow-right"></i>
             </button>

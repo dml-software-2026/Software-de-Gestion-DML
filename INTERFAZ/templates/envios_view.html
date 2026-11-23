@@ -49,6 +49,7 @@
       {% if puede_recibir %}
       <form id="recepcion-form" method="POST" action="{{ url_for('envios.envios_confirmar', id=envio.id) }}" class="d-inline"
             onsubmit="return confirmarRecepcion(event);">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-success">
           <i class="bi bi-check-circle"></i> Dar Ingreso en DML
         </button>
@@ -240,6 +241,7 @@ function confirmarRecepcion(event) {
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <form method="POST" action="{{ url_for('envios.envios_freeze', id=envio.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <p>¿El envío ya salió de RAYPAC? Una vez freezado no se puede editar: si vuelve a RAYPAC antes de
             llegar a DML, un ADMIN tiene que desfreezarlo.</p>
@@ -269,6 +271,7 @@ function confirmarRecepcion(event) {
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form method="POST" action="{{ url_for('envios.envios_unfreeze', id=envio.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <div class="alert alert-warning">
             <i class="bi bi-exclamation-triangle"></i> <strong>Acción sensible:</strong>

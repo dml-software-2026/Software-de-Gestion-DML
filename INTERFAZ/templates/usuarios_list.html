@@ -42,6 +42,7 @@
                 <a href="{{ url_for('admin.usuario_edit', id=u.id) }}" class="btn btn-sm btn-info">Editar</a>
                 {% if u.id != user.id %}
                 <form method="POST" action="{{ url_for('admin.usuario_toggle', id=u.id) }}" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-sm {% if u.is_active %}btn-warning{% else %}btn-outline-success{% endif %}"
                         onclick="return confirmarAccion(event, '¿Estás seguro?')">
                         {{ "Desactivar" if u.is_active else "Activar" }}
