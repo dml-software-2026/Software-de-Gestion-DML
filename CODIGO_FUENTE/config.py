@@ -26,6 +26,9 @@ class Config:
     # sitios (Lax) y, en Render (siempre HTTPS), solo viaja por HTTPS. En
     # local es http, por eso Secure va solo con la variable RENDER.
     SESSION_COOKIE_SAMESITE = "Lax"
+    # #380: el token CSRF dura lo que la sesión. Por defecto vencía a la hora:
+    # una ficha abierta más de una hora sin guardar fallaba al guardar.
+    WTF_CSRF_TIME_LIMIT = None
     SESSION_COOKIE_SECURE = bool(os.getenv("RENDER"))
 
 

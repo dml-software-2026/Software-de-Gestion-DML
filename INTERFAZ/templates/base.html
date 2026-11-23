@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# #380: token CSRF para los fetch que mandan datos (header X-CSRFToken) #}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}DML ST & Repuestos{% endblock %}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
@@ -138,7 +140,7 @@
         <li class="nav-item dropdown">
           <a class="nav-link nav-link-enhanced dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
             <i class="bi bi-person-circle"></i>
-            <span class="nav-text">{{ current_user['nombre'] }}</span>
+            <span class="nav-text">{{ current_user['nombre'] or current_user['email'] }}</span>
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li class="dropdown-header">
@@ -490,6 +492,33 @@ document.addEventListener('submit', function (e) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creando...';
   }
+});
+
+// Ojito de mostrar/ocultar contraseña (mismo diseño que el login, #189):
+// cualquier <input type="password" data-ojito> lo recibe solo.
+document.querySelectorAll('input[type="password"][data-ojito]').forEach(function (input) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'password-wrapper';
+  input.parentNode.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'password-toggle';
+  btn.innerHTML = '<i class="bi bi-eye"></i>';
+  const actualizar = function (mostrar) {
+    const texto = mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña';
+    btn.querySelector('i').className = mostrar ? 'bi bi-eye-slash' : 'bi bi-eye';
+    btn.setAttribute('aria-pressed', mostrar);
+    btn.setAttribute('aria-label', texto);
+    btn.title = texto;
+  };
+  actualizar(false);
+  btn.addEventListener('click', function () {
+    const mostrar = input.type === 'password';
+    input.type = mostrar ? 'text' : 'password';
+    actualizar(mostrar);
+  });
+  wrapper.appendChild(btn);
 });
 </script>
 </body>

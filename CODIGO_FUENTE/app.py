@@ -2,13 +2,15 @@ import logging
 import os
 import sys
 from datetime import datetime
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, flash, jsonify, redirect, request, url_for
+from flask_wtf.csrf import CSRFError, CSRFProtect
 
 load_dotenv()
 
-from CODIGO_FUENTE.blueprints.admin import admin_bp
+from CODIGO_FUENTE.blueprints.admin import admin_bp, backup_auto
 from CODIGO_FUENTE.blueprints.api import api_bp
 from CODIGO_FUENTE.blueprints.auth import auth_bp
 from CODIGO_FUENTE.blueprints.dml import dml_bp
@@ -74,6 +76,35 @@ app.register_blueprint(estadisticas_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(notificaciones_bp)
 app.register_blueprint(pedidos_bp)
+
+# #380: protección CSRF. Todo POST tiene que traer el token de la sesión:
+# campo oculto {{ csrf_token() }} en cada <form method="POST"> o header
+# X-CSRFToken en los fetch (lo leen de <meta name="csrf-token"> de base.html).
+# Así una página de otro sitio no puede mandar formularios con la sesión
+# abierta de un usuario. tests/test_csrf.py revisa que ningún form se quede
+# sin token.
+csrf = CSRFProtect(app)
+# La llama el GitHub Actions del backup semanal, no un navegador: tiene su
+# propia clave (BACKUP_AUTO_TOKEN) y no puede traer un token de sesión.
+csrf.exempt(backup_auto)
+
+
+@app.errorhandler(CSRFError)
+def csrf_vencido(e):
+    """#380: token faltante o viejo (ej. la página quedó abierta desde antes
+    de cerrar sesión o de un deploy): en vez de un 400 pelado, volver a la
+    página con un aviso. Los fetch reciben el mismo mensaje en JSON."""
+    logger.warning("CSRF rechazado en %s: %s", request.path, e.description)
+    mensaje = "La página quedó vieja y no se guardó nada. Volvé a intentarlo."
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify(ok=False, error=mensaje + " (Si sigue pasando, recargá la página.)"), 400
+    flash(mensaje, "warning")
+    # Solo se vuelve a una página del propio sistema: si el POST vino de otro
+    # sitio (justo el caso que esto frena), no se redirige para allá.
+    anterior = request.referrer
+    if not anterior or urlparse(anterior).netloc != request.host:
+        anterior = url_for("auth.index")
+    return redirect(anterior)
 
 
 @app.route("/health")

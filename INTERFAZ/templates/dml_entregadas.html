@@ -138,6 +138,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="{{ url_for('dml.dml_registrar_acuse', id=ficha.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body">
                     <div class="alert alert-info">
                         <strong>Cliente:</strong> {{ ficha.cliente }}<br>
@@ -213,7 +214,13 @@ document.addEventListener('DOMContentLoaded', function () {
             const datos = new FormData();
             datos.append('campo', campo.dataset.campo);
             datos.append('valor', valor);
-            fetch(campo.dataset.url, { method: 'POST', body: datos, credentials: 'same-origin' })
+            fetch(campo.dataset.url, {
+                method: 'POST', body: datos, credentials: 'same-origin',
+                headers: {  // #380: token CSRF; Accept para que un error vuelva en JSON
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
+                }
+            })
                 .then(function (r) {
                     // Sin permiso o sin sesión el server redirige a una página HTML, no devuelve JSON
                     return r.json().catch(function () { return { ok: false, error: 'No se pudo guardar (¿se cerró la sesión?).' }; });

@@ -12,6 +12,7 @@
   {% endif %}
 
   <form method="POST" id="envio-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <!-- Tipo de Entrega -->
     <div class="card mb-4" style="border-left: 4px solid #17a2b8;">
       <div class="card-body">

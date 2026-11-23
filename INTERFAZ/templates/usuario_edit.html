@@ -14,9 +14,16 @@
                 </div>
                 <div class="card-body">
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label class="form-label"><strong>Email:</strong> {{ target_user.email }}</label>
                             <small class="form-text text-muted d-block">El email no puede cambiar.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="nombre" class="form-label">Nombre:</label>
+                            <input type="text" class="form-control" id="nombre" name="nombre" required maxlength="100"
+                                   value="{{ target_user.nombre or '' }}">
                         </div>
 
                         <div class="mb-3">
@@ -30,7 +37,7 @@
 
                         <div class="mb-3">
                             <label for="password" class="form-label">Nueva Contraseña:</label>
-                            <input type="password" class="form-control" id="password" name="password" minlength="6">
+                            <input type="password" class="form-control" id="password" name="password" minlength="6" data-ojito>
                             <small class="form-text text-muted">Dejar en blanco para no cambiar.</small>
                         </div>
 

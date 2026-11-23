@@ -60,6 +60,7 @@
                     {% if existe %}
                     {# Modal de confirmación de la app (#132), no el confirm() del navegador #}
                     <form method="post" onsubmit="return confirmarAccion(event, 'Esto reemplaza las cantidades y ubicaciones de DML con la planilla {{ planilla }}. ¿Continuar?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger">
                             <i class="bi bi-upload"></i> Cargar stock desde la planilla
                         </button>

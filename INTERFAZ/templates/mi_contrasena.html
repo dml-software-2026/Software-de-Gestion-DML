@@ -13,6 +13,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" autocomplete="off">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         {% for campo, etiqueta, ayuda in [
                             ('actual', 'Contraseña actual', ''),
                             ('nueva', 'Contraseña nueva', 'Mínimo ' ~ password_min ~ ' caracteres.'),
