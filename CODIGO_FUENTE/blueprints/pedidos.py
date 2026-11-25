@@ -22,9 +22,11 @@ from CODIGO_FUENTE.services.stock import actualizar_estado_alerta_stock, ajustar
 
 pedidos_bp = Blueprint("pedidos", __name__, url_prefix="/pedidos")
 
-ROLES_VEN = ("ADMIN", "RAYPAC", "DML_REPUESTOS")
+# DML_ST: Ricardo (técnico) es quien prepara los pedidos (pedido del cliente, 25/11):
+# lo hace con el rol técnico o con Repuestos, indistintamente.
+ROLES_VEN = ("ADMIN", "RAYPAC", "DML_REPUESTOS", "DML_ST")
 ROLES_PIDEN = ("ADMIN", "RAYPAC")
-ROLES_PREPARAN = ("ADMIN", "DML_REPUESTOS")
+ROLES_PREPARAN = ("ADMIN", "DML_REPUESTOS", "DML_ST")
 OBSERVACIONES_MAX = 500
 
 ESTADOS = {

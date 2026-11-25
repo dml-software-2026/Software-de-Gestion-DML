@@ -94,6 +94,7 @@
     {% set secciones = [
         ('raypac.raypac_list', 'bi-box-seam-fill', 'RAYPAC', 'Máquinas ingresadas desde casa matriz', ['ADMIN', 'RAYPAC', 'DML_ST']),
         ('envios.envios_list', 'bi-camion-fill', 'Envíos', 'Envíos de equipos y repuestos entre RAYPAC y DML', todos),
+        ('pedidos.pedidos_list', 'bi-cart-fill', 'Pedidos', 'Pedidos de repuestos de RAYPAC a DML', todos),
         ('tickets.tickets_list', 'bi-ticket-perforated-fill', 'Tickets', 'Seguimiento de cada máquina ingresada', todos),
         ('dml.dml_list', 'bi-wrench-adjustable', 'Fichas ST', 'En qué estado está cada máquina en DML', todos),
         ('dml.dml_entregadas', 'bi-clipboard-check-fill', 'Entregadas', 'Máquinas reparadas y acuses de recibo', ['ADMIN', 'DML_ST', 'RAYPAC']),

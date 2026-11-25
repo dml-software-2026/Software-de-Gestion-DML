@@ -14,7 +14,7 @@ from CODIGO_FUENTE.extensions import get_db
 
 TIPOS_POR_ROL = {
     "ADMIN": ("MAQUINA", "REPUESTO", "PEDIDO"),
-    "DML_ST": ("MAQUINA",),
+    "DML_ST": ("MAQUINA", "PEDIDO"),  # el técnico también prepara pedidos (25/11)
     "DML_REPUESTOS": ("REPUESTO", "PEDIDO"),
     "RAYPAC": ("PEDIDO_ENVIADO",),
 }

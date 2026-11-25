@@ -226,3 +226,11 @@ def test_permisos(client, avisos, repuesto, remito):
     loguear_como(client, "RAYPAC")  # y ya enviado, RAYPAC no lo puede editar ni cancelar
     client.post(f"/pedidos/{pedido_id}/cancelar")
     assert pedido(pedido_id)['estado'] == "ENVIADO"
+
+
+@necesita_db
+def test_el_tecnico_tambien_envia(client, avisos, repuesto, remito):
+    """Ricardo (técnico) prepara y envía pedidos igual que Repuestos (pedido del cliente, 25/11)."""
+    pedido_id, detalle_id = pedir(client, repuesto, 1)
+    enviar(client, pedido_id, detalle_id, 1, remito, role="DML_ST")
+    assert pedido(pedido_id)['estado'] == "ENVIADO"
