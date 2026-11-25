@@ -157,8 +157,7 @@ def dml_entregadas():
 
     return render_template("dml_entregadas.html", fichas=fichas, user_role=user['role'],
                            PAGO_OPCIONES=PAGO_OPCIONES,
-                           edita_pago=user['role'] in ROLES_EDITAN_PAGO,
-                           ve_pago_tecnico=user['role'] in ROLES_EDITAN_PAGO)
+                           edita_pago=user['role'] in ROLES_EDITAN_PAGO)
 
 
 @dml_bp.route("/<int:id>/pago", methods=["POST"])

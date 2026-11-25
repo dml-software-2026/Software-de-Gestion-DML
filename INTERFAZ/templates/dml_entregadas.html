@@ -30,11 +30,13 @@
                     <th>N° de Serie</th>
                     <th>Fecha Entrega</th>
                     <th>Recibido Por</th>
-                    {# #372: seguimiento del pago. RAYPAC ve lo suyo (factura y su
-                       pago) en solo lectura; el pago al técnico es interno de DML. #}
+                    {# #372: seguimiento del pago. Es solo de DML: RAYPAC no lo ve
+                       (pedido del cliente, 25/11). #}
+                    {% if edita_pago %}
                     <th>N° Factura</th>
                     <th>Pago RAYPAC</th>
-                    {% if ve_pago_tecnico %}<th>Pago Técnico</th>{% endif %}
+                    <th>Pago Técnico</th>
+                    {% endif %}
                     {% if user_role in ['ADMIN', 'RAYPAC'] %}
                     <th>Contacto</th>
                     <th>Email</th>
@@ -93,9 +95,6 @@
                         </div>
                     </td>
                     {% endfor %}
-                    {% else %}
-                    <td class="text-dark">{{ ficha.numero_factura or '-' }}</td>
-                    <td><span class="badge {{ 'bg-success' if ficha.pago_raypac == 'PAGADO' else 'bg-danger' }}">{{ ficha.pago_raypac }}</span></td>
                     {% endif %}
                     {% if user_role in ['ADMIN', 'RAYPAC'] %}
                     <td class="text-dark">{{ ficha.contacto_cliente or '-' }}</td>
