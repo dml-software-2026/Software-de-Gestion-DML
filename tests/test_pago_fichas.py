@@ -117,10 +117,10 @@ def test_columnas_en_entregadas_segun_el_rol(client, ficha):
     html = client.get("/dml/entregadas").get_data(as_text=True)
     assert "Pago Técnico" in html and 'data-campo="pago_tecnico"' in html and 'data-campo="numero_factura"' in html
 
-    # RAYPAC: factura y su pago en solo lectura, sin el pago al técnico
+    # RAYPAC: el pago es solo de DML, no ve ninguna de las 3 columnas (pedido del cliente, 25/11)
     loguear_como(client, "RAYPAC")
     html = client.get("/dml/entregadas").get_data(as_text=True)
-    assert "N° Factura" in html and "Pago RAYPAC" in html
+    assert "N° Factura" not in html and "Pago RAYPAC" not in html
     assert "Pago Técnico" not in html and "js-pago" not in html
 
 
