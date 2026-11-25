@@ -159,8 +159,10 @@ body {
     gap: 0.5rem;
 }
 
-/* Responsive - móvil */
-@media (max-width: 992px) {
+/* Responsive - menú desplegable (☰): la navbar colapsa por debajo de
+   1200px (navbar-expand-xl en base.html). Con 11 secciones no entra en
+   una notebook de 1024-1199px sin desbordar la página. */
+@media (max-width: 1199.98px) {
     .nav-link-enhanced {
         flex-direction: row;
         justify-content: flex-start;
@@ -401,7 +403,7 @@ a:focus-visible > .home-card i {
 /* #372: seguimiento del pago en /dml/entregadas. El desplegable se pinta
    según el valor (DEBE rojo, PAGADO verde) y el borde avisa si se guardó. */
 .pago-campo {
-    min-width: 8rem;
+    min-width: 7rem;
 }
 .pago-debe .dml-select-toggle {
     background-color: var(--bs-danger-bg-subtle);
@@ -432,4 +434,30 @@ a:focus-visible > .home-card i {
     top: auto;
     bottom: 100%;
     margin-bottom: 0.125rem;
+}
+
+/* Navbar en notebooks (1200-1599px): botones más compactos. Con el tamaño
+   normal (90px de mínimo por botón) las 11 secciones de ADMIN ocupaban
+   ~1540px y desbordaban la página a 1280-1440px. */
+@media (min-width: 1200px) and (max-width: 1599.98px) {
+    .nav-link-enhanced {
+        padding: 0.55rem 0.4rem !important;
+        margin: 0;
+        min-width: 70px;
+    }
+    .navbar-nav.nav-pills-custom {
+        gap: 0.15rem;
+    }
+    .nav-link-enhanced .nav-text {
+        font-size: 0.78rem;
+    }
+    .nav-link-enhanced i {
+        font-size: 1.3rem;
+    }
+}
+
+/* Tablas con muchas columnas (RAYPAC, Entregadas): letra un poco más chica
+   para que entren en una notebook sin scroll horizontal. */
+.tabla-compacta {
+    font-size: 0.875rem;
 }
