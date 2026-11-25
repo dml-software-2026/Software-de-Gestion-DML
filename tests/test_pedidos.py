@@ -107,10 +107,10 @@ def test_raypac_pide_y_a_dml_le_llega_el_aviso(client, mails, repuesto, creados)
     # Mail a los destinatarios de "Nuevo pedido o máquina ingresada"
     assert len(mails) == 1 and mails[0][0] == "dml@dml.test" and f"#{pedido['id']}" in mails[0][1]
 
-    # Campanita: la ven Repuestos y ADMIN, no el técnico
+    # Campanita: la ven Repuestos, el técnico (también prepara pedidos) y ADMIN
     with app.app_context():
         assert any(a["tipo"] == "PEDIDO" and a["id"] == pedido['id'] for a in avisos_sin_ver(usuario("DML_REPUESTOS")))
-        assert not any(a["tipo"] == "PEDIDO" for a in avisos_sin_ver(usuario("DML_ST")))
+        assert any(a["tipo"] == "PEDIDO" and a["id"] == pedido['id'] for a in avisos_sin_ver(usuario("DML_ST")))
 
     # Abrirlo lo saca de la campanita de quien lo abrió
     loguear_como(client, "DML_REPUESTOS")
@@ -175,10 +175,13 @@ def test_permisos_por_rol(client, mails, repuesto, creados):
     loguear_como(client, "DML_REPUESTOS")
     assert crear_pedido(client, creados, codigo, 1) is None
 
-    # El técnico no entra a Pedidos
+    # El técnico prepara pedidos (Ricardo, pedido del cliente 25/11), pero no pide
     loguear_como(client, "DML_ST")
-    assert client.get("/pedidos").status_code == 302
-    assert client.get(f"/pedidos/{pedido['id']}").status_code == 302
+    assert client.get("/pedidos").status_code == 200
+    assert client.get(f"/pedidos/{pedido['id']}").status_code == 200
+    assert crear_pedido(client, creados, codigo, 1) is None
+    client.post(f"/pedidos/{pedido['id']}/preparar")
+    assert estado(pedido['id']) == "EN_PREPARACION"
 
 
 @necesita_db
@@ -216,7 +219,7 @@ def test_pdf_del_pedido_para_el_deposito(client, mails, repuesto, creados, pdf_s
     loguear_como(client, "RAYPAC")
     pedido = crear_pedido(client, creados, codigo, 3)
 
-    for role in ("DML_REPUESTOS", "ADMIN"):
+    for role in ("DML_REPUESTOS", "DML_ST", "ADMIN"):
         loguear_como(client, role)
         assert "Descargar PDF" in client.get(f"/pedidos/{pedido['id']}").get_data(as_text=True)
         r = client.get(f"/pedidos/{pedido['id']}/pdf")
@@ -228,14 +231,12 @@ def test_pdf_del_pedido_para_el_deposito(client, mails, repuesto, creados, pdf_s
 
 
 @necesita_db
-def test_pdf_del_pedido_no_lo_descargan_raypac_ni_el_tecnico(client, mails, repuesto, creados):
-    """#374: la hoja lleva la ubicación física, que RAYPAC no ve (#308); el técnico no entra a Pedidos."""
+def test_pdf_del_pedido_no_lo_descarga_raypac(client, mails, repuesto, creados):
+    """#374: la hoja lleva la ubicación física, que RAYPAC no ve (#308). El PDF es solo de DML."""
     codigo, _ = repuesto
     loguear_como(client, "RAYPAC")
     pedido = crear_pedido(client, creados, codigo, 1)
     assert "Descargar PDF" not in client.get(f"/pedidos/{pedido['id']}").get_data(as_text=True)
-    assert client.get(f"/pedidos/{pedido['id']}/pdf").status_code == 302
-    loguear_como(client, "DML_ST")
     assert client.get(f"/pedidos/{pedido['id']}/pdf").status_code == 302
 
 
